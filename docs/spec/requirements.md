@@ -20,7 +20,12 @@ Acceptance criteria use EARS phrasing (WHEN / IF / WHILE ... THEN the system SHA
 
 ### Scope
 
-In scope for v1: every feature listed below on Windows 10+, macOS 13+, Linux (X11 and Wayland via portals), and Android 10+ (API 29+).
+Platforms: Windows 10+, macOS 13+, Linux (X11 and Wayland), and Android 10+ (API 29+). Individual requirements note where a feature needs a newer OS version.
+
+Releases and order of work:
+
+- **Release 1 (R1–R16):** project setup, then Android ↔ desktop, then desktop ↔ desktop.
+- **Release 2 (R17–R30):** additional features, built after Release 1 is stable.
 
 Out of scope for v1: iOS, use over the internet or across subnets (no relay or NAT traversal), multiple user accounts sharing one mesh, audio streaming during screen sharing, and Bluetooth fallback between two desktops.
 
@@ -78,7 +83,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 **User story:** As a user, I want to choose what each paired device may do on this device, so that a lost phone can't silently control my computer.
 
 1. The system SHALL keep a separate permission setting for each capability for each paired device. The options are Allow, Ask every time, and Deny.
-2. Defaults for a newly paired device SHALL be: clipboard Allow, files Ask, gallery browsing Ask, media control Allow, keyboard/mouse input Ask, screen viewing Ask, localhost access Ask.
+2. Defaults for a newly paired device SHALL be: clipboard Allow, files Ask, gallery browsing Ask, media control Allow, keyboard/mouse input Ask, screen viewing Ask, localhost access Ask. Release 2 capabilities default to: camera/microphone Ask, notifications Ask, second display Ask, terminal Deny, file browsing Ask, file changes (upload, rename, delete) Deny, SMS/calls Ask, find device Allow, lock Allow.
 3. WHEN a capability set to Ask is requested THEN the host SHALL show a prompt naming the requesting device and the capability. IF the user does not answer within 30 seconds THEN the system SHALL deny the request.
 4. WHILE another device is controlling input or viewing the screen THEN the host SHALL show a persistent, visible indicator and a one-click "Stop" control.
 5. WHEN the user presses Stop or revokes a permission THEN the system SHALL end the affected activity within 1 second.
@@ -124,7 +129,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 **User story:** As a user, I want to control any of my devices from any other device.
 
 1. The system SHALL let a controller send pointer movement, clicks (left, right, middle), scroll, and drag to a desktop host.
-2. On a desktop host, the system SHALL inject input with the native API: SendInput on Windows, CGEvent on macOS (needs the Accessibility permission), XTest on X11, and the RemoteDesktop portal/libei on Wayland.
+2. On a desktop host, the system SHALL inject input with the native API: SendInput on Windows, CGEvent on macOS (needs the Accessibility permission), XTest on X11, and the RemoteDesktop portal/libei on Wayland. WHERE a Wayland compositor has no RemoteDesktop portal THEN the system SHALL fall back to a `uinput` virtual device and SHALL guide the user through the one-time setup it needs (a udev rule that gives the user access to `/dev/uinput`).
 3. WHERE the controller is a desktop and the host is Android THEN the system SHALL send taps, swipes, and the back/home/recents actions through an Android AccessibilityService that the user has enabled.
 4. IF the host lacks the required OS permission THEN the system SHALL explain which permission is missing and open the settings screen for it.
 5. Input latency from controller to host SHOULD be under 50 ms (95th percentile) on the LAN.
@@ -205,3 +210,150 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 2. Logs SHALL NOT contain clipboard content, file contents, keystrokes, pairing tokens, or private keys.
 3. Users SHALL be able to export and delete all local data from settings.
 4. All UI text SHALL be translatable, with English as the first language.
+
+---
+
+# Release 2: Additional features
+
+These requirements build on the Release 1 core: the encrypted session, per-device permissions (R5), the video pipeline (R12), input injection (R9), and tunnels (R13). Every new capability goes through the permission engine and follows the indicator and Stop rules in R5.4 and R5.5 when it is active.
+
+## Requirement 17: Phone as webcam and microphone
+
+**User story:** As a user, I want to use my phone's camera and microphone on my desktop, so that I get better video calls without buying a webcam.
+
+1. The Android app SHALL stream the front or back camera, chosen by the user, to a paired desktop. The user SHALL be able to switch cameras, toggle the flash, and set zoom during the stream.
+2. The desktop SHALL expose the stream as a virtual camera that other apps can select: a CoreMediaIO Camera Extension on macOS, `MFCreateVirtualCamera` on Windows 11, and `v4l2loopback` on Linux (the app guides the user to install the module).
+3. WHERE the OS has no supported virtual camera (Windows 10) THEN the desktop SHALL show the camera in a window only and SHALL explain the limitation.
+4. The Android app SHALL optionally stream the microphone. Linux SHALL expose it as a PipeWire virtual source. On macOS and Windows, the microphone SHALL be available only once a virtual audio driver ships, and until then the app SHALL say so.
+5. The stream SHALL reach at least 720p at 30 fps, SHOULD reach 1080p at 30 fps, and SHOULD have under 150 ms latency on the LAN.
+6. WHILE the camera or microphone is streaming THEN the phone SHALL show a persistent notification with Stop, in addition to Android's own privacy indicator.
+
+## Requirement 18: Notification mirroring
+
+**User story:** As a user, I want to see and answer my phone's notifications on my desktop, so that I don't have to pick up my phone.
+
+1. WHEN a notification is posted on Android and mirroring is on THEN the system SHALL send its app name, title, text, and icon to paired desktops that have the notifications permission, and the desktop SHALL show it as a native notification.
+2. The user SHALL choose which apps are mirrored, and whether newly installed apps are mirrored by default. The default SHALL be off.
+3. The system SHALL NOT send the content of notifications marked `VISIBILITY_SECRET`, and SHALL send only "New notification from <app>" for `VISIBILITY_PRIVATE` notifications unless the user allows full content.
+4. WHERE a notification has a reply action (`RemoteInput`) THEN the desktop SHALL allow an inline reply. WHERE it has other action buttons THEN the desktop SHALL show them.
+5. WHEN a mirrored notification is dismissed on either device THEN the system SHALL dismiss it on the other device, if the user turned on dismissal sync.
+6. Notification contents SHALL NOT be stored on the desktop after they are dismissed or after 24 hours.
+
+## Requirement 19: Shared mouse and keyboard across desktops
+
+**User story:** As a user with several computers on my desk, I want one mouse and keyboard to move between them, as if they were one computer.
+
+1. The desktop app SHALL provide a layout editor where the user places the screens of paired desktops next to each other.
+2. WHEN the cursor reaches a screen edge that the layout links to another desktop THEN the system SHALL hide the local cursor, capture local mouse and keyboard input, and send it to that desktop, with the cursor entering at the matching position.
+3. The system SHALL capture local input with the native API: low-level input hooks on Windows, a `CGEventTap` on macOS (needs the Input Monitoring and Accessibility permissions), XInput2 on X11, and the InputCapture portal on Wayland.
+4. A user-configurable hotkey SHALL return control to the local desktop, and another SHALL lock the cursor to the current screen.
+5. WHEN control moves to another desktop THEN the clipboard SHALL move with it, following R7.
+6. Input latency SHOULD be under 30 ms (95th percentile) on the LAN.
+7. Dragging files across a screen edge to copy them SHOULD be supported in a later version.
+
+## Requirement 20: Phone or tablet as a second display
+
+**User story:** As a user, I want to use my tablet or phone as an extra monitor for my desktop.
+
+1. The desktop SHALL create a virtual display that matches the Android device's resolution and pixel density, and SHALL stream it to that device with the R12 pipeline.
+2. The system SHALL create virtual displays with: the ScreenCast portal "virtual" source type on Linux (GNOME and KDE), an Indirect Display Driver (IddCx) on Windows, and the virtual display API on macOS (a private API, see design §18.4).
+3. Touch on the Android device SHALL become pointer input on the virtual display, and a stylus SHALL become pen input where the host supports it.
+4. WHEN the stream stops THEN the system SHALL remove the virtual display, so windows move back to real screens.
+
+## Requirement 21: Remote terminal
+
+**User story:** As a user, I want to open a shell on another of my computers without setting up SSH.
+
+1. A paired device with the terminal permission SHALL be able to open an interactive terminal on a desktop host, running as the host's logged-in user and never with elevated rights.
+2. The terminal permission SHALL default to Deny, and the user SHALL be able to change it only on the host itself, not from a remote device.
+3. Each terminal session SHALL follow R5.3 (Ask) and R5.4 (indicator and Stop) unless the user set Always allow on the host.
+4. The host SHALL use a pseudo-terminal: `openpty` on macOS and Linux, ConPTY on Windows.
+5. The desktop and Android apps SHALL provide a terminal view with resizing, copy and paste, and on Android an extra row of keys (Esc, Tab, Ctrl, arrows).
+6. The activity log SHALL record when a session starts and ends, and SHALL NOT record what was typed or shown.
+
+## Requirement 22: Remote DevTools and ADB
+
+**User story:** As a web or Android developer, I want to debug my phone from my desktop over Wi-Fi.
+
+1. WHERE the user has turned on Wireless debugging on the Android device THEN UrDevice SHALL help the desktop's `adb` pair and connect to it, and SHALL carry the ADB connection over the encrypted session.
+2. Once `adb` is connected, the desktop SHALL list the phone's Chrome tabs and debuggable WebViews and open DevTools for a selected one.
+3. Between desktops, the user SHALL be able to share a browser's remote-debugging port (for example 9222) using R13 localhost sharing.
+4. The app SHALL explain that Developer options and Wireless debugging must be turned on by the user, because Android does not let apps turn them on.
+
+## Requirement 23: Port forwarding profiles
+
+**User story:** As a developer, I want my usual port forwards to start on their own, so that my phone always reaches my dev servers.
+
+1. The user SHALL be able to save a profile: host device, host ports, viewer devices, and the local port on each viewer.
+2. WHEN all devices in a profile are connected and the profile is enabled THEN the system SHALL start its tunnels automatically.
+3. The user SHALL be able to set up a forward from either side: from the viewer ("reach my desktop's :3000") or from the host ("give my phone my :8080", like `adb reverse`). The host SHALL still approve sharing its ports, following R13.5.
+4. Each profile SHALL be turned on or off with one tap.
+
+## Requirement 24: HTTP request inspector
+
+**User story:** As a developer, I want to see the HTTP requests going through a localhost tunnel, so that I can debug the mobile view of my site.
+
+1. The user SHALL be able to turn on inspection for a tunnel. Inspection SHALL be off by default.
+2. WHILE inspection is on THEN the system SHALL record, for HTTP/1.1 and WebSocket traffic: method, URL, status, headers, timing, size, and bodies up to 1 MB.
+3. The system SHALL hide the values of `Authorization`, `Cookie`, and `Set-Cookie` headers by default, with a per-session option to show them.
+4. Records SHALL be kept in memory only and SHALL be cleared when the tunnel or inspector stops.
+5. The inspector SHALL let the user filter records and SHOULD let the user resend a request.
+6. Encrypted traffic (TLS to the dev server) and HTTP/2 SHALL be shown as raw TCP connections without request details.
+
+## Requirement 25: Find my device
+
+**User story:** As a user, I want to make a lost phone or laptop ring, even if it's on silent.
+
+1. A paired device SHALL be able to make another device ring at full volume. On Android, it SHALL use the alarm audio stream and, where the user granted Do Not Disturb access, SHALL ring during Do Not Disturb.
+2. The ringing device SHALL show a full-screen message, and the user SHALL be able to stop the ringing from either device.
+3. The app SHALL show when each device was last seen and on which network, and SHALL make clear that it can only reach devices on the LAN or in Bluetooth range.
+
+## Requirement 26: Remote file browser and search
+
+**User story:** As a user, I want to browse and search another device's files without sending them first.
+
+1. A paired device with the file browsing permission SHALL be able to list folders and files on a host, inside folders the host user has chosen to share. The default on desktop is the home folder. On Android, the user picks folders through the system folder picker.
+2. The host SHALL refuse any path outside the shared folders, including through symbolic links.
+3. The user SHALL be able to search shared folders by file name, with results shown as they are found.
+4. The user SHALL be able to download files and see image thumbnails. Uploading, renaming, and deleting SHALL need the separate file changes permission (default Deny).
+5. Downloads SHALL use the R8 transfer mechanism, including progress and hash checks.
+
+## Requirement 27: Shared clipboard history
+
+**User story:** As a user, I want to find something I copied earlier on any of my devices.
+
+1. The system SHALL keep the last 50 clipboard items (adjustable) and sync the history to devices that have the clipboard permission.
+2. The user SHALL be able to search and pin items, and paste any item on the current device.
+3. Items SHALL expire after 24 hours unless pinned. The user SHALL be able to change the expiry time.
+4. Sensitive items (R7.3) SHALL never be stored. The history SHALL be encrypted on disk with a key kept in secure storage (R1.2).
+5. The user SHALL be able to clear the history on all devices at once.
+
+## Requirement 28: Lock the desktop with the phone
+
+**User story:** As a user, I want my computer to lock itself when I walk away with my phone.
+
+1. WHEN proximity lock is on and the paired phone stays out of range for a set time (default 30 s), based on Bluetooth signal strength or a lost connection, THEN the desktop SHALL lock its screen.
+2. The desktop SHALL lock with: `LockWorkStation` on Windows, `loginctl lock-session` or the screensaver D-Bus API on Linux, and display sleep with "require password immediately" on macOS (see design §18.12).
+3. The phone SHALL provide a button to lock a paired desktop immediately.
+4. The system SHALL NOT lock while the user is presenting or sharing the screen, unless the user turns this exception off.
+5. Unlocking the desktop with the phone is out of scope for this release, because it needs OS sign-in plug-ins and a separate security review.
+
+## Requirement 29: SMS and calls from the desktop
+
+**User story:** As a user, I want to read and send text messages and handle calls from my desktop.
+
+1. The desktop SHALL show SMS conversations and SHALL be able to send SMS through the phone.
+2. WHEN a call comes in THEN the desktop SHALL show the caller and SHALL offer Answer, Decline, and Silence. In this release, call audio stays on the phone.
+3. Because Google Play restricts SMS and call-log permissions, these features SHALL be in a separate "full" build of the Android app, distributed outside Google Play (GitHub Releases, F-Droid). The Play build SHALL offer replies to messaging apps through notification mirroring (R18.4) instead.
+4. Messages cached on the desktop SHALL be encrypted on disk and deleted when the phone is unpaired.
+
+## Requirement 30: Automations
+
+**User story:** As a user, I want UrDevice to act on its own in common situations, so that I don't repeat the same steps.
+
+1. The user SHALL be able to create rules made of a trigger and one or more actions.
+2. Triggers SHALL include: a device connects or disconnects, the device joins a chosen Wi-Fi network, a desktop app starts (for example a slide-show app), a time of day, and a battery level.
+3. Actions SHALL include: turning a feature on or off, starting a port-forwarding profile, locking a desktop, showing a notification on another device, and offering to open Mousepad or Presenter on the phone.
+4. Rules SHALL run on the device that owns them. Actions on another device SHALL go through that device's permission checks.
+5. A "run command" action SHALL exist on desktop only, SHALL be off until the user turns it on in settings, and SHALL run as the logged-in user.
+6. WHERE Android blocks an action from the background (opening a screen, reading the Wi-Fi name without location permission) THEN the system SHALL show a notification the user can tap instead, or SHALL explain which permission is needed.

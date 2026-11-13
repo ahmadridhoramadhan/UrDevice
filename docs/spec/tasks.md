@@ -51,7 +51,7 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 ## Phase 4: Remote control and keyboard
 
 - [ ] T4.1 Input protocol (Pointer, Key, Text, Laser) over datagrams, with a fallback to the control stream. _Req: R9, R10_
-- [ ] T4.2 Desktop `InputSink`: Windows SendInput, macOS CGEvent (plus the Accessibility permission check and prompt), X11 XTest, and the Wayland RemoteDesktop portal with a saved restore token. _Req: R9.2, R9.4_
+- [ ] T4.2 Desktop `InputSink`: Windows SendInput, macOS CGEvent (plus the Accessibility permission check and prompt), X11 XTest, the Wayland RemoteDesktop portal with a saved restore token, and the `uinput` fallback with its udev-rule setup. _Req: R9.2, R9.4_
 - [ ] T4.3 Android Mousepad screen: gestures, acceleration and sensitivity settings, keep-screen-on. _Req: R9a_
 - [ ] T4.4 Android Presenter screen: buttons, volume-key capture, laser (gyroscope and touch), and the timer with vibration alerts. _Req: R9b_
 - [ ] T4.5 Desktop laser overlay window on each OS, with the cursor-move fallback. _Req: R9b.3_
@@ -98,3 +98,57 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 - [ ] T9.3 Packaging and signing: macOS `.dmg` with notarization, Windows `.msi` with Authenticode, Linux `.deb`/`.rpm`/AppImage/Flatpak, and a signed Android AAB. _Req: R14.3_
 - [ ] T9.4 External security review of pairing, transport, and permissions, and fixes for its findings. _Req: R3, R4, R5_
 - [ ] T9.5 User documentation in `docs/`: getting started, permissions on each OS, and troubleshooting.
+
+---
+
+# Release 2
+
+Start after Release 1 (Phases 0–9) is stable. Design references are to [design §18](design.md#18-release-2-features).
+
+## Phase 10: Release 2 risk spikes
+
+- [ ] T10.1 Spike: Wayland InputCapture portal on GNOME and KDE. List which desktops can share their mouse. _Req: R19.3_
+- [ ] T10.2 Spike: virtual cameras: a macOS Camera Extension, `MFCreateVirtualCamera` on Windows 11, and `v4l2loopback` on Linux, each showing a test pattern in a video-call app. _Req: R17.2_
+- [ ] T10.3 Spike: virtual displays: the ScreenCast virtual source on GNOME and KDE, a sample IddCx driver on Windows (including the signing steps and cost), and `CGVirtualDisplay` on the current macOS. _Req: R20.2_
+- [ ] T10.4 Spike: Google Play policy for full-screen intents, SMS, and call permissions. Confirm the `play`/`full` build split. _Req: R25.1, R29.3_
+
+## Phase 11: Phone-centered features
+
+- [ ] T11.1 Notification mirroring: listener service changes, per-app and visibility filtering, desktop native notifications, reply and actions, dismissal sync, 24 h retention. _Req: R18_
+- [ ] T11.2 Find my device: Ring messages, Android alarm-stream ringing with the full-screen fallback, desktop ringing window, last-seen display. _Req: R25_
+- [ ] T11.3 Webcam: CameraX → MediaCodec stream, camera controls, desktop viewer window. _Req: R17.1, R17.3, R17.5, R17.6_
+- [ ] T11.4 Virtual camera back-ends on macOS, Windows 11, and Linux. _Req: R17.2_
+- [ ] T11.5 Microphone: Opus stream and PipeWire virtual source on Linux, with the "not yet available" message on macOS and Windows. _Req: R17.4_
+- [ ] T11.6 Android `play` and `full` build flavors. _Req: R29.3_
+- [ ] T11.7 SMS and calls in the `full` build: conversations, sending, incoming-call controls, encrypted desktop cache. _Req: R29_
+
+## Phase 12: Desktop ↔ desktop features
+
+- [ ] T12.1 Display layout sharing and the layout editor UI. _Req: R19.1_
+- [ ] T12.2 Input capture back-ends: Windows hooks, macOS `CGEventTap`, X11 XInput2, Wayland InputCapture. _Req: R19.3_
+- [ ] T12.3 Edge handoff (KvmEnter/KvmLeave), hotkeys, clipboard handoff, latency measurement. _Req: R19.2, R19.4–R19.6_
+- [ ] T12.4 Second display: virtual display back-ends from the T10.3 results, streaming to Android, touch and pen mapping, cleanup when the stream stops. _Req: R20_
+- [ ] T12.5 Remote terminal host: `portable-pty`, TermOpen/TermResize, local-only permission flag. _Req: R21.1–R21.4, R21.6_
+- [ ] T12.6 Terminal viewers: desktop (`alacritty_terminal` + Slint grid) and Android (`vt100` + Compose grid with extra keys). _Req: R21.5_
+- [ ]* T12.7 Integration tests: a remote request can't change the terminal permission; terminal sessions end on Stop.
+
+## Phase 13: Developer features
+
+- [ ] T13.1 Port forwarding profiles: storage, auto-start, host-initiated ForwardOffer, one-tap toggles. _Req: R23_
+- [ ] T13.2 HTTP request inspector: read-only parser, TLS/HTTP/2 detection, ring buffer, hidden header values, filters, resend. _Req: R24_
+- [ ] T13.3 ADB over the tunnel: find `adbd` ports, pairing helper, Chrome tab list, DevTools launch. _Req: R22_
+- [ ]* T13.4 Fuzz target for the HTTP inspector parser.
+
+## Phase 14: Files, history, lock, and automations
+
+- [ ] T14.1 Remote file browser: Fs protocol, `cap-std` roots on desktop, SAF adapter on Android, name search, thumbnails, write operations behind `fs.write.v1`. _Req: R26_
+- [ ]* T14.2 Property tests: file-browser paths never escape a shared root, including through symbolic links.
+- [ ] T14.3 Clipboard history: encrypted storage, sync with tombstones, search, pin, expiry, Clear all. _Req: R27_
+- [ ] T14.4 Proximity lock: RSSI averaging, calibration UI, lock back-ends for each OS, presenting and screen-sharing exceptions, lock-now button. _Req: R28_
+- [ ] T14.5 Automation engine: rules, triggers, actions, Android notification fallback, desktop-only "run command" setting. _Req: R30_
+- [ ] T14.6 Automation UI on desktop and Android. _Req: R30.1_
+
+## Phase 15: Release 2 hardening
+
+- [ ] T15.1 External security review of the terminal, file browser, run command, and SMS features. _Req: R21, R26, R29, R30_
+- [ ] T15.2 Extend the device-matrix smoke tests and user docs to the Release 2 features.
