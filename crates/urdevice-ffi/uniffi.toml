@@ -1,0 +1,3 @@
+[bindings.kotlin]
+package_name = "com.urdevice.core"
+cdylib_name = "urdevice_ffi"

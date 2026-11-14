@@ -1,0 +1,16 @@
+[package]
+name = "urdevice-platform"
+description = "Desktop adapters (Windows, Linux, macOS) for the UrDevice core platform traits."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+futures-core.workspace = true
+urdevice-core.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive icon foreground: the 64-unit symbol scaled into the 66dp safe zone of a 108dp icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.9"
+        android:scaleY="0.9"
+        android:translateX="25.2"
+        android:translateY="27">
+        <path
+            android:fillColor="@color/urdevice_lime"
+            android:pathData="M17,20V35A15,15 0,0 0,47 35V20H41V35A9,9 0,0 1,23 35V20Z" />
+        <path
+            android:fillColor="@color/urdevice_lime"
+            android:pathData="M13.5,19a6.5,6.5 0,1 0,13 0a6.5,6.5 0,1 0,-13 0Z" />
+        <path
+            android:fillColor="@color/urdevice_lime"
+            android:pathData="M37.5,19a6.5,6.5 0,1 0,13 0a6.5,6.5 0,1 0,-13 0Z" />
+    </group>
+</vector>

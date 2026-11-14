@@ -1,0 +1,44 @@
+export component MainWindow inherits Window {
+    in property <string> core-version;
+    in property <string> platform-name;
+
+    title: "UrDevice";
+    icon: @image-url("../../../assets/urdevice-icon-512.png");
+    preferred-width: 360px;
+    preferred-height: 240px;
+    background: #0f1f10;
+
+    VerticalLayout {
+        alignment: center;
+        spacing: 12px;
+        padding: 24px;
+
+        Image {
+            source: @image-url("../../../assets/urdevice-symbol-light.svg");
+            height: 72px;
+            image-fit: contain;
+        }
+
+        Text {
+            text: "UrDevice";
+            color: #c6f19d;
+            font-size: 24px;
+            font-weight: 500;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "Core version " + root.core-version;
+            color: #e8f5dc;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.platform-name;
+            color: #9fb59a;
+            font-size: 12px;
+            horizontal-alignment: center;
+        }
+    }
+}

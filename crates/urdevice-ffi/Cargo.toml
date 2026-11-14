@@ -1,0 +1,30 @@
+[package]
+name = "urdevice-ffi"
+description = "UniFFI bindings that expose the UrDevice core to the Android app."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "urdevice_ffi"
+
+# Host-only tool that generates the Kotlin bindings from the built library:
+#   cargo run -p urdevice-ffi --features bindgen --bin uniffi-bindgen -- generate ...
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+uniffi.workspace = true
+urdevice-core.workspace = true
+
+[lints]
+workspace = true

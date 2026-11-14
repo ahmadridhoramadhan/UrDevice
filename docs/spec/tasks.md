@@ -4,8 +4,8 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 0: Setup and risk spikes
 
-- [ ] T0.1 Create the Cargo workspace with the crates from design §2, add `rustfmt`/`clippy` config, and add a CI workflow (build + clippy + `cargo deny` + `cargo audit` on Linux, macOS, and Windows). _Req: R16_
-- [ ] T0.2 Create the Android Gradle project (Kotlin, Compose, minSdk 29) and build `urdevice-ffi` for `arm64-v8a`, `armeabi-v7a`, and `x86_64` with `cargo-ndk`. Generate UniFFI Kotlin bindings and call one `core_version()` function from the app. _Req: R15_
+- [x] T0.1 Create the Cargo workspace with the crates from design §2, add `rustfmt`/`clippy` config, and add a CI workflow (build + clippy + `cargo deny` + `cargo audit` on Linux, macOS, and Windows). _Req: R16_
+- [x] T0.2 Create the Android Gradle project (Kotlin, Compose, minSdk 29) and build `urdevice-ffi` for `arm64-v8a`, `armeabi-v7a`, and `x86_64` with `cargo-ndk`. Generate UniFFI Kotlin bindings and call one `core_version()` function from the app. _Req: R15_
 - [ ] T0.3 Spike: try QUIC between Android and a desktop on real Wi-Fi, including multicast discovery through `MulticastLock` and NsdManager. Measure round-trip time. _Req: R2, R4_
 - [ ] T0.4 Spike: check the Google Play policy for AccessibilityService remote-control use and write a short disclosure plan. Record the decision in `docs/`. _Req: R9.3, R15_
 - [ ] T0.5 Spike: Bluetooth PAN between Android and Windows/Linux, and a `btleplug` GATT connection between macOS and Android. Confirm that the fallback in design §8 works. _Req: R6_
