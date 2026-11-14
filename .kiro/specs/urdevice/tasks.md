@@ -30,9 +30,9 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 ## Phase 2: App shells
 
 - [ ] T2.1 Desktop: Slint app with a tray icon and start at login. Add the Devices list, the Pair screen (QR display and code confirmation), Device detail with permission settings, and the Settings screen (name, hidden mode, reset identity, data export and delete). _Req: R1.4, R1.5, R2, R3, R5, R14.1, R14.2, R16.3_
-- [ ] T2.2 Desktop: permission prompt dialog, a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.3–R5.6_
+- [ ] T2.2 Desktop: permission prompt dialog (including the first-use prompt with its three choices, the warning for terminal and file changes, and the extra confirmation for "Allow always"), a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.2–R5.6_
 - [ ] T2.3 Android: foreground service that hosts the core, NsdManager discovery adapter, and Compose Devices/Pair screens (CameraX + ML Kit QR scanner, the app's own QR display, code confirmation). _Req: R2, R3, R15.1_
-- [ ] T2.4 Android: permission screens, a notification with Stop, the permission prompt UI, and the Settings screen. _Req: R5, R15.2, R16.3_
+- [ ] T2.4 Android: permission screens, a notification with Stop, the permission prompt UI (including the first-use prompt, R5.2), and the Settings screen. _Req: R5, R15.2, R16.3_
 - [ ] T2.5 Localization setup on both platforms (Slint `@tr`, Android `strings.xml`). _Req: R16.4_
 
 ## Phase 3: Clipboard and files

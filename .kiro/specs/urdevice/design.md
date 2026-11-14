@@ -44,8 +44,8 @@ UrDevice/
 │  ├─ app/
 │  └─ core-bindings/          # generated Kotlin + jniLibs from urdevice-ffi
 ├─ fuzz/                      # cargo-fuzz targets
+├─ .kiro/specs/urdevice/      # this spec (requirements, design, tasks)
 └─ docs/
-   ├─ spec/                   # this spec
    └─ security/threat-model.md
 ```
 
@@ -174,7 +174,7 @@ This flow is used for devices found by discovery. Both pairing contexts accept a
 - Each grant applies to one *activity* (one transfer, one screen session, one input session), unless the user chose "Allow always".
 - **First-use prompt (R5.2):** a newly paired device starts with every capability `unset`. The first request for an `unset` capability shows a prompt with three choices: "Allow always" (stored as `allow`), "Ask every time" (stored as `ask`), and "Deny" (stored as `deny`; the feature does not start). If the user does not answer within 30 s, the request is denied and the capability stays `unset`.
 - For `term.v1` and `fs.write.v1`, the first-use prompt shows a warning that the other device gets full control of this device's shell or files, and "Allow always" needs one extra confirmation (R5.2).
-- Active input and screen activities register with an `ActivityMonitor`. It drives the on-screen indicator and the Stop button. Calling `revoke()` cancels the activity's tokio tasks and closes its streams. The target is under 1 s, and in practice it is immediate (R5.4, R5.5).
+- Active input, screen, and audio activities register with an `ActivityMonitor`. It drives the on-screen indicator and the Stop button. Calling `revoke()` cancels the activity's tokio tasks and closes its streams. The target is under 1 s, and in practice it is immediate (R5.4, R5.5).
 - There are no per-capability defaults. All capabilities start as `unset` (R5.2).
 
 ## 8. Bluetooth fallback (R6)
@@ -331,7 +331,7 @@ browser → 127.0.0.1:3000 ─► B listener ─► QUIC stream ─► A: check 
 | Missing OS permission | `PermStatus::Missing(kind)` → UI explanation plus a button that opens settings |
 | Hash mismatch during transfer | Delete the part file, retry that file once, then report a failure |
 | Port conflict on the viewer | Bind the next free port and show it |
-| Permission prompt times out | Deny; the capability stays Not set; record in the activity log |
+| Permission prompt times out | Deny and record it in the activity log. A capability that was Not set stays Not set; one set to Ask keeps its value |
 
 Errors in the core use `thiserror` enums. They cross UniFFI as typed Kotlin exceptions.
 
@@ -344,9 +344,9 @@ The full threat model goes in `docs/security/threat-model.md` (task T1.9). Summa
 | Someone on the same Wi-Fi tries to connect | Mutual TLS with pinned keys; pairing only while the pairing screen is open; lockout |
 | MITM during pairing | QR: fingerprint pinning plus token HMAC over channel binding. Discovery: 6-digit code shown on both screens |
 | Spoofed discovery announcements | Discovery only suggests addresses; identity is checked in TLS |
-| Stolen or lost device | Unpair it from any other device; Requirement 5 prompts for sensitive capabilities; the identity key is in secure storage and protected by the OS lock screen |
+| Stolen or lost device | Unpair it from any other device; under Requirement 5 the user chooses each capability for each device (Allow always, Ask every time, or Deny); the identity key is in secure storage and protected by the OS lock screen |
 | Malicious peer sends crafted messages | Size limits, protobuf validation, fuzzed parsers, path cleaning, no remote control over tunnel targets |
-| Silent surveillance through screen or input | A first-use prompt for each capability and device, then the user's choice (Ask every time or Allow always), a persistent indicator, a one-click Stop, and an activity log |
+| Silent surveillance through screen or input | A first-use prompt for each capability and device, then the user's choice (Allow always, Ask every time, or Deny), a persistent indicator, a one-click Stop, and an activity log |
 | Clipboard leaks passwords | Sensitive flags respected; global pause |
 | Localhost tunnel used as a pivot | Allow-list per port and device; loopback targets only; no LAN exposure by default, and it expires when enabled |
 | Logs leak data | Logging (`tracing`) redacts content; field allow-list |
@@ -357,10 +357,10 @@ The project also runs `cargo audit` and `cargo deny` in CI, uses only well-known
 
 - **Unit tests:** protocol encode/decode, the permission engine, path cleaning, pairing state machines, and backoff timing.
 - **Property tests (`proptest`):** path cleaning never leaves the incoming folder; encode→decode returns the same message; framing handles arbitrary splits.
-- **Integration tests:** two or three in-process cores on loopback test pairing (both flows), wrong-fingerprint rejection, token replay, lockout, reconnect, file resume, and tunnel allow-listing.
+- **Integration tests:** two or three in-process cores on loopback test pairing (both flows), the first-use permission prompt (three choices, 30 s timeout), wrong-fingerprint rejection, token replay, lockout, reconnect, file resume, and tunnel allow-listing.
 - **Fuzzing (`cargo-fuzz`):** control-message parser, discovery packet parser, BLE reassembly, and QR payload parser.
 - **Platform smoke tests:** a device matrix checklist (Windows 11, macOS 14/15, Ubuntu GNOME Wayland, KDE X11, Android 10/13/15) for each feature.
-- **Performance checks:** input latency (R9.5), file throughput (R8.8), and screen latency (R12.4) measured with timestamps embedded in the stream.
+- **Performance checks:** input latency (R9.5), file throughput (R8.8), screen latency (R12.4), and audio delay (T16.5) measured with timestamps embedded in the stream.
 
 ## 17. Decisions
 
@@ -508,7 +508,8 @@ The tunnel targets the phone's own loopback only, as in §11. UrDevice uses the 
 
 ### 18.15 Speaker (R31)
 
-- **Capability:** `audio.out.v1`. It is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). The first request from a paired device shows the first-use prompt (R5.2).
+- **Capability:** `audio.out.v1`. It is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). The first request from a paired device shows the first-use prompt (R5.2). When the stored choice is `allow`, later audio from that device plays at once with no prompt (R31.3). A change to the setting takes effect within 1 s (R31.4, R5.5).
+- **Platforms (R31.1):** host and target can each be Windows, macOS, Linux, or Android.
 - **Transport:** audio travels over the existing session (R31.2). The codec is Opus. Whether it uses a QUIC stream or datagrams is decided after T16.2.
 - **Host (source):** a per-OS adapter captures system audio. Whether each OS can do this is the result of spike T16.1. IF an OS cannot capture audio THEN the UI says so and explains what the user must enable (R31.7).
 - **Target:** a per-OS adapter plays the audio, with its own volume and a mute for each source (R31.6).

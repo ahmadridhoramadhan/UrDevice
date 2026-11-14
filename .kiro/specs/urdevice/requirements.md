@@ -82,10 +82,10 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 
 **User story:** As a user, I want to choose what each paired device may do on this device, so that a lost phone can't silently control my computer.
 
-1. The system SHALL keep a separate permission setting for each capability for each paired device. The options are Allow, Ask every time, and Deny.
+1. The system SHALL keep a separate permission setting for each capability for each paired device. The options are Allow, Ask every time, and Deny. Before the user makes a first choice, the setting is Not set (R5.2).
 2. A newly paired device SHALL have every capability in the state "Not set". WHEN a paired device first requests a capability that is Not set THEN the target device SHALL show a first-use prompt naming the requesting device and the capability, with three choices: "Allow always" (the feature starts and later requests run with no prompt), "Ask every time", and "Deny" (the feature is not activated). The choice SHALL be saved for that device and capability. IF the user does not answer within 30 seconds THEN the request SHALL be denied and the capability SHALL stay Not set. For the remote terminal (R21) and file changes (R26: upload, rename, delete), the first-use prompt SHALL show a clear warning that the other device gets full control of this device's shell or files, and "Allow always" SHALL need one extra confirmation.
 3. WHEN a capability set to Ask is requested THEN the host SHALL show a prompt naming the requesting device and the capability. IF the user does not answer within 30 seconds THEN the system SHALL deny the request.
-4. WHILE another device is controlling input or viewing the screen THEN the host SHALL show a persistent, visible indicator and a one-click "Stop" control.
+4. WHILE another device is controlling input, viewing the screen, or playing its audio on this device (R31.5) THEN the host SHALL show a persistent, visible indicator and a one-click "Stop" control.
 5. WHEN the user presses Stop or revokes a permission THEN the system SHALL end the affected activity within 1 second.
 6. The system SHALL keep a local activity log of granted and denied requests (device, capability, time) for the last 30 days. Log entries SHALL NOT contain clipboard or file contents.
 
@@ -266,7 +266,7 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 
 1. A paired device with the terminal permission SHALL be able to open an interactive terminal on a desktop host, running as the host's logged-in user and never with elevated rights.
 2. The terminal permission SHALL start as Not set. The first-use prompt (R5.2) SHALL show a warning, and "Allow always" SHALL need one extra confirmation. The user SHALL be able to change the permission only on the host itself, not from a remote device.
-3. Each terminal session SHALL follow R5.3 (Ask) and R5.4 (indicator and Stop) unless the user set Always allow on the host.
+3. Each terminal session SHALL follow R5.3 (Ask) and R5.4 (indicator and Stop) unless the user chose Allow always on the host (R5.2).
 4. The host SHALL use a pseudo-terminal: `openpty` on macOS and Linux, ConPTY on Windows.
 5. The desktop and Android apps SHALL provide a terminal view with resizing, copy and paste, and on Android an extra row of keys (Esc, Tab, Ctrl, arrows).
 6. The activity log SHALL record when a session starts and ends, and SHALL NOT record what was typed or shown.
