@@ -17,4 +17,5 @@ The spec is the source of truth: [requirements](../specs/urdevice/requirements.m
 
 - The owner decides goals and scope. Do not add features, delete data, or merge code without the owner's explicit approval.
 - Do the review of a pull request only when the owner asks to merge it.
+- Review and merge are two steps. After the review, report every finding (blocking and minor, including inconsistencies outside the diff) to the owner and wait for an explicit go. Merge only after that go. Never review and merge in one step.
 - Do not claim in docs or the write-up that a Kiro feature was used unless it was.
