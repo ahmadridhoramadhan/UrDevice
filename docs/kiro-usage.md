@@ -14,6 +14,8 @@ The spec lives in [`.kiro/specs/urdevice/`](../.kiro/specs/urdevice/):
 - [`design.md`](../.kiro/specs/urdevice/design.md): architecture, protocol, security model, and platform adapters.
 - [`tasks.md`](../.kiro/specs/urdevice/tasks.md): phased tasks, each linked to the requirements it covers.
 
+The spec was first written in Kiro Web (see "Kiro IDE, CLI, and Crew" below).
+
 How it helped: **TODO** (for example, how the task list kept work in small steps, and how changing a requirement updated the design first).
 
 Spec changes made during the hackathon: a first-use permission prompt (R5.2), and a "use another device as a speaker" feature (R31).
@@ -40,7 +42,14 @@ A Kiro Crew bot ("PM UrDevice") plans the work, splits it into small tasks, trac
 
 ## Kiro IDE, CLI, and Crew
 
-**TODO:** which of these were used for which parts, and how they differed.
+Two Kiro products were used:
+
+- **Kiro Web:** the owner used it to write the spec (requirements, design, tasks). The owner was new to Kiro and asked for the spec to be placed in `docs/`. It was moved to `.kiro/specs/urdevice/` later, once the hackathon rules showed that `/.kiro` is required.
+- **Kiro Crew:** the owner continued here for end-to-end work. The Crew bot plans the work, splits tasks, reviews and merges pull requests (through the GitHub MCP server), and tracks the deadline.
+
+The Kiro IDE and CLI were not used.
+
+**TODO:** how the two differed in practice (speed, control, quality of results), in the owner's words.
 
 ## Third-party licenses
 
