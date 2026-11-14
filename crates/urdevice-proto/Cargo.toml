@@ -1,0 +1,15 @@
+[package]
+name = "urdevice-proto"
+description = "Protobuf schemas and generated types for the UrDevice protocol."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+# `prost` and `prost-build` are added together with the first schema in `proto/`.
+[dependencies]
+
+[lints]
+workspace = true

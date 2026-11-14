@@ -1,0 +1,32 @@
+[package]
+name = "urdevice-desktop"
+description = "UrDevice desktop app (Slint) for Windows, Linux, and macOS."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "urdevice"
+path = "src/main.rs"
+
+[dependencies]
+png.workspace = true
+slint.workspace = true
+urdevice-core.workspace = true
+urdevice-platform.workspace = true
+
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+tray-icon.workspace = true
+
+# Linux uses the StatusNotifierItem D-Bus protocol directly, so no GTK is needed.
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni.workspace = true
+
+[build-dependencies]
+slint-build.workspace = true
+
+[lints]
+workspace = true

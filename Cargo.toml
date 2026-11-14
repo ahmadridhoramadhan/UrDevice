@@ -1,0 +1,60 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/urdevice-proto",
+    "crates/urdevice-core",
+    "crates/urdevice-platform",
+    "crates/urdevice-media",
+    "crates/urdevice-ffi",
+    "crates/urdevice-desktop",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.95"
+repository = "https://github.com/ahmadridhoramadhan/UrDevice"
+publish = false
+
+[workspace.dependencies]
+# Internal crates
+urdevice-core = { path = "crates/urdevice-core" }
+urdevice-media = { path = "crates/urdevice-media" }
+urdevice-platform = { path = "crates/urdevice-platform" }
+urdevice-proto = { path = "crates/urdevice-proto" }
+
+# Shared third-party crates
+futures-core = "0.3"
+thiserror = "2"
+
+# Desktop UI
+slint = { version = "1.18", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "accessibility",
+    "backend-winit",
+    "renderer-femtovg",
+    "renderer-software",
+] }
+slint-build = "1.18"
+png = "0.18"
+tray-icon = "0.26"
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+
+# Android bindings
+uniffi = "0.32"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = "symbols"

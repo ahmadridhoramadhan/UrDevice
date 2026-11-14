@@ -13,7 +13,7 @@ UrDevice connects your Mac, Windows, Linux, and Android devices peer-to-peer ove
 
 Desktop apps use Rust and [Slint](https://slint.dev). The Android app uses native Kotlin. Both share one Rust core.
 
-**Status:** specification. See [docs/](docs/README.md).
+**Status:** project setup. See [docs/](docs/README.md) for the spec and [docs/development.md](docs/development.md) to build it.
 
 ## License
 
