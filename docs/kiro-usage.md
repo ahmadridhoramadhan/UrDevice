@@ -26,7 +26,9 @@ A Kiro Crew bot ("PM UrDevice") plans the work, splits it into small tasks, trac
 
 ## Steering docs
 
-**TODO** (none yet). Planned: project conventions for Rust, Kotlin, and security rules.
+Three steering files are in [`.kiro/steering/`](../.kiro/steering/): `product.md` (goal, decisions, owner rules), `tech.md` (stack, crates, checks before commit), and `security.md` (security rules for every change). They were written by the Kiro Crew bot from the spec and the repository, and the owner approved them.
+
+How they helped: **TODO** (after real use).
 
 ## Agent hooks
 
