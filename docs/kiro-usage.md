@@ -44,7 +44,7 @@ A Kiro Crew bot ("PM UrDevice") plans the work, splits it into small tasks, trac
 
 Two Kiro products were used:
 
-- **Kiro Web:** the owner used it to write the spec (requirements, design, tasks). The owner was new to Kiro and asked for the spec to be placed in `docs/`. It was moved to `.kiro/specs/urdevice/` later, once the hackathon rules showed that `/.kiro` is required.
+- **Kiro Web:** the owner used it to write the spec (requirements, design, tasks). At that time the owner did not yet know how Kiro works in detail and asked for the spec to be placed in `docs/`. It was moved to `.kiro/specs/urdevice/` later.
 - **Kiro Crew:** the owner continued here for end-to-end work. The Crew bot plans the work, splits tasks, reviews and merges pull requests (through the GitHub MCP server), and tracks the deadline.
 
 The Kiro IDE and CLI were not used.
