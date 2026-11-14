@@ -83,7 +83,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 **User story:** As a user, I want to choose what each paired device may do on this device, so that a lost phone can't silently control my computer.
 
 1. The system SHALL keep a separate permission setting for each capability for each paired device. The options are Allow, Ask every time, and Deny.
-2. Defaults for a newly paired device SHALL be: clipboard Allow, files Ask, gallery browsing Ask, media control Allow, keyboard/mouse input Ask, screen viewing Ask, localhost access Ask. Release 2 capabilities default to: camera/microphone Ask, notifications Ask, second display Ask, terminal Deny, file browsing Ask, file changes (upload, rename, delete) Deny, SMS/calls Ask, find device Allow, lock Allow.
+2. A newly paired device SHALL have every capability in the state "Not set". WHEN a paired device first requests a capability that is Not set THEN the target device SHALL show a first-use prompt naming the requesting device and the capability, with three choices: "Allow always" (the feature starts and later requests run with no prompt), "Ask every time", and "Deny" (the feature is not activated). The choice SHALL be saved for that device and capability. IF the user does not answer within 30 seconds THEN the request SHALL be denied and the capability SHALL stay Not set. For the remote terminal (R21) and file changes (R26: upload, rename, delete), the first-use prompt SHALL show a clear warning that the other device gets full control of this device's shell or files, and "Allow always" SHALL need one extra confirmation.
 3. WHEN a capability set to Ask is requested THEN the host SHALL show a prompt naming the requesting device and the capability. IF the user does not answer within 30 seconds THEN the system SHALL deny the request.
 4. WHILE another device is controlling input or viewing the screen THEN the host SHALL show a persistent, visible indicator and a one-click "Stop" control.
 5. WHEN the user presses Stop or revokes a permission THEN the system SHALL end the affected activity within 1 second.
@@ -357,3 +357,16 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 4. Rules SHALL run on the device that owns them. Actions on another device SHALL go through that device's permission checks.
 5. A "run command" action SHALL exist on desktop only, SHALL be off until the user turns it on in settings, and SHALL run as the logged-in user.
 6. WHERE Android blocks an action from the background (opening a screen, reading the Wi-Fi name without location permission) THEN the system SHALL show a notification the user can tap instead, or SHALL explain which permission is needed.
+
+## Requirement 31: Use another device as a speaker
+
+**User story:** As a user, I want sound from one of my devices to play on another paired device, so that I can switch speakers quickly without extra setup.
+
+1. The source device (Host) SHALL be able to send its system audio to any paired target device. Host and target MAY each be Windows, macOS, Linux, or Android.
+2. The audio SHALL travel over the existing encrypted session. No new connection or pairing step SHALL be needed.
+3. The `audio.out.v1` permission SHALL follow R5.2: the first time a paired device sends audio, the target asks once (Allow always, Ask every time, or Deny). WHEN the choice is Allow always THEN later audio from that device SHALL play at once, with no prompt.
+4. The user SHALL be able to change `audio.out.v1` per device at any time, and a change SHALL take effect within 1 second (R5.5).
+5. WHILE a device is playing audio from another device THEN the target SHALL show a visible indicator naming the source and a one-click "Stop" control.
+6. The target SHALL keep its own volume control, and the user SHALL be able to mute a source from the target.
+7. WHERE the host OS cannot capture system audio THEN the UI SHALL say so and explain what the user must enable.
+8. The system SHALL record each start and stop in the activity log (device, time), without audio content.

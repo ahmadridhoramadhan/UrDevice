@@ -5,7 +5,7 @@
 //! through UniFFI callback interfaces.
 //!
 //! The data types here are placeholders sized for project setup. Each feature
-//! phase in `docs/spec/tasks.md` fills in the fields it needs.
+//! phase in `.kiro/specs/urdevice/tasks.md` fills in the fields it needs.
 
 use std::future::Future;
 use std::path::PathBuf;
