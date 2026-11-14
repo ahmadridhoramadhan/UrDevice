@@ -1,6 +1,6 @@
 # Development
 
-This page lists what you need to build UrDevice on each platform. The repository layout is described in [design §2](spec/design.md#2-repository-layout).
+This page lists what you need to build UrDevice on each platform. The repository layout is described in [design §2](../.kiro/specs/urdevice/design.md#2-repository-layout).
 
 ```
 UrDevice/
