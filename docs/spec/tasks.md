@@ -22,7 +22,7 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 - [ ] T1.7 QR pairing: create the invite and token, encode the URI, verify the HMAC over the TLS exporter, make tokens single-use with expiry, and add the lockout counter. _Req: R3.1–R3.4, R3.7, R3.8_
 - [ ] T1.8 Code-confirmation pairing: derive the 6-digit code from the exporter and require confirmation on both sides. _Req: R3.5_
 - [ ] T1.9 Write `docs/security/threat-model.md` from design §15. _Req: R4, R5_
-- [ ] T1.10 Permission engine and ActivityMonitor: Allow/Ask/Deny, the 30 s timeout, revoke and stop, and the defaults from R5.2. _Req: R5_
+- [ ] T1.10 Permission engine and ActivityMonitor: Allow/Ask/Deny/Not set, the first-use prompt (R5.2) with the warning and extra confirmation for terminal and file changes, the 30 s timeout, and revoke and stop. _Req: R5_
 - [ ] T1.11 Logging with `tracing` and a redaction layer. _Req: R16.2_
 - [ ]* T1.12 Integration tests: both pairing flows, wrong-fingerprint rejection, token replay, lockout, reconnect, and unpair-then-reject.
 - [ ]* T1.13 Fuzz targets: control-message framing, Announce parser, and QR payload parser.
@@ -152,3 +152,15 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 
 - [ ] T15.1 External security review of the terminal, file browser, run command, and SMS features. _Req: R21, R26, R29, R30_
 - [ ] T15.2 Extend the device-matrix smoke tests and user docs to the Release 2 features.
+
+---
+
+# Added by owner request (14 Nov 2026)
+
+## Phase 16: Speaker
+
+- [ ] T16.1 Spike: capture system audio on each OS (WASAPI loopback, PipeWire/PulseAudio monitor, macOS ScreenCaptureKit or a loopback driver, Android `AudioPlaybackCapture`). Record which OS and version works. _Req: R31.1, R31.7_
+- [ ] T16.2 Audio protocol: Opus stream over a QUIC stream or datagrams, with a small jitter buffer and `audio.out.v1` capability negotiation. _Req: R31.1, R31.2_
+- [ ] T16.3 Target playback on each OS, with volume, mute, and the "playing from X" indicator and Stop button. _Req: R31.5, R31.6_
+- [ ] T16.4 `audio.out.v1` uses the first-use prompt (R5.2), a per-device setting in the UI, and activity-log entries. _Req: R31.3, R31.4, R31.8_
+- [ ] T16.5 Measure audio delay between host and target on Wi-Fi. _Req: R31.1_
