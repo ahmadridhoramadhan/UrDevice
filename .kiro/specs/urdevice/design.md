@@ -87,7 +87,7 @@ paired_device(
   last_addrs       TEXT,               -- JSON list of SocketAddr
   row_mac          BLOB NOT NULL
 )
-permission(device_id, capability, mode /* allow|ask|deny */, PRIMARY KEY(device_id, capability))
+permission(device_id, capability, mode /* unset|allow|ask|deny */, PRIMARY KEY(device_id, capability))
 activity_log(id, device_id, capability, decision, ts)   -- pruned after 30 days (R5.6)
 shared_port(port, label, allowed_devices JSON, lan_expose_until INTEGER NULL)
 ```
@@ -168,12 +168,14 @@ This flow is used for devices found by discovery. Both pairing contexts accept a
 
 ### 7.4 Permission engine (R5)
 
-`PermissionEngine::check(device_id, capability) -> Allow | Deny | Ask(Future<Decision>)`.
+`PermissionEngine::check(device_id, capability) -> Allow | Deny | Ask(Future<Decision>)`. A capability that has never been set (`unset`) is handled like `Ask`, but with the first-use prompt below.
 
 - `Ask` sends a prompt to the UI through a `UiDelegate` trait. If the user doesn't answer within 30 s, the request is denied.
-- Each grant applies to one *activity* (one transfer, one screen session, one input session), unless the user checks "Always allow".
+- Each grant applies to one *activity* (one transfer, one screen session, one input session), unless the user chose "Allow always".
+- **First-use prompt (R5.2):** a newly paired device starts with every capability `unset`. The first request for an `unset` capability shows a prompt with three choices: "Allow always" (stored as `allow`), "Ask every time" (stored as `ask`), and "Deny" (stored as `deny`; the feature does not start). If the user does not answer within 30 s, the request is denied and the capability stays `unset`.
+- For `term.v1` and `fs.write.v1`, the first-use prompt shows a warning that the other device gets full control of this device's shell or files, and "Allow always" needs one extra confirmation (R5.2).
 - Active input and screen activities register with an `ActivityMonitor`. It drives the on-screen indicator and the Stop button. Calling `revoke()` cancels the activity's tokio tasks and closes its streams. The target is under 1 s, and in practice it is immediate (R5.4, R5.5).
-- Defaults follow R5.2.
+- There are no per-capability defaults. All capabilities start as `unset` (R5.2).
 
 ## 8. Bluetooth fallback (R6)
 
@@ -370,22 +372,23 @@ The project also runs `cargo audit` and `cargo deny` in CI, uses only well-known
 
 Each feature below is a core service with its own capability string, which is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). Section 18.N covers Requirement 16+N.
 
-| Requirement | Capability | Default permission |
+| Requirement | Capability | Initial state and notes |
 |---|---|---|
-| R17 Webcam and microphone | `camera.v1`, `mic.v1` | Ask |
-| R18 Notification mirroring | `notify.v1` | Ask |
-| R19 Shared mouse and keyboard | `kvm.v1` | Ask (uses input permission) |
-| R20 Second display | `display.v1` | Ask |
-| R21 Remote terminal | `term.v1` | Deny, changed only on the host |
-| R22 DevTools and ADB | `adb.v1` | Ask |
+| R17 Webcam and microphone | `camera.v1`, `mic.v1` | Not set |
+| R18 Notification mirroring | `notify.v1` | Not set |
+| R19 Shared mouse and keyboard | `kvm.v1` | Not set (uses input permission) |
+| R20 Second display | `display.v1` | Not set |
+| R21 Remote terminal | `term.v1` | Not set; first-use warning and extra confirmation; changed only on the host |
+| R22 DevTools and ADB | `adb.v1` | Not set |
 | R23 Port profiles | `tunnel.v1` (existing) | Follows localhost |
 | R24 Request inspector | local only | Off |
-| R25 Find my device | `ring.v1` | Allow |
-| R26 File browser | `fs.browse.v1`, `fs.write.v1` | Ask / Deny |
+| R25 Find my device | `ring.v1` | Not set |
+| R26 File browser | `fs.browse.v1`, `fs.write.v1` | Not set; `fs.write.v1` has the first-use warning and extra confirmation |
 | R27 Clipboard history | `cliphist.v1` | Follows clipboard |
-| R28 Proximity lock | `lock.v1` | Allow |
-| R29 SMS and calls | `telephony.v1` | Ask |
+| R28 Proximity lock | `lock.v1` | Not set |
+| R29 SMS and calls | `telephony.v1` | Not set |
 | R30 Automations | local only | n/a |
+| R31 Speaker | `audio.out.v1` | Not set |
 
 ### 18.1 Phone as webcam and microphone (R17)
 
@@ -511,4 +514,4 @@ The tunnel targets the phone's own loopback only, as in §11. UrDevice uses the 
 | Windows driver signing (IddCx, virtual audio) | R17.4, R20 | Get an EV certificate. Virtual audio waits until the IddCx process is in place |
 | Wayland InputCapture portal not available on all desktops | R19 | Spike T10.1 and document which desktops work |
 | Google Play policy (SMS, call permissions, full-screen intents) | R25, R29 | Separate `full` build, with fallbacks in the Play build |
-| New attack surface (terminal, file browser, run command) | R21, R26, R30 | Deny by default, settings changeable only on the device itself, `cap-std` sandboxing, fuzzing, and a second external security review before Release 2 |
+| New attack surface (terminal, file browser, run command) | R21, R26, R30 | Not set until the user decides, with a first-use warning and extra confirmation for terminal and file changes, settings changeable only on the device itself, `cap-std` sandboxing, fuzzing, and a second external security review before Release 2 |
