@@ -265,7 +265,7 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 **User story:** As a user, I want to open a shell on another of my computers without setting up SSH.
 
 1. A paired device with the terminal permission SHALL be able to open an interactive terminal on a desktop host, running as the host's logged-in user and never with elevated rights.
-2. The terminal permission SHALL default to Deny, and the user SHALL be able to change it only on the host itself, not from a remote device.
+2. The terminal permission SHALL start as Not set. The first-use prompt (R5.2) SHALL show a warning, and "Allow always" SHALL need one extra confirmation. The user SHALL be able to change the permission only on the host itself, not from a remote device.
 3. Each terminal session SHALL follow R5.3 (Ask) and R5.4 (indicator and Stop) unless the user set Always allow on the host.
 4. The host SHALL use a pseudo-terminal: `openpty` on macOS and Linux, ConPTY on Windows.
 5. The desktop and Android apps SHALL provide a terminal view with resizing, copy and paste, and on Android an extra row of keys (Esc, Tab, Ctrl, arrows).
@@ -315,7 +315,7 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 1. A paired device with the file browsing permission SHALL be able to list folders and files on a host, inside folders the host user has chosen to share. The default on desktop is the home folder. On Android, the user picks folders through the system folder picker.
 2. The host SHALL refuse any path outside the shared folders, including through symbolic links.
 3. The user SHALL be able to search shared folders by file name, with results shown as they are found.
-4. The user SHALL be able to download files and see image thumbnails. Uploading, renaming, and deleting SHALL need the separate file changes permission (default Deny).
+4. The user SHALL be able to download files and see image thumbnails. Uploading, renaming, and deleting SHALL need the separate file changes permission. It starts as Not set, and the first-use prompt (R5.2) SHALL show a warning and need one extra confirmation for "Allow always".
 5. Downloads SHALL use the R8 transfer mechanism, including progress and hash checks.
 
 ## Requirement 27: Shared clipboard history

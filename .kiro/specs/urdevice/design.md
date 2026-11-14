@@ -331,7 +331,7 @@ browser → 127.0.0.1:3000 ─► B listener ─► QUIC stream ─► A: check 
 | Missing OS permission | `PermStatus::Missing(kind)` → UI explanation plus a button that opens settings |
 | Hash mismatch during transfer | Delete the part file, retry that file once, then report a failure |
 | Port conflict on the viewer | Bind the next free port and show it |
-| Permission prompt times out | Deny; record in the activity log |
+| Permission prompt times out | Deny; the capability stays Not set; record in the activity log |
 
 Errors in the core use `thiserror` enums. They cross UniFFI as typed Kotlin exceptions.
 
@@ -346,7 +346,7 @@ The full threat model goes in `docs/security/threat-model.md` (task T1.9). Summa
 | Spoofed discovery announcements | Discovery only suggests addresses; identity is checked in TLS |
 | Stolen or lost device | Unpair it from any other device; Requirement 5 prompts for sensitive capabilities; the identity key is in secure storage and protected by the OS lock screen |
 | Malicious peer sends crafted messages | Size limits, protobuf validation, fuzzed parsers, path cleaning, no remote control over tunnel targets |
-| Silent surveillance through screen or input | Prompt per session by default, a persistent indicator, a one-click Stop, and an activity log |
+| Silent surveillance through screen or input | A first-use prompt for each capability and device, then the user's choice (Ask every time or Allow always), a persistent indicator, a one-click Stop, and an activity log |
 | Clipboard leaks passwords | Sensitive flags respected; global pause |
 | Localhost tunnel used as a pivot | Allow-list per port and device; loopback targets only; no LAN exposure by default, and it expires when enabled |
 | Logs leak data | Logging (`tracing`) redacts content; field allow-list |
@@ -506,7 +506,16 @@ The tunnel targets the phone's own loopback only, as in §11. UrDevice uses the 
 - **"Run command"** goes through `std::process::Command`, without a shell, using an argument list the user entered. It is off until enabled in settings (R30.5).
 - **Android background limits (R30.6):** Android doesn't let apps open screens from the background. Actions like "open Presenter" become a notification that opens the screen when tapped.
 
-### 18.15 Release 2 risks
+### 18.15 Speaker (R31)
+
+- **Capability:** `audio.out.v1`. It is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). The first request from a paired device shows the first-use prompt (R5.2).
+- **Transport:** audio travels over the existing session (R31.2). The codec is Opus. Whether it uses a QUIC stream or datagrams is decided after T16.2.
+- **Host (source):** a per-OS adapter captures system audio. Whether each OS can do this is the result of spike T16.1. IF an OS cannot capture audio THEN the UI says so and explains what the user must enable (R31.7).
+- **Target:** a per-OS adapter plays the audio, with its own volume and a mute for each source (R31.6).
+- **Indicator and Stop (R31.5):** the playing session registers with the `ActivityMonitor` (§7.4), which drives the indicator naming the source and the Stop button.
+- **Activity log (R31.8):** each start and stop is recorded with the device and time, without audio content.
+
+### 18.16 Release 2 risks
 
 | Risk | Affects | Plan |
 |---|---|---|
