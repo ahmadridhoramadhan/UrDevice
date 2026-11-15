@@ -1,6 +1,6 @@
 # Onboarding: layout
 
-The first-launch flow, for desktop and Android. This is a layout mockup, not final art. Open [`onboarding.html`](onboarding.html) in a browser. Click the step numbers. In step 6, click a device in the list.
+The first-launch flow, for desktop and Android. This is a layout mockup, not final art. Open [`onboarding.html`](onboarding.html) in a browser. It has no scripts, so it also works in file viewers. Click the step numbers. In step 6, click a device in the list.
 
 The look is "Frankenstein": dark background, green glow, dashed "stitch" borders. Colors in the mockup are placeholders.
 
@@ -20,7 +20,7 @@ The look is "Frankenstein": dark background, green glow, dashed "stitch" borders
 - No account and no login.
 - Pairing can be skipped. The app still opens.
 - Nearby devices: pairing starts from a clickable list, not by typing a code. The 6-digit code is shown on both devices and the user confirms it matches (R3.5). This stops a stranger on the same Wi-Fi from posing as a known device.
-- The list rows have no dropdown arrow. A click opens the code under the row. A second click closes it.
+- The list rows have no dropdown arrow. A click opens the code under the row. (The mockup cannot close it again. The real app should.)
 - Camera access (QR) and Nearby devices access (Android) are asked only on the step that needs them (R15.2).
 
 ## Spec links
