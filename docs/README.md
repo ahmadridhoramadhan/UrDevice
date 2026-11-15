@@ -10,6 +10,10 @@
 
 - [How UrDevice used Kiro](kiro-usage.md): the write-up for the Kiroween submission.
 
+## Design
+
+- [Onboarding layout](design/onboarding.md): first-launch flow for desktop and Android, with a clickable mockup.
+
 ## Development
 
 - [Development](development.md): prerequisites and build commands for each platform.

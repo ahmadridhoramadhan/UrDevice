@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UrDevice onboarding mockup</title>
+<!-- Layout mockup only. Open this file in a browser. Click the step numbers; in step 6 click a device. -->
+<style>
+body{margin:0;background:#0b0f0c;color:#d7e6d9;font-family:ui-sans-serif,system-ui,sans-serif;padding:16px}
+.tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.tb{font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid #3b4a3f;background:#0b0f0c;color:#9bb0a1;cursor:pointer}
+.tb.on{border-color:#5cff9a;color:#5cff9a;box-shadow:0 0 8px #5cff9a55}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.win{flex:2 1 420px;min-width:300px;border:2px dashed #3b4a3f;border-radius:10px;background:#111813;overflow:hidden}
+.bar{display:flex;gap:6px;align-items:center;padding:7px 10px;border-bottom:2px dashed #3b4a3f;font-size:11px;color:#7f9285}
+.bar i{width:9px;height:9px;border-radius:50%;background:#2a352d;display:inline-block}
+.dbody{display:flex;min-height:300px}
+.art{width:36%;display:flex;align-items:center;justify-content:center;font-size:44px;border-right:2px dashed #3b4a3f;background:#0b0f0c;text-shadow:0 0 18px #5cff9a88;text-align:center;padding:8px}
+.cont{flex:1;padding:16px;display:flex;flex-direction:column;gap:10px}
+.ph{flex:1 1 210px;max-width:250px;min-width:200px;border:3px solid #3b4a3f;border-radius:26px;background:#111813;padding:10px 12px 14px;display:flex;flex-direction:column;gap:8px;min-height:450px}
+.notch{width:60px;height:5px;border-radius:3px;background:#2a352d;margin:0 auto 4px}
+.pa{height:100px;display:flex;align-items:center;justify-content:center;font-size:36px;background:#0b0f0c;border:1px dashed #3b4a3f;border-radius:12px;text-shadow:0 0 14px #5cff9a88;text-align:center}
+.pa.cam{height:170px;position:relative;background:#050806}
+.t{font-size:15px;font-weight:700;color:#5cff9a}
+.p{font-size:12px;color:#9bb0a1;line-height:1.45}
+.bx{border:1px dashed #3b4a3f;border-radius:8px;padding:8px;font-size:12px;background:#0b0f0c}
+.bt{font-size:12px;text-align:center;padding:8px 12px;border-radius:7px;border:1px solid #5cff9a;color:#5cff9a;background:#0b0f0c;cursor:pointer}
+.bt.b{border-color:#8fb3ff;color:#8fb3ff}.bt.r{border-color:#ff6b6b;color:#ff6b6b}.bt.g{border-color:#3b4a3f;color:#7f9285}
+.sp{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.dl{display:flex;gap:5px}.dl i{flex:1;height:4px;border-radius:2px;background:#2a352d}.dl i.on{background:#5cff9a}
+.cap{font-size:11px;color:#7f9285;margin:0 0 6px}
+.qr{display:grid;gap:2px;padding:8px;background:#d7e6d9;border-radius:6px}
+.qr i{display:block;aspect-ratio:1;background:#0b0f0c}.qr i.o{background:#d7e6d9}
+.vf{position:absolute;inset:26px;border:2px solid #5cff9a;border-radius:10px;box-shadow:0 0 12px #5cff9a66}
+.it{border:1px solid #3b4a3f;border-radius:8px;background:#0b0f0c;overflow:hidden}
+.it.on{border-color:#5cff9a;box-shadow:0 0 8px #5cff9a44}
+.hd{display:flex;align-items:center;gap:8px;padding:9px 10px;font-size:13px;cursor:pointer}
+.hd small{color:#7f9285;font-size:11px}
+.dot{width:8px;height:8px;border-radius:50%;background:#5cff9a;box-shadow:0 0 6px #5cff9a}
+.pn{padding:10px;border-top:1px dashed #3b4a3f;font-size:12px}
+.code{font-size:22px;letter-spacing:3px;color:#5cff9a;text-align:center;font-weight:700;margin:4px 0}
+.wait{border:1px dashed #3b4a3f;border-radius:12px;padding:30px 8px;text-align:center;font-size:12px;color:#7f9285;background:#0b0f0c}
+</style>
+</head>
+<body>
+<div class="tabs" id="tabs"></div>
+<div class="row">
+ <div><div class="cap">Desktop</div><div class="win" id="dw"></div></div>
+ <div><div class="cap">Phone</div><div class="ph" id="pw"></div></div>
+</div>
+<script>
+function qr(n,w){var h='<div class="qr" style="grid-template-columns:repeat('+n+',1fr);width:'+w+'px">';var s=7;for(var y=0;y<n;y++){for(var x=0;x<n;x++){var f=(x<3&&y<3)||(x>=n-3&&y<3)||(x<3&&y>=n-3);s=(s*1103515245+12345)&0x7fffffff;var on=f||((s>>8)%2===0);if(f&&((x%2==1&&y%2==1)||(x==1&&y==1)))on=true;h+='<i'+(on?'':' class="o"')+'></i>';}}return h+'</div>';}
+var S=[
+ {a:'⚡',t:'Welcome to UrDevice',p:'Link your own devices into one network. No cloud and no account.',d:'<div class="bx">Name this device<br><b style="font-size:14px">Work laptop</b></div>',pd:'<div class="bx">Name this device<br><b style="font-size:14px">Pixel 9</b></div>',b:'Continue'},
+ {a:'🔑',t:'Your device key',p:'A private key is made on this device. It never leaves it.',d:'<div class="bx">Fingerprint<br><b style="color:#5cff9a">7F3A · 91C2 · D08E</b></div>',pd:'<div class="bx">Fingerprint<br><b style="color:#5cff9a">B20C · 4E7A · 19FD</b></div>',b:'Create key'},
+ {a:'📱⟷💻',t:'How it connects',p:'Devices find each other on the same Wi-Fi. Data goes straight between them, encrypted.',d:'<div class="bx">Same network only. Nothing is sent to a server.</div>',pd:'<div class="bx">Same network only. Nothing is sent to a server.</div>',b:'Next'},
+ {a:'🛡',t:'You decide',p:'The first time a device asks for something, you choose.',d:'<div style="display:flex;gap:6px;flex-wrap:wrap"><span class="bt">Allow always</span><span class="bt b">Ask every time</span><span class="bt r">Deny</span></div><div class="p">Terminal and file changes show a warning.</div>',pd:'<div class="sp" style="margin:0"><span class="bt">Allow always</span><span class="bt b">Ask every time</span><span class="bt r">Deny</span></div><div class="p">Terminal and file changes show a warning.</div>',b:'Got it'},
+ {k:'qr',t:'Pair with a QR code',p:'On your phone, open UrDevice and scan this QR code.',pp:'Point the camera at the QR code on your desktop.',d:'<div class="p">The QR code is single use and expires soon.</div>',pd:'<div class="p">Camera access is asked only now.</div>',b:'Nearby devices instead'},
+ {k:'nb',t:'Nearby devices',p:'Click a device to pair with it.',b:'It matches'}
+];
+var c=0,sel=null,done=false;
+var D=[['Pixel 9','Android'],['Studio Mac','macOS'],['Tablet','Android']];
+function pick(i){sel=(sel===i)?null:i;done=false;go(5);}
+function ok(){done=true;go(5);}
+function tabs(){var h='';for(var i=0;i<S.length;i++){h+='<span class="tb'+(i==c?' on':'')+'" onclick="go('+i+')">'+(i+1)+'</span>';}document.getElementById('tabs').innerHTML=h+'<span class="p" style="margin-left:6px">'+S[c].t+'</span>';}
+function dots(){var h='<div class="dl">';for(var i=0;i<S.length;i++){h+='<i'+(i<=c?' class="on"':'')+'></i>';}return h+'</div>';}
+function go(i){c=i;var s=S[i];var dw,pw;
+ if(s.k=='nb'){
+  var l='';for(var j=0;j<D.length;j++){var o=sel===j;
+   l+='<div class="it'+(o?' on':'')+'"><div class="hd" onclick="pick('+j+')"><span class="dot"></span>'+D[j][0]+' <small>'+D[j][1]+'</small></div>';
+   if(o){l+='<div class="pn">'+(done?'<b style="color:#5cff9a">Paired with '+D[j][0]+'</b>':'Confirm this code is the same on both devices<div class="code">482 915</div><div class="p">Waiting for '+D[j][0]+' to confirm</div>')+'</div>';}
+   l+='</div>';}
+  dw='<div class="bar"><i></i><i></i><i></i><span style="margin-left:6px">UrDevice</span></div><div class="dbody"><div class="art">📡</div><div class="cont">'+dots()+'<div class="t">'+s.t+'</div><div class="p">'+s.p+'</div>'+l+'<div class="sp" style="flex-direction:row;justify-content:flex-end"><span class="bt g">Back</span></div></div></div>';
+  var p='<div class="notch"></div>'+dots()+'<div class="t">'+s.t+'</div>';
+  if(sel===null){p+='<div class="wait">Waiting for a pairing request<br><br>📡</div><div class="p">Nearby devices permission is asked only now.</div><div class="sp"><span class="bt g">Cancel</span></div>';}
+  else if(!done){p+='<div class="p">Work laptop wants to pair with you.</div><div class="bx">Confirm this code is the same on both devices<div class="code">482 915</div></div><div class="sp"><span class="bt" onclick="ok()">It matches</span><span class="bt g">Cancel</span></div>';}
+  else{p+='<div class="bx"><b style="color:#5cff9a">Paired with Work laptop</b></div><div class="sp"><span class="bt">Done</span></div>';}
+  pw=p;
+ } else {
+  var art=s.k=='qr'?qr(11,150):s.a;
+  var pa=s.k=='qr'?'<div class="pa cam"><div class="vf"></div><span style="font-size:11px;color:#9bb0a1">📷 camera</span></div>':'<div class="pa">'+s.a+'</div>';
+  var dbtn=s.k=='qr'?'<span class="p">Skip for now</span><span class="bt g">'+s.b+'</span>':'<span class="bt">'+s.b+'</span>';
+  var pbtn=s.k=='qr'?'<span class="bt g">'+s.b+'</span><span class="bt g">Skip for now</span>':'<span class="bt">'+s.b+'</span>';
+  dw='<div class="bar"><i></i><i></i><i></i><span style="margin-left:6px">UrDevice</span></div><div class="dbody"><div class="art">'+art+'</div><div class="cont">'+dots()+'<div class="t">'+s.t+'</div><div class="p">'+s.p+'</div>'+s.d+'<div class="sp" style="flex-direction:row;justify-content:flex-end;align-items:center">'+dbtn+'</div></div></div>';
+  pw='<div class="notch"></div>'+dots()+pa+'<div class="t">'+s.t+'</div><div class="p">'+(s.pp||s.p)+'</div>'+s.pd+'<div class="sp">'+pbtn+'</div>';
+ }
+ document.getElementById('dw').innerHTML=dw;document.getElementById('pw').innerHTML=pw;tabs();}
+go(0);
+</script>
+</body>
+</html>
