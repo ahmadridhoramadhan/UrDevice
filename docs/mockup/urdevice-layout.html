@@ -1,0 +1,1536 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>UrDevice: mockup layout</title>
+<!--
+  Mockup layout UrDevice (desktop, Android v1, Android v2).
+  Ini panduan, bukan desain final. Semua data contoh dan semua interaksi
+  hanya simulasi di browser. Acuan perilaku: .kiro/specs/urdevice/
+  (requirements.md dan design.md). Font dan library QR diambil dari CDN
+  hanya untuk mockup; aplikasi asli membundel semuanya (R16.1).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F1E6; --surface:#FFFEF8; --surface2:#FCF8EC; --ink:#1E2E4A; --ink-soft:#46536E; --muted:#6E7263; --line:#E6DCC4; --line2:#D5C9A6;
+  --navy:#1E2E4A; --brand-green:#0F1F10; --brand-lime:#C6F19D; --brand:#0F1F10; --brand-dark:#0F1F10; --brand-soft:#EAF6DC;
+  --teal:#0F766E; --teal-light:#D7EBE6; --teal-dark:#0B4F4A;
+  --amber:#8A5A12; --amber-bg:#F7E7BD;
+  --deny:#9B2C1F; --deny-bg:#FADBD3; --deny-dot:#C0392B; --ask-dot:#B97F10; --allow-dot:#3E7C1F;
+  --side-bg:#FCFCF7; --mp-bg:#1E2E4A;
+  --radius-lg:22px;
+  --font:"Sora",system-ui,sans-serif; --mono:"IBM Plex Mono",monospace; --serif:"Source Serif 4",Georgia,serif;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#0D1526; --surface:#16203A; --surface2:#1A2745; --ink:#F1EBDC; --ink-soft:#C3CBDE; --muted:#97A0B8; --line:#2A3A5F; --line2:#3A4E7C; --navy:#C6F19D; --brand:#C6F19D; --brand-dark:#C6F19D; --brand-soft:#1C2E1D; --teal:#2DD4BF; --teal-light:#123B36; --teal-dark:#99F6E4; --amber:#E8B34B; --amber-bg:#3A2E10; --deny:#F2A49A; --deny-bg:#46211C; --deny-dot:#E0654F; --ask-dot:#D99A26; --allow-dot:#8FD96B; --side-bg:#111B31; --mp-bg:#26365E; }
+  .btn{color:#0F1F10}
+}
+*{box-sizing:border-box}
+html,body{overflow-x:clip}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);line-height:1.55}
+button{font-family:var(--font);color:inherit}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+[hidden]{display:none!important}
+.mono{font-family:var(--mono)}
+.page{max-width:1180px;margin:0 auto;padding:22px 18px 40px;display:grid;grid-template-columns:minmax(0,1fr);gap:26px}
+.page>*{min-width:0}
+.hint{margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+.sub{color:var(--muted);font-size:13px;margin:4px 0 14px}
+.ok{color:var(--allow-dot);font-weight:700;font-size:12.5px;margin:6px 0 0}
+.r2{display:inline-flex;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--amber-bg);color:var(--amber);vertical-align:middle}
+.tag{display:inline-flex;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+.tag.deny{background:var(--deny-bg);color:var(--deny)}
+
+/* intro */
+.intro{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius-lg);padding:18px 20px}
+.intro h1{margin:0;font-family:var(--serif);font-size:26px;font-weight:600}
+.intro p{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+.intro ul{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--ink-soft)}
+.intro-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+/* panel + buttons */
+.panel{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;box-shadow:0 14px 34px rgba(30,46,74,.10)}
+.panel-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 16px;border-bottom:1.5px dashed var(--line);flex-wrap:wrap;background:var(--surface2)}
+.panel-head strong{font-size:13px;letter-spacing:.02em}
+.ph-left,.ph-right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dotwin{display:flex;gap:6px}.dotwin i{width:11px;height:11px;border-radius:50%;display:block}
+.badge{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid var(--line)}
+.badge.ok{background:var(--teal-light);color:var(--teal-dark);border-color:transparent}
+.badge.warn{background:var(--amber-bg);color:var(--amber);border-color:transparent}
+.btn{border:1.5px solid var(--navy);background:var(--navy);color:#F6F1E6;padding:9px 14px;border-radius:999px;font-weight:700;font-size:13px;cursor:pointer;min-height:38px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn svg{width:17px;height:17px;flex:none}
+.btn.sm{padding:5px 11px;font-size:12px;min-height:32px}
+.btn.wide{width:100%}
+.btn.secondary{background:transparent;color:var(--ink);border-color:var(--line2)}
+.btn.brand{background:var(--brand-green);border-color:var(--brand-green);color:var(--brand-lime)}
+.btn.danger,.btn.stop{background:var(--deny-dot);border-color:var(--deny-dot);color:#FFF7ED}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+@media (prefers-color-scheme: dark){.btn.brand{background:var(--brand-lime);border-color:var(--brand-lime);color:var(--brand-green)}}
+.linkbtn{border:0;background:none;color:var(--teal-dark);font-weight:700;cursor:pointer;padding:0;font-size:inherit;text-decoration:underline;min-height:0}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* desktop */
+.desktop-grid{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:640px;position:relative}
+.desktop-grid>*{min-width:0}
+@media(max-width:820px){.desktop-grid{grid-template-columns:minmax(0,1fr)}}
+.d-side{border-right:1.5px solid var(--line);padding:16px 12px 14px;display:flex;flex-direction:column;gap:4px;background:var(--side-bg)}
+@media(max-width:820px){.d-side{border-right:0;border-bottom:1.5px solid var(--line)}}
+.brand{padding:2px 10px 14px}
+.brand-logo{width:188px;max-width:100%;height:auto;display:block}
+img.logo-dark{display:none}
+@media(prefers-color-scheme:dark){img.logo-light{display:none}img.logo-dark{display:block}}
+.side-label,.m-label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);padding:4px 10px 6px}
+.m-label{padding:12px 2px 8px}
+.side-sep{border-top:1.5px dashed var(--line2);margin:10px 4px 2px}
+.dev-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1.5px solid transparent;background:transparent;padding:10px;border-radius:14px;cursor:pointer;color:var(--ink);min-width:0}
+.dev-item:hover{border-color:var(--line2);background:var(--surface)}
+.dev-item[aria-current="true"]{background:var(--surface);border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-light)}
+.dev-item .ic{width:38px;height:38px;border-radius:11px;background:var(--teal-light);display:grid;place-items:center;flex:none;color:var(--teal-dark)}
+.dev-item .ic svg{width:20px;height:20px}
+.dev-item .meta{min-width:0;flex:1}
+.dev-item b{display:block;font-size:13.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev-item small{display:block;color:var(--muted);font-size:11.5px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev-item.offline .ic,.device.offline .ic,.dev-item.disc .ic,.device.disc .ic{background:var(--line);color:var(--muted)}
+.dev-item.offline b,.device.offline b{color:var(--ink-soft)}
+.status-dot{flex:none;margin-left:auto;width:9px;height:9px;border-radius:50%;background:var(--teal)}
+.status-dot.off{background:var(--line2)}
+.add-device{margin-top:8px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border:1.5px dashed var(--line2);border-radius:14px;background:transparent;color:var(--teal-dark);font-weight:700;font-size:13.5px;cursor:pointer;min-height:42px}
+.add-device:hover{border-color:var(--teal)}
+.add-device[aria-current="true"]{border-style:solid;border-color:var(--teal);background:var(--brand-soft);color:var(--brand-dark);box-shadow:0 0 0 3px var(--teal-light)}
+.side-settings{margin-top:auto;padding-top:14px}
+.settings-btn{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:transparent;padding:10px;border-radius:12px;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--ink);min-height:40px}
+.settings-btn svg{width:18px;height:18px;flex:none;opacity:.8}
+.settings-btn[aria-current="true"]{background:var(--brand-green);color:var(--brand-lime)}
+.d-main{padding:22px;min-width:0}
+.screen{display:none}.screen.active{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.screen h2{margin:0;font-size:24px;letter-spacing:-.01em;font-family:var(--serif);font-weight:600}
+
+/* heroes */
+.self-hero,.peer-hero{background:var(--brand-green);color:#F6F1E6;border-radius:18px;padding:20px;margin-bottom:16px}
+.self-hero{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.hero-top{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.big-ic{width:60px;height:60px;border-radius:16px;background:var(--brand-lime);display:grid;place-items:center;flex:none;color:var(--brand-green)}
+.self-hero .big-ic{background:rgba(246,241,230,.13);color:#F6F1E6}
+.big-ic svg{width:30px;height:30px}
+.self-hero h2,.peer-hero h2{margin:0;color:#F6F1E6;font-size:26px;font-family:var(--serif);font-weight:600}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:rgba(246,241,230,.14);color:#F6F1E6}
+.chip svg{width:14px;height:14px;flex:none}
+.chip.warn{background:#E8B34B;color:#2A1D05}
+.hero-side{margin-left:auto;text-align:right}
+.batt-big{font-size:30px;font-weight:800;line-height:1.05}
+.hero-side small{color:#B9C4DE;font-size:11.5px}
+.batt-gauge{width:104px;height:8px;border-radius:99px;background:rgba(246,241,230,.22);margin:7px 0 5px auto;overflow:hidden}
+.batt-gauge i{display:block;height:100%;border-radius:99px;background:var(--brand-lime)}
+.peer-hero.dim{background:#3B4A3C}
+.peer-hero.dim .big-ic{background:rgba(246,241,230,.2);color:#F6F1E6}
+
+/* top actions */
+.top-actions{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.icon-action{display:inline-flex;align-items:center;height:44px;padding:0 13px;border-radius:999px;border:1.5px solid var(--line2);background:var(--surface);color:var(--ink-soft);cursor:pointer;font-size:13.5px;font-weight:700;overflow:hidden;transition:border-color .15s,color .15s,background-color .15s}
+.icon-action svg{width:19px;height:19px;flex:none}
+.icon-action .ia-label{max-width:0;opacity:0;white-space:nowrap;transform:translateX(-6px);transition:max-width .3s,opacity .22s,transform .3s,margin-left .3s}
+.icon-action:hover .ia-label,.icon-action:focus-visible .ia-label,.icon-action.primary .ia-label{max-width:180px;opacity:1;transform:none;margin-left:8px}
+.icon-action.danger{border-color:var(--deny-dot);background:var(--deny-dot);color:#FFF7ED}
+.icon-action.primary{border-color:var(--brand-green);background:var(--brand-green);color:var(--brand-lime)}
+.icon-action:not(.danger):not(.primary):hover{border-color:var(--deny-dot);color:var(--deny);background:var(--deny-bg)}
+
+/* banners, indicator, prompts, toast */
+.conn-banner{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;margin:-4px 0 16px;font-size:13px}
+.conn-banner svg{width:20px;height:20px;flex:none;margin-top:1px}
+.conn-banner b{display:block;font-size:13.5px}
+.conn-banner p{margin:2px 0 0;line-height:1.45}
+.conn-banner.ble{background:var(--amber-bg);color:var(--amber);border:1.5px solid color-mix(in srgb,var(--amber) 35%,transparent)}
+.conn-banner.off{background:var(--surface2);color:var(--ink-soft);border:1.5px dashed var(--line2)}
+.act-ind{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--deny-bg);color:var(--deny);font-size:13px;font-weight:600;margin-bottom:14px;flex-wrap:wrap}
+.act-ind .rec{width:10px;height:10px;border-radius:50%;background:var(--deny-dot);flex:none;animation:pulse 1.2s ease-in-out infinite}
+.act-ind .btn{margin-left:auto}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.d-prompt-wrap{position:absolute;top:16px;right:16px;z-index:6;width:min(360px,calc(100% - 32px))}
+.prompt-card{background:var(--surface);border:1.5px solid var(--teal);border-radius:16px;padding:14px;box-shadow:0 18px 40px rgba(30,46,74,.25);animation:fade .18s ease}
+.pc-head{display:flex;align-items:center;gap:8px;font-size:13px}
+.pc-head svg{width:18px;height:18px;color:var(--teal-dark);flex:none}
+.pc-left{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--amber);background:var(--amber-bg);padding:2px 8px;border-radius:999px;white-space:nowrap}
+.prompt-card p,.hu p{margin:8px 0 4px;font-size:13.5px}
+.prompt-card small{display:block;color:var(--muted);font-size:11.5px;line-height:1.4}
+.pc-actions{display:flex;gap:8px;margin-top:12px}
+.pc-actions .btn{flex:1}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--brand-green);color:var(--brand-lime);padding:10px 16px;border-radius:12px;font-size:13px;font-weight:600;z-index:50;max-width:min(560px,calc(100% - 32px));box-shadow:0 10px 30px rgba(0,0,0,.25)}
+
+/* permissions */
+.feat-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:20px 0 10px}
+.feat-head h3{margin:0;font-size:16.5px;font-family:var(--serif);font-weight:600}
+.perm-list{display:grid;gap:8px}
+.perm-row{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface)}
+.perm-row .ic{width:38px;height:38px;border-radius:11px;background:var(--brand-soft);display:grid;place-items:center;flex:none;color:var(--brand-dark)}
+.perm-row .ic svg{width:19px;height:19px}
+.perm-row .pmeta{min-width:0;flex:1}
+.perm-row b{font-size:13.5px;display:block;line-height:1.3}
+.perm-row p{margin:0;color:var(--muted);font-size:12px;line-height:1.4}
+.seg{display:inline-flex;border:1.5px solid var(--line2);border-radius:999px;overflow:hidden;background:var(--surface);flex:none}
+.seg button{border:0;background:transparent;cursor:pointer;min-height:32px;padding:6px 11px;font-size:12px;font-weight:700;color:var(--ink-soft);white-space:nowrap}
+.perm-seg [data-perm="allow"].on{background:var(--brand-lime);color:var(--brand-green)}
+.perm-seg [data-perm="ask"].on{background:var(--amber-bg);color:var(--amber)}
+.perm-seg [data-perm="deny"].on{background:var(--deny-bg);color:var(--deny)}
+@media(max-width:620px){.perm-row{flex-wrap:wrap}.perm-seg{width:100%}.perm-seg button{flex:1}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:0;font-size:11.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.lg{width:11px;height:11px;border-radius:4px;display:inline-block}
+.lg.on{background:var(--brand-lime);border:1px solid var(--brand-green)}
+.lg.ask{background:var(--brand-lime);box-shadow:inset 0 0 0 3px var(--amber-bg)}
+.lg.off{background:var(--line)}
+.legend-list{margin:8px 0 12px;padding-left:18px;font-size:13px;color:var(--ink-soft)}
+
+/* localhost ports */
+.ports{margin-top:6px}
+.port-row{border:1.5px solid var(--line);border-radius:14px;background:var(--surface);padding:11px 13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.port-row .pmeta{flex:1;min-width:150px}
+.port-row b{display:block;font-size:13.5px}
+.port-row small{display:block;color:var(--muted);font-size:12px}
+.lan-on{color:var(--amber);font-weight:700}
+.lan-sel{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink-soft)}
+.lan-sel select,.fld select{font-family:var(--font);font-size:12.5px;padding:5px 8px;border:1.5px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink)}
+.icon-x{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line2);background:transparent;cursor:pointer;color:var(--muted);font-size:16px;line-height:1}
+.lan-warn{flex-basis:100%;display:flex;gap:10px;padding:11px 12px;border-radius:12px;background:var(--amber-bg);color:var(--amber);font-size:12.5px;line-height:1.45}
+.lan-warn svg{width:18px;height:18px;flex:none;margin-top:2px}
+.lan-warn p{margin:4px 0 0}
+.lan-warn .ack{display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:600}
+.lw-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.port-add{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.port-add input,.set-in,.fld input,.kb-input,.reply-row input{font-family:var(--font);font-size:13px;padding:8px 11px;border:1.5px solid var(--line2);border-radius:10px;background:var(--surface);color:var(--ink);min-width:0}
+.port-add input[type=number]{width:96px}
+.port-add input[type=text]{flex:1;min-width:120px}
+.empty{color:var(--muted);font-size:13px;margin:0 0 8px}
+
+/* media player */
+.switch{margin-left:auto;display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;font-weight:700;color:var(--ink-soft);position:relative}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .track{width:48px;height:27px;border-radius:99px;background:var(--line2);position:relative;flex:none;transition:background-color .18s}
+.switch .track::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(15,31,16,.35);transition:transform .18s}
+.switch input:checked + .track{background:var(--brand-green)}
+.switch input:checked + .track::after{transform:translateX(21px);background:var(--brand-lime)}
+.switch input:focus-visible + .track{outline:3px solid var(--brand);outline-offset:2px}
+.switch input:disabled + .track{opacity:.45}
+@media(prefers-color-scheme:dark){.switch input:checked + .track{background:#2F5A2E}}
+.mp-console{border:1.5px solid var(--mp-bg);border-radius:18px;background:var(--mp-bg);color:#F6F1E6;overflow:hidden}
+.mp-msg{margin:0;padding:18px;color:#C9D2E6;font-size:13.5px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.mp-msg .btn.brand{background:var(--brand-lime);border-color:var(--brand-lime);color:var(--mp-bg)}
+.mp-sources{display:flex;gap:6px;padding:10px 12px;border-bottom:1px dashed rgba(246,241,230,.25);flex-wrap:wrap}
+.mp-src{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1.5px solid transparent;background:transparent;color:#B9C4DE;font-size:12.5px;font-weight:700;cursor:pointer;min-height:34px}
+.mp-src .src-dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.55}
+.mp-src .src-state{font-size:11px;font-weight:600;opacity:.75}
+.mp-src:hover{border-color:rgba(198,241,157,.45);color:#F6F1E6}
+.mp-src.on{background:var(--brand-lime);color:var(--mp-bg)}
+.mp-stage{display:flex;gap:18px;padding:18px;align-items:center}
+.mp-cover{width:96px;height:96px;border-radius:16px;background:var(--brand-lime);color:var(--mp-bg);display:grid;place-items:center;flex:none}
+.mp-cover svg{width:44px;height:44px}
+.mp-main{flex:1;min-width:0}
+.mp-srcname{display:block;font-size:11.5px;font-weight:700;color:var(--brand-lime);margin-bottom:2px}
+.mp-main b{display:block;font-size:17px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-artist{color:#B9C4DE;font-size:13px}
+.mp-progress{height:8px;border-radius:99px;background:rgba(246,241,230,.22);margin-top:12px;overflow:hidden}
+.mp-progress.seek{cursor:pointer}
+.mp-progress i{display:block;height:100%;border-radius:99px;background:var(--brand-lime)}
+.mp-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#B9C4DE;margin-top:5px}
+.mp-live{margin:12px 0 0;font-size:12px;color:#B9C4DE;font-family:var(--mono)}
+.mp-controls{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.mp-btn{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(246,241,230,.35);background:transparent;display:grid;place-items:center;cursor:pointer;color:#F6F1E6;padding:0;min-height:0}
+.mp-btn svg{width:17px;height:17px}
+.mp-btn:hover{border-color:var(--brand-lime);color:var(--brand-lime)}
+.mp-btn.play{width:52px;height:52px;background:var(--brand-lime);border-color:var(--brand-lime);color:var(--mp-bg)}
+.mp-btn.play svg{width:21px;height:21px}
+.mp-btn.on{background:var(--brand-lime);border-color:var(--brand-lime);color:var(--mp-bg)}
+.mp-volume{margin-left:auto;display:flex;align-items:center;gap:8px;color:#B9C4DE}
+.mp-volume input{width:104px;accent-color:var(--brand-lime)}
+@media(max-width:560px){.mp-stage{flex-direction:column;align-items:stretch}.mp-volume{margin-left:0;width:100%}.mp-volume input{flex:1}}
+
+/* feature tiles */
+.feat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px}
+.feat-cell{position:relative;min-width:0}
+.feat{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;height:100%;padding:18px 6px 14px;border:1.5px solid transparent;border-radius:18px;background:var(--brand-lime);cursor:pointer;color:var(--brand-green);text-align:center;transition:background-color .16s,border-color .16s}
+.feat .ic{width:56px;height:56px;border-radius:18px;background:var(--brand-green);display:grid;place-items:center;flex:none;color:var(--brand-lime);transition:transform .16s}
+.feat .ic svg{width:26px;height:26px}
+.feat .ft{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+.feat b{font-size:13.5px;line-height:1.3}
+.feat small{font-size:10.5px;font-weight:700;line-height:1.3;padding:2px 8px;border-radius:999px}
+.feat:hover .ic{transform:translateY(-3px)}
+.feat-cell.ask .feat small{background:var(--amber-bg);color:#8A5A12}
+.feat-cell.off .feat{background:var(--surface2);border-color:var(--line);color:var(--muted);cursor:not-allowed}
+.feat-cell.off .feat .ic{background:var(--line);color:var(--muted)}
+.feat-cell.off .feat:hover .ic{transform:none}
+.feat-cell.off .feat small{color:var(--muted);padding:0}
+.feat-set{position:absolute;top:6px;left:6px;width:30px;height:30px;min-height:0;border-radius:50%;border:1.5px solid transparent;background:rgba(15,31,16,.08);color:var(--brand-green);display:grid;place-items:center;cursor:pointer;padding:0}
+.feat-set svg{width:16px;height:16px}
+.feat-set:hover{background:rgba(15,31,16,.16)}
+
+/* feature view */
+.fv-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.fv-head h3{margin:0;font-size:20px;font-family:var(--serif);font-weight:600}
+.fv-head small{display:block;color:var(--muted);font-size:12px}
+.fv-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 13px;border-radius:12px;font-size:13px;font-weight:600;margin-bottom:12px}
+.fv-status.wait{background:var(--amber-bg);color:var(--amber)}
+.fv-status.err{background:var(--deny-bg);color:var(--deny)}
+.fv-status.okk{background:var(--brand-soft);color:var(--brand-dark)}
+.fv-status .btn{margin-left:auto}
+.pair-dot{width:9px;height:9px;border-radius:50%;background:var(--ask-dot);flex:none;animation:pulse 1.2s ease-in-out infinite}
+.fv-card{border:1.5px solid var(--line);border-radius:14px;background:var(--surface);padding:13px;margin-bottom:10px}
+.fv-card b{display:block;font-size:13.5px}
+.fv-card p{margin:4px 0 8px;font-size:13px;word-break:break-all}
+.fv-card small{color:var(--muted);font-size:12px}
+.drop{border:2px dashed var(--line2);border-radius:16px;padding:22px;text-align:center;color:var(--muted);display:grid;justify-items:center;gap:8px;margin-bottom:12px}
+.drop svg{width:28px;height:28px}
+.xfer{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;background:var(--surface)}
+.xfer-top{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:600}
+.xfer-bar{height:7px;border-radius:99px;background:var(--line);margin:7px 0 4px;overflow:hidden}
+.xfer-bar i{display:block;height:100%;background:var(--teal);border-radius:99px}
+.xfer small{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
+.thumbs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+.thumb{aspect-ratio:1;border-radius:10px;border:3px solid transparent;cursor:pointer;padding:0}
+.thumb.sel{border-color:var(--teal)}
+.touchpad{height:220px;border:2px solid var(--ink);border-radius:18px;background:repeating-linear-gradient(0deg,transparent,transparent 23px,color-mix(in srgb,var(--line) 55%,transparent) 24px),repeating-linear-gradient(90deg,transparent,transparent 23px,color-mix(in srgb,var(--line) 55%,transparent) 24px);display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:12px}
+.mouse-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.keys button,.mouse-btns button{border:1.5px solid var(--line2);background:var(--surface);border-radius:10px;padding:8px 10px;font-size:12.5px;font-weight:700;cursor:pointer;min-height:38px}
+.kb-input{width:100%;min-height:90px;resize:vertical}
+.pres{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pres button{min-height:110px;border-radius:16px;border:1.5px solid var(--line2);background:var(--surface);font-size:15px;font-weight:800;cursor:pointer}
+.pres button.next{background:var(--brand-green);color:var(--brand-lime);border-color:var(--brand-green)}
+.ptimer{margin-top:10px;font-size:13px;color:var(--muted)}
+.ptimer b{font-family:var(--mono);color:var(--ink);font-size:18px}
+.viewer{background:#0B0F19;border-radius:16px;padding:12px;display:grid;place-items:center;margin-bottom:10px}
+.vscreen{background:linear-gradient(135deg,#1E2E4A,#0F766E);color:#F6F1E6;border-radius:10px;display:grid;place-items:center;text-align:center;font-weight:700;font-size:13px;padding:10px;width:100%;aspect-ratio:16/9}
+.viewer.android .vscreen{width:min(200px,60%);aspect-ratio:9/19}
+.vscreen small{display:block;font-weight:500;opacity:.8;font-family:var(--mono);font-size:11px}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin:10px 0}
+.slider{display:flex;gap:10px;align-items:center;font-size:12.5px;font-weight:600;margin-top:10px}
+.slider input{flex:1;accent-color:var(--teal)}
+
+/* notifications */
+.notif{margin-top:22px;border:1.5px solid var(--line);border-radius:18px;background:var(--surface);padding:16px}
+.notif-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.notif-head h3{margin:0;font-size:16.5px;font-family:var(--serif);font-weight:600}
+.notif-off{margin:12px 0 0;color:var(--muted);font-size:13px}
+.napps{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.napps .m-label{padding:0 4px 0 0;flex-basis:100%}
+.napp{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line2);background:transparent;border-radius:999px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink-soft);min-height:32px}
+.napp svg{width:14px;height:14px}
+.napp.on{background:var(--brand-lime);border-color:var(--brand-lime);color:var(--brand-green)}
+.notif-list{display:grid;gap:8px;margin-top:12px}
+.notif-item{display:flex;gap:12px;align-items:flex-start;padding:11px 12px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface2)}
+.notif-item .nic{width:36px;height:36px;border-radius:11px;background:var(--brand-soft);color:var(--brand-dark);display:grid;place-items:center;flex:none}
+.notif-item .nic svg{width:18px;height:18px}
+.notif-item .nmeta{min-width:0;flex:1}
+.notif-item b{font-size:13.5px;display:block;line-height:1.3}
+.notif-item p{margin:1px 0 0;color:var(--muted);font-size:12.5px;line-height:1.4}
+.notif-item time{font-family:var(--mono);font-size:11px;color:var(--muted);flex:none;padding-top:2px}
+.reply-row{display:flex;gap:6px;margin-top:8px}
+.reply-row input{flex:1}
+
+/* add device / pairing */
+.scan-box{border:1.5px solid var(--line);border-radius:16px;background:var(--surface2);padding:14px;margin-top:10px;text-align:center}
+.scan-view{position:relative;height:190px;border-radius:12px;background:#111;overflow:hidden;display:grid;place-items:center}
+.scan-frame{width:130px;height:130px;border:3px solid var(--brand-lime);border-radius:16px}
+.scan-line{position:absolute;left:20%;right:20%;height:2px;background:var(--brand-lime);top:30%;animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes scan{to{top:68%}}
+.scan-box p{margin:10px 0;font-size:13px;color:var(--ink-soft)}
+.pair-msg{margin:10px 0 0;font-size:12.5px;font-weight:600;color:var(--allow-dot);line-height:1.45}
+.host-qr{border:1.5px solid var(--line);border-radius:18px;background:var(--surface2);padding:18px 16px;text-align:center;margin:16px 0}
+.pair-qr{width:188px;height:188px;margin:10px auto 8px;padding:10px;background:#fff;border:1.5px solid var(--line2);border-radius:16px}
+.pair-qr svg{width:100%;height:100%;display:block}
+.pair-label{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+.host-meta{font-size:12.5px;color:var(--muted)}
+.host-meta b{color:var(--ink);font-size:13.5px}
+.qr-exp{font-size:12px;color:var(--muted);margin-top:6px}
+.qr-exp b{font-family:var(--mono);color:var(--ink)}
+.detect-list{display:grid;gap:10px}
+.detect-item{border:1.5px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;min-width:0}
+.detect-item.open{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-light)}
+.detect-item.connected{border-color:var(--allow-dot)}
+.detect-head{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:transparent;border:0;padding:12px 13px;cursor:pointer;color:var(--ink)}
+.detect-head .ic{width:40px;height:40px;border-radius:12px;background:var(--amber-bg);display:grid;place-items:center;flex:none;color:var(--amber)}
+.detect-head .ic svg{width:21px;height:21px}
+.detect-item.connected .ic{background:var(--brand-soft);color:var(--brand-dark)}
+.detect-head .meta{min-width:0;flex:1}
+.detect-head b{display:block;font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detect-head small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detect-badge{flex:none;font-size:11px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:3px 9px;border-radius:999px}
+.detect-item.connected .detect-badge{background:var(--brand-soft);color:var(--brand-dark)}
+.chev{flex:none;width:26px;height:26px;display:grid;place-items:center;color:var(--muted);transition:transform .2s}
+.chev svg{width:16px;height:16px}
+.detect-item.open .chev{transform:rotate(180deg)}
+.detect-drop{border-top:1.5px dashed var(--line2);padding:16px 14px 18px;text-align:center;background:var(--surface2);animation:fade .18s ease}
+.drop-note{margin:8px auto 0;font-size:12.5px;color:var(--muted);max-width:380px}
+.drop-actions{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.pair-code{display:flex;gap:6px;justify-content:center;max-width:330px;margin:10px auto 4px}
+.pair-code span{flex:1 1 0;max-width:46px;height:52px;display:grid;place-items:center;border:1.5px solid var(--line2);border-radius:12px;background:var(--surface);font-family:var(--mono);font-size:23px;color:var(--ink)}
+.pair-status{display:inline-flex;align-items:center;gap:9px;margin-top:12px;padding:7px 14px;border-radius:999px;background:var(--amber-bg);color:var(--amber);font-size:13px;font-weight:700}
+.pair-status.done{background:var(--brand-soft);color:var(--brand-dark)}
+.pair-status.done .pair-dot{background:var(--allow-dot);animation:none}
+
+/* settings */
+.set-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px dashed var(--line);font-size:13.5px;flex-wrap:wrap}
+.set-row .lbl{min-width:0;flex:1}
+.set-row .lbl small{display:block;color:var(--muted);font-size:12px}
+.set-row .val{font-weight:600}
+.set-row .switch{margin-left:0}
+.did{font-size:12px;word-break:break-all}
+.set-block{padding:12px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+.set-block small{display:block;color:var(--muted);font-size:12px}
+.log{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.log li{display:flex;gap:10px;font-size:12.5px;align-items:baseline;flex-wrap:wrap}
+.log time{font-family:var(--mono);color:var(--muted);font-size:11.5px}
+.log em{font-style:normal;font-weight:700;margin-left:auto;font-size:11.5px}
+.log em.ok{color:var(--allow-dot)}.log em.no{color:var(--deny)}
+
+/* onboarding overlay */
+.onb{position:absolute;inset:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow-y:auto}
+.onb-card{width:min(600px,100%);background:var(--surface);border:1.5px solid var(--line2);border-radius:22px;padding:20px;box-shadow:0 18px 40px rgba(30,46,74,.22);animation:fade .2s ease}
+.onb-card h2{margin:8px 0 4px;font-family:var(--serif);font-weight:600;font-size:23px}
+.onb-card p{margin:0 0 10px;color:var(--ink-soft);font-size:13.5px}
+.onb-top{display:flex;align-items:center;justify-content:space-between}
+.onb-dots{display:flex;gap:6px}
+.onb-dots i{width:22px;height:5px;border-radius:9px;background:var(--line)}
+.onb-dots i.on{background:var(--brand-green)}
+.onb-ic{width:52px;height:52px;border-radius:15px;background:var(--brand-green);color:var(--brand-lime);display:grid;place-items:center;margin-top:10px}
+.onb-ic svg{width:26px;height:26px}
+.onb-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.onb-note{margin:12px 0 0!important;font-size:11.5px!important;color:var(--muted)!important}
+
+/* android (shared) */
+.android-wrap{display:flex;justify-content:center;padding:24px 16px}
+.phone{width:min(340px,100%);background:#0B0F19;border-radius:36px;padding:10px;box-shadow:0 18px 40px rgba(30,46,74,.22)}
+.phone-in{background:var(--surface);border-radius:28px;overflow:hidden;height:720px;display:flex;flex-direction:column;position:relative}
+.phone-status{display:flex;justify-content:space-between;padding:10px 16px 4px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.phone-appbar{padding:8px 16px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px dashed var(--line)}
+.phone-logo{height:26px;width:auto;display:block}
+.phone-body{padding:14px 14px 18px;flex:1;overflow-y:auto;min-height:0}
+.phone [data-ind] .act-ind{margin:8px 12px 0;font-size:12px}
+.settings-icon-btn,.m-back,.m-sheet-close{width:38px;height:38px;min-height:0;border-radius:50%;border:1.5px solid var(--line2);background:var(--surface);color:var(--ink-soft);display:grid;place-items:center;cursor:pointer;padding:0;flex:none}
+.settings-icon-btn svg,.m-back svg,.m-sheet-close svg{width:17px;height:17px}
+.mview,.v2view{animation:fade .18s ease}
+.m-self{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--brand-green);border:1.5px solid rgba(198,241,157,.35);border-radius:18px;padding:13px;color:#F6F1E6;cursor:pointer}
+.m-self .ic{width:42px;height:42px;border-radius:13px;background:var(--brand-lime);color:var(--brand-green);display:grid;place-items:center;flex:none}
+.m-self .ic svg{width:22px;height:22px}
+.m-self .meta{min-width:0;flex:1}
+.m-self b{display:block;font-size:14.5px;line-height:1.3}
+.m-self small{display:block;color:#A9BFA4;font-size:11.5px;line-height:1.4}
+.pill{flex:none;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--brand-green);background:var(--brand-lime);padding:4px 9px;border-radius:999px}
+.pill.ghost{background:var(--surface2);color:var(--ink-soft);border:1px solid var(--line)}
+.device{display:flex;gap:11px;align-items:center;padding:12px;border:1.5px solid var(--line);border-radius:16px;background:var(--surface);width:100%;text-align:left;color:var(--ink);margin-bottom:8px}
+button.device{cursor:pointer}
+.device .ic{width:42px;height:42px;border-radius:12px;background:var(--teal-light);display:grid;place-items:center;flex:none;color:var(--teal-dark)}
+.device .ic svg{width:21px;height:21px}
+.device .meta{min-width:0;flex:1}
+.device b{display:block;font-size:14px}
+.device small{display:block;color:var(--muted);font-size:11.5px;line-height:1.4}
+.device .status-dot{margin-left:0}
+.m-backrow{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.m-title{margin:0;font-size:17px;font-family:var(--serif);font-weight:600}
+.m-backrow .icon-action{height:40px;padding:0 11px}
+.phone .self-hero,.phone .peer-hero{padding:15px;border-radius:16px;margin-bottom:14px}
+.phone .peer-hero h2{font-size:21px}
+.phone .big-ic{width:48px;height:48px;border-radius:14px}
+.phone .big-ic svg{width:24px;height:24px}
+.phone .batt-big{font-size:22px}
+.phone .batt-gauge{width:68px}
+.phone .feat-head{margin:16px 0 8px}
+.phone .feat-head h3{font-size:15.5px}
+.phone .feat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}
+.phone .feat{padding:16px 4px 12px;border-radius:16px}
+.phone .feat .ic{width:48px;height:48px;border-radius:15px}
+.phone .feat .ic svg{width:23px;height:23px}
+.phone .feat b{font-size:12.5px}
+.phone .mp-stage{flex-direction:column;align-items:stretch;gap:12px;padding:14px}
+.phone .mp-cover{width:58px;height:58px;border-radius:14px}
+.phone .mp-cover svg{width:28px;height:28px}
+.phone .mp-main b{font-size:15px}
+.phone .mp-sources{padding:8px 10px;gap:5px}
+.phone .mp-src{font-size:11.5px;padding:5px 9px}
+.phone .mp-volume{margin-left:0;width:100%}
+.phone .mp-volume input{flex:1}
+.phone .notif{padding:13px;margin-top:18px;border-radius:16px}
+.phone .perm-row{flex-wrap:wrap;gap:9px;padding:10px 11px}
+.phone .perm-row .ic{width:34px;height:34px;border-radius:10px}
+.phone .perm-seg{width:100%;display:flex}
+.phone .perm-seg button{flex:1;padding:6px 4px}
+.phone .host-qr{padding:14px 12px}
+.phone .pair-code span{height:42px;font-size:18px;border-radius:10px}
+.phone .fv-head h3{font-size:17px}
+.phone .touchpad{height:200px}
+.phone .set-row{font-size:13px}
+.phone .onb{padding:12px 10px}
+.phone .onb-card{padding:16px;border-radius:18px}
+.phone .onb-card h2{font-size:19px}
+.phone .conn-banner{font-size:12.5px}
+.hu-wrap{position:absolute;top:28px;left:8px;right:8px;z-index:12}
+.hu{background:var(--surface);border:1.5px solid var(--teal);border-radius:18px;padding:12px;box-shadow:0 14px 30px rgba(0,0,0,.3);animation:fade .18s ease;color:var(--ink)}
+.hu-top{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+.hu-top svg{width:15px;height:15px;color:var(--teal-dark)}
+.hu b{font-size:13.5px}
+.hu p{margin:2px 0 0;font-size:13px}
+.m-sheet{position:absolute;inset:0;z-index:10}
+.m-sheet:not([hidden]){display:flex;flex-direction:column;justify-content:flex-end}
+.m-sheet-bg{position:absolute;inset:0;background:rgba(15,31,16,.45);border:0;cursor:pointer;padding:0}
+.m-sheet-panel{position:relative;background:var(--surface);border-top:1.5px solid var(--line2);border-radius:22px 22px 0 0;padding:16px 14px 20px;max-height:90%;overflow-y:auto;animation:sheetUp .22s ease}
+.m-sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.m-sheet-head h4{margin:0;font-size:16px;font-family:var(--serif);font-weight:600;flex:1}
+@keyframes sheetUp{from{transform:translateY(16px);opacity:.4}to{transform:none;opacity:1}}
+
+/* android v2: the same components, dark brand theme through variables */
+.v2-in{--surface:#13261A;--surface2:#0F1F12;--paper:#0B1A0C;--ink:#F1EBDC;--ink-soft:#C9D6C4;--muted:#8FA98C;--line:rgba(246,241,230,.14);--line2:rgba(198,241,157,.3);--navy:#C6F19D;--brand:#C6F19D;--brand-dark:#C6F19D;--brand-soft:rgba(198,241,157,.14);--teal:#C6F19D;--teal-light:rgba(198,241,157,.16);--teal-dark:#C6F19D;--amber:#E8B34B;--amber-bg:rgba(232,179,75,.16);--deny:#F2A49A;--deny-bg:rgba(242,164,154,.14);--allow-dot:#8FD96B;background:#0B1A0C;color:#F1EBDC}
+.v2-in .btn{color:#0F1F10}
+.v2-in .btn.secondary{color:#F1EBDC}
+.v2-in .btn.brand{background:var(--brand-lime);border-color:var(--brand-lime);color:var(--brand-green)}
+.v2-in .btn.danger,.v2-in .btn.stop{color:#FFF7ED}
+.v2-appbar{display:flex;justify-content:space-between;align-items:center;padding:8px 16px 10px;border-bottom:1px solid rgba(198,241,157,.16)}
+.v2-in img.logo-light{display:none}
+.v2-in img.logo-dark{display:block}
+.v2-self{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:rgba(198,241,157,.10);border:1.5px solid rgba(198,241,157,.35);border-radius:18px;padding:13px;color:#F1EBDC;cursor:pointer}
+.v2-self .ic{width:42px;height:42px;border-radius:13px;background:var(--brand-lime);color:var(--brand-green);display:grid;place-items:center;flex:none}
+.v2-self .ic svg{width:22px;height:22px}
+.v2-self .meta{min-width:0;flex:1}
+.v2-self b{display:block;font-size:14.5px}
+.v2-self small{display:block;color:#A9BFA4;font-size:11.5px}
+.v2-khead{display:flex;align-items:flex-start;gap:8px;margin-bottom:12px}
+.v2-khead .kt{min-width:0;flex:1}
+.v2-khead h3{margin:0;font-family:var(--serif);font-size:21px;font-weight:600;line-height:1.2}
+.v2-kchip{display:inline-flex;align-items:center;gap:6px;margin-top:5px;font-size:11px;font-weight:700;color:var(--brand-lime);background:rgba(198,241,157,.12);padding:3px 9px;border-radius:999px}
+.v2-kchip i{width:7px;height:7px;border-radius:50%;background:var(--brand-lime)}
+.v2-kchip.off{color:#C9D6C4}.v2-kchip.off i{background:#8FA98C}
+.v2-kmeta{display:block;font-size:11px;color:#8FA98C;margin-top:4px}
+.v2-iconbtn{width:38px;height:38px;min-height:0;border-radius:50%;border:1.5px solid rgba(246,241,230,.25);background:transparent;color:#C9D6C4;display:grid;place-items:center;cursor:pointer;padding:0;flex:none}
+.v2-iconbtn svg{width:17px;height:17px}
+.v2-iconbtn.danger{border-color:#C0392B;background:#C0392B;color:#FFF7ED}
+.v2-iconbtn.primary{border-color:var(--brand-lime);background:var(--brand-lime);color:var(--brand-green)}
+.v2-in .feat-grid{grid-template-columns:1fr;gap:8px}
+.v2-in .feat{flex-direction:row;justify-content:flex-start;text-align:left;padding:11px 14px;gap:12px;border-radius:16px}
+.v2-in .feat .ic{width:40px;height:40px;border-radius:12px}
+.v2-in .feat .ic svg{width:20px;height:20px}
+.v2-in .feat .ft{align-items:flex-start}
+.v2-in .feat b{font-size:14px}
+.v2-in .feat-cell.has-gear .feat{padding-right:52px}
+.v2-in .feat-set{top:50%;left:auto;right:10px;transform:translateY(-50%);width:32px;height:32px}
+.v2-in .feat-cell.ask .feat small{color:#8A5A12;background:#F7E7BD}
+.v2-in .notif{background:rgba(246,241,230,.04)}
+.v2-tabs{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(198,241,157,.18);background:rgba(0,0,0,.22);padding:8px 6px 12px}
+.v2-tabs button{border:0;background:transparent;font-size:11px;font-weight:700;color:#8FA98C;cursor:pointer;padding:6px 2px;border-radius:10px;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:44px}
+.v2-tabs button svg{width:20px;height:20px}
+.v2-tabs button[aria-current="true"]{color:var(--brand-lime);background:rgba(198,241,157,.12)}
+.v2-in .m-sheet-panel{background:#182B17}
+.v2-in .onb{background:rgba(11,26,12,.9)}
+.v2-in .phone-status{color:#8FA98C}
+
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <section class="intro" aria-label="Tentang mockup ini">
+    <h1>UrDevice: mockup layout</h1>
+    <p>Mockup ini panduan, bukan desain final. Data dan interaksi hanya simulasi. Acuan perilaku ada di <span class="mono">.kiro/specs/urdevice/</span>.</p>
+    <ul>
+      <li>Ubah izin di <b>Perangkat ini</b> (desktop) atau kartu Pixel di HP. Ubin fitur di device lain langsung ikut berubah.</li>
+      <li>Buka fitur yang <b>Always Ask</b>, misalnya Mousepad di HP. Laptop menampilkan permintaan izin dengan batas 30 detik.</li>
+      <li>Coba <b>Putuskan koneksi</b> lalu <b>Hubungkan lagi</b>, dan halaman <b>Tambah Device</b> (Scan QR, atau pilih device untuk kode 6 digit).</li>
+    </ul>
+    <div class="intro-actions">
+      <button class="btn secondary sm" type="button" data-act="simble">Simulasi: Wi-Fi putus, pindah ke Bluetooth LE</button>
+    </div>
+  </section>
+
+  <!-- DESKTOP -->
+  <section aria-label="Layout aplikasi desktop UrDevice">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="ph-left"><span class="dotwin"><i style="background:#F87171"></i><i style="background:#FBBF24"></i><i style="background:#34D399"></i></span><strong>UrDevice: Desktop · Windows / macOS / Linux</strong></div>
+        <div class="ph-right"><span class="badge ok" data-pathbadge>Wi-Fi · terenkripsi</span><button class="btn secondary sm" type="button" data-act="onbopen" data-k="dsk">Lihat onboarding</button></div>
+      </div>
+      <div class="desktop-grid">
+        <nav class="d-side" aria-label="Daftar device">
+          <div class="brand">
+            <img class="brand-logo logo-light" src="../../assets/urdevice-logo-light-bg.svg" alt="UrDevice" width="223" height="64">
+            <img class="brand-logo logo-dark" src="../../assets/urdevice-logo-dark-bg.svg" alt="" aria-hidden="true" width="223" height="64">
+          </div>
+          <button class="dev-item" type="button" data-act="dgo" data-to="self" data-side="self" aria-current="true">
+            <span class="ic" data-icon="laptop"></span>
+            <span class="meta"><b>Laptop Ahmad</b><small>Perangkat ini · Windows 11</small><small>192.168.1.8 · Baterai 82%</small></span>
+            <span class="status-dot" role="img" aria-label="Perangkat ini"></span>
+          </button>
+          <div class="side-sep" aria-hidden="true"></div>
+          <span class="side-label">Device</span>
+          <button class="dev-item" type="button" data-act="dgo" data-to="pixel" data-side="pixel" aria-current="false" data-sidepixel>
+            <span class="ic" data-icon="phone"></span>
+            <span class="meta"><b>Pixel</b><small data-sideline1></small><small data-sideline2></small></span>
+            <span class="status-dot" data-sidedot></span>
+          </button>
+          <button class="dev-item offline" type="button" data-act="dgo" data-to="mac" data-side="mac" aria-current="false">
+            <span class="ic" data-icon="laptop"></span>
+            <span class="meta"><b>MacBook Kantor</b><small>macOS · Offline</small><small>Terlihat kemarin 17.20</small></span>
+            <span class="status-dot off" role="img" aria-label="Offline"></span>
+          </button>
+          <button class="add-device" type="button" data-act="dgo" data-to="add" data-side="add" aria-current="false"><span aria-hidden="true" style="font-size:17px;line-height:1">+</span> Add Device</button>
+          <div class="side-settings"><button class="settings-btn" type="button" data-act="dgo" data-to="settings" data-side="settings" aria-current="false"><span data-icon="gear"></span>Settings</button></div>
+        </nav>
+
+        <div class="d-main">
+          <div data-ind="laptop"></div>
+          <div class="screen active" data-panel="self"><div id="dskSelf"></div></div>
+
+          <div class="screen" data-panel="pixel">
+            <div class="top-actions" id="dskActions" aria-label="Aksi koneksi Pixel"></div>
+            <div id="dskHero"></div>
+            <div id="dskBanner"></div>
+            <div id="dskMp"></div>
+            <div class="feat-head"><h3>Fitur di Pixel</h3>
+              <p class="legend"><span><i class="lg on"></i>Allow</span><span><i class="lg ask"></i>Always Ask: Pixel konfirmasi dulu</span><span><i class="lg off"></i>Deny: dimatikan oleh Pixel</span></p>
+            </div>
+            <div class="feat-grid" id="dskTiles"></div>
+            <div id="dskNotif"></div>
+          </div>
+
+          <div class="screen" data-panel="feature"><div id="dskFeat"></div></div>
+
+          <div class="screen" data-panel="mac">
+            <div class="top-actions"><button class="icon-action" type="button" data-act="forget" data-name="MacBook Kantor" aria-label="Lupakan device"><span data-icon="trash"></span><span class="ia-label" aria-hidden="true">Lupakan device</span></button></div>
+            <div class="peer-hero dim"><div class="hero-top"><span class="big-ic" data-icon="laptop"></span><div><h2>MacBook Kantor</h2><div class="chips"><span class="chip">macOS 15</span><span class="chip">Offline</span><span class="chip mono">192.168.1.40</span></div></div><div class="hero-side"><small>Terlihat kemarin 17.20<br>di Wi-Fi Kantor</small></div></div></div>
+            <div class="conn-banner off"><span data-icon="power"></span><div><b>MacBook Kantor sedang offline</b><p>UrDevice tersambung otomatis saat MacBook Kantor ada di jaringan yang sama. Tidak ada relay internet.</p></div></div>
+          </div>
+
+          <div class="screen" data-panel="add"><div id="dskAdd"></div></div>
+
+          <div class="screen" data-panel="settings"><h2>Settings</h2><div data-settings="laptop" data-k="dsk"></div></div>
+        </div>
+        <div class="d-prompt-wrap" data-prompt="laptop"></div>
+        <div class="onb" id="dskOnb" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANDROID v1 -->
+  <section aria-label="Layout aplikasi Android UrDevice versi 1">
+    <div class="panel">
+      <div class="panel-head"><strong>UrDevice: Android v1 · halaman dengan tombol kembali</strong><div class="ph-right"><button class="btn secondary sm" type="button" data-act="onbopen" data-k="v1">Lihat onboarding</button></div></div>
+      <div class="android-wrap">
+        <div class="phone"><div class="phone-in">
+          <div class="phone-status"><span>09.41</span><span data-phonepath>Wi-Fi ▂▄▆</span></div>
+          <div class="hu-wrap" data-prompt="pixel"></div>
+          <div class="phone-appbar">
+            <img class="phone-logo logo-light" src="../../assets/urdevice-logo-light-bg.svg" alt="UrDevice" width="223" height="64">
+            <img class="phone-logo logo-dark" src="../../assets/urdevice-logo-dark-bg.svg" alt="" aria-hidden="true" width="223" height="64">
+            <button class="settings-icon-btn" type="button" data-act="mgo" data-to="settings" aria-label="Settings"><span data-icon="gear"></span></button>
+          </div>
+          <div data-ind="pixel"></div>
+          <div class="phone-body" id="v1Body">
+            <div data-mview="home" class="mview">
+              <button class="m-self" type="button" data-act="sheetopen" data-sheet="v1Sheet" aria-haspopup="dialog" aria-label="Perangkat ini, Pixel. Buka izin untuk device lain">
+                <span class="ic" data-icon="phone"></span>
+                <span class="meta"><b>Pixel</b><small>Perangkat ini · Android 14 · 192.168.1.12</small><small>Ketuk untuk izin device lain</small></span>
+                <span class="pill">64%</span>
+              </button>
+              <span class="m-label">Device</span>
+              <div data-homelist="v1"></div>
+              <button class="add-device" type="button" data-act="mgo" data-to="add"><span aria-hidden="true" style="font-size:17px;line-height:1">+</span> Add Device</button>
+            </div>
+            <div data-mview="peer" class="mview" hidden>
+              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Kembali"><span data-icon="back"></span></button><span id="v1Actions" class="btn-row"></span></div>
+              <div id="v1Hero"></div>
+              <div id="v1Banner"></div>
+              <div id="v1Mp"></div>
+              <div class="feat-head"><h3>Fitur di Laptop Ahmad</h3></div>
+              <div class="feat-grid" id="v1Tiles"></div>
+              <div id="v1Notif"></div>
+            </div>
+            <div data-mview="feature" class="mview" hidden><div id="v1Feat"></div></div>
+            <div data-mview="add" class="mview" hidden>
+              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Kembali"><span data-icon="back"></span></button><h3 class="m-title">Tambah Device</h3></div>
+              <div id="v1Add"></div>
+            </div>
+            <div data-mview="settings" class="mview" hidden>
+              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Kembali"><span data-icon="back"></span></button><h3 class="m-title">Settings</h3></div>
+              <div data-settings="pixel" data-k="v1"></div>
+            </div>
+          </div>
+          <div class="m-sheet" id="v1Sheet" hidden role="dialog" aria-label="Izin untuk device lain di Pixel">
+            <button class="m-sheet-bg" type="button" data-act="sheetclose" data-sheet="v1Sheet" aria-label="Tutup"></button>
+            <div class="m-sheet-panel">
+              <div class="m-sheet-head"><h4>Perangkat ini: Pixel</h4><button class="m-sheet-close" type="button" data-act="sheetclose" data-sheet="v1Sheet" aria-label="Tutup"><span data-icon="close"></span></button></div>
+              <div data-selfsheet="pixel"></div>
+            </div>
+          </div>
+          <div class="onb" id="v1Onb" hidden></div>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANDROID v2 -->
+  <section aria-label="Layout aplikasi Android UrDevice versi 2">
+    <div class="panel">
+      <div class="panel-head"><strong>UrDevice: Android v2 · tab bar bawah (pembanding)</strong><div class="ph-right"><button class="btn secondary sm" type="button" data-act="onbopen" data-k="v2">Lihat onboarding</button></div></div>
+      <div class="android-wrap">
+        <div class="phone"><div class="phone-in v2-in">
+          <div class="phone-status"><span>09.41</span><span data-phonepath>Wi-Fi ▂▄▆</span></div>
+          <div class="hu-wrap" data-prompt="pixel"></div>
+          <div class="v2-appbar">
+            <img class="phone-logo logo-dark" src="../../assets/urdevice-logo-dark-bg.svg" alt="UrDevice" width="223" height="64">
+            <button class="settings-icon-btn" type="button" data-act="v2go" data-to="settings" aria-label="Settings"><span data-icon="gear"></span></button>
+          </div>
+          <div data-ind="pixel"></div>
+          <div class="phone-body" id="v2Body">
+            <div data-v2view="devices" class="v2view">
+              <button class="v2-self" type="button" data-act="sheetopen" data-sheet="v2Sheet" aria-haspopup="dialog" aria-label="Perangkat ini, Pixel. Buka izin untuk device lain">
+                <span class="ic" data-icon="phone"></span>
+                <span class="meta"><b>Pixel</b><small>Perangkat ini · Android 14 · 192.168.1.12</small><small>Ketuk untuk izin device lain</small></span>
+                <span class="pill">64%</span>
+              </button>
+              <span class="m-label">Device</span>
+              <div data-homelist="v2"></div>
+            </div>
+            <div data-v2view="kontrol" class="v2view" hidden>
+              <div class="v2-khead"><div class="kt" id="v2Hero"></div><span id="v2Actions" class="btn-row"></span></div>
+              <div id="v2Banner"></div>
+              <div id="v2Mp"></div>
+              <span class="m-label">Fitur di Laptop Ahmad</span>
+              <div class="feat-grid" id="v2Tiles"></div>
+              <div id="v2Notif"></div>
+            </div>
+            <div data-v2view="feature" class="v2view" hidden><div id="v2Feat"></div></div>
+            <div data-v2view="tambah" class="v2view" hidden><h3 class="m-title" style="margin-bottom:4px">Tambah Device</h3><div id="v2Add"></div></div>
+            <div data-v2view="settings" class="v2view" hidden>
+              <div class="m-backrow"><button class="v2-iconbtn" type="button" data-act="v2go" data-to="devices" aria-label="Kembali"><span data-icon="back"></span></button><h3 class="m-title">Settings</h3></div>
+              <div data-settings="pixel" data-k="v2"></div>
+            </div>
+          </div>
+          <div class="m-sheet" id="v2Sheet" hidden role="dialog" aria-label="Izin untuk device lain di Pixel">
+            <button class="m-sheet-bg" type="button" data-act="sheetclose" data-sheet="v2Sheet" aria-label="Tutup"></button>
+            <div class="m-sheet-panel">
+              <div class="m-sheet-head"><h4>Perangkat ini: Pixel</h4><button class="v2-iconbtn" type="button" data-act="sheetclose" data-sheet="v2Sheet" aria-label="Tutup"><span data-icon="close"></span></button></div>
+              <div data-selfsheet="pixel"></div>
+            </div>
+          </div>
+          <div class="onb" id="v2Onb" hidden></div>
+          <nav class="v2-tabs" aria-label="Navigasi Android versi 2">
+            <button type="button" data-act="v2go" data-to="devices" data-v2tab="devices" aria-current="true"><span data-icon="devices"></span><span>Perangkat</span></button>
+            <button type="button" data-act="v2go" data-to="kontrol" data-v2tab="kontrol" aria-current="false"><span data-icon="sliders"></span><span>Kontrol</span></button>
+            <button type="button" data-act="v2go" data-to="tambah" data-v2tab="tambah" aria-current="false"><span data-icon="pluscircle"></span><span>Tambah</span></button>
+          </nav>
+        </div></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+'use strict';
+/* ===== helpers ===== */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const IC={
+  laptop:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/>',
+  phone:'<rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>',
+  monitor:'<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  tablet:'<rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/>',
+  clip:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4a3 3 0 016 0"/>',
+  folder:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
+  image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/>',
+  mouse:'<rect x="7" y="2" width="10" height="20" rx="5"/><path d="M12 6v4"/>',
+  kbd:'<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+  present:'<rect x="3" y="3" width="18" height="12" rx="2"/><path d="M12 15v4M8 21l4-2 4 2M10 7l4 2-4 2z"/>',
+  screen:'<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/>',
+  code:'<path d="M8 9l-4 3 4 3M16 9l4 3-4 3"/>',
+  media:'<circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z" fill="currentColor"/>',
+  bell:'<path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/>',
+  gear:'<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34h0a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55h0a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87v0a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z"/>',
+  wifi:'<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0120 0"/><path d="M5 12.86a10 10 0 0114 0"/><path d="M8.5 16.43a5 5 0 017 0"/>',
+  bt:'<path d="M7 7l10 10-5 5V2l5 5L7 17"/>',
+  power:'<path d="M12 3v8"/><path d="M6.34 6.34a8 8 0 1011.32 0"/>',
+  trash:'<path d="M4 7h16"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/><path d="M6.5 7l.9 12.1A1.5 1.5 0 008.9 20.5h6.2a1.5 1.5 0 001.5-1.4L17.5 7"/><path d="M10 11v6M14 11v6"/>',
+  link:'<path d="M10 13a5 5 0 007.07 0l3-3a5 5 0 00-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 00-7.07 0l-3 3a5 5 0 007.07 7.07l1.5-1.5"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  chev:'<path d="M6 9l6 6 6-6"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  check:'<path d="M5 12l5 5 9-10"/>',
+  alert:'<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/>',
+  upload:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+  cam:'<path d="M3 8a2 2 0 012-2h2l2-2h6l2 2h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="4"/>',
+  play:'<path d="M8 5v14l11-7z" fill="currentColor" stroke="none"/>',
+  pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor" stroke="none"/>',
+  prev:'<path d="M6 5h2v14H6zM20 5v14L9.5 12z" fill="currentColor" stroke="none"/>',
+  next:'<path d="M16 5h2v14h-2zM4 5v14l10.5-7z" fill="currentColor" stroke="none"/>',
+  vol:'<path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/>',
+  mute:'<path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/><path d="M16 9l5 6M21 9l-5 6"/>',
+  note:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  yt:'<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.2 9.3l5 2.7-5 2.7z" fill="currentColor" stroke="none"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>',
+  msg:'<path d="M21 12a8 8 0 01-8 8H4l2.3-2.9A8 8 0 1121 12z"/>',
+  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/>',
+  insta:'<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.2 6.8h.01"/>',
+  devices:'<rect x="3" y="4" width="13" height="10" rx="2"/><rect x="17" y="9" width="5" height="11" rx="1.6"/><path d="M2 20h12"/>',
+  sliders:'<path d="M4 8h9M19 8h1M4 16h3M13 16h7"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/>',
+  pluscircle:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'
+};
+function svg(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(IC[n]||'')+'</svg>'}
+function now(){const d=new Date();return String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0')}
+function fmt(s){s=Math.max(0,Math.floor(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function listJoin(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+', dan '+a[a.length-1]}
+let toastTimer=null;
+function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.hidden=true},3800)}
+
+/* ===== data ===== */
+const DEV={
+  laptop:{name:'Laptop Ahmad',os:'Windows 11',ip:'192.168.1.8',batt:82,charging:false,kind:'desktop',icon:'laptop'},
+  pixel:{name:'Pixel',os:'Android 14',ip:'192.168.1.12',batt:64,charging:true,kind:'android',icon:'phone'}
+};
+const CAPS=[
+  {id:'clipboard',label:'Clipboard',desc:'Salin di device lain, tempel di sini',icon:'clip',def:'allow'},
+  {id:'files',label:'Terima file',desc:'Device lain mengirim file ke perangkat ini',icon:'folder',def:'ask'},
+  {id:'gallery',label:'Galeri',desc:'Device lain melihat dan mengunduh foto dan video',icon:'image',def:'ask',android:true},
+  {id:'input',label:'Remote control',desc:'Mouse, keyboard, dan presenter dari device lain',icon:'mouse',def:'ask'},
+  {id:'media',label:'Media',desc:'Kontrol musik dan video dari device lain',icon:'media',def:'allow'},
+  {id:'screen',label:'Bagi layar',desc:'Layar perangkat ini dilihat dari device lain',icon:'screen',def:'ask'},
+  {id:'tunnel',label:'Localhost',desc:'Port yang dibagikan dibuka dari device lain',icon:'code',def:'deny'},
+  {id:'notify',label:'Notifikasi',desc:'Notifikasi perangkat ini tampil di device lain',icon:'bell',def:'allow',r2:true}
+];
+const CAP={};CAPS.forEach(c=>{CAP[c.id]=c});
+const ML={allow:'Allow',ask:'Always Ask',deny:'Deny'};
+function capsFor(host){return CAPS.filter(c=>!c.android||DEV[host].kind==='android')}
+function defPerms(o){const p={};CAPS.forEach(c=>{p[c.id]=c.def});return Object.assign(p,o||{})}
+const FEAT={
+  clipboard:{cap:'clipboard',label:'Clipboard',icon:'clip',gear:true,req:'action'},
+  files:{cap:'files',label:'Kirim file',icon:'folder',gear:true,req:'action',noBle:true},
+  gallery:{cap:'gallery',label:'Galeri',icon:'image',req:'open',noBle:true},
+  mousepad:{cap:'input',label:'Mousepad',icon:'mouse',req:'open',act:true},
+  keyboard:{cap:'input',label:'Keyboard',icon:'kbd',req:'open',act:true},
+  presenter:{cap:'input',label:'Presenter',icon:'present',req:'open',act:true},
+  screen:{cap:'screen',label:'Bagi layar',icon:'screen',req:'open',act:true,noBle:true},
+  tunnel:{cap:'tunnel',label:'Localhost',icon:'code',gear:true,req:'open',noBle:true},
+  media:{cap:'media',label:'Media',icon:'media',req:'open'}
+};
+const FEATS={desktop:['clipboard','files','mousepad','keyboard','presenter','screen','tunnel'],android:['clipboard','files','gallery','screen','keyboard','tunnel']};
+const REQV={clipboard:'mengirim clipboard ke perangkat ini',files:'mengirim 2 file (3,4 MB) ke perangkat ini',gallery:'membuka galeri perangkat ini',mousepad:'mengendalikan perangkat ini dengan Mousepad',keyboard:'mengetik ke perangkat ini',presenter:'mengendalikan presentasi di perangkat ini',screen:'melihat layar perangkat ini',tunnel:'membuka localhost perangkat ini',media:'mengontrol media di perangkat ini'};
+const ACTV={mousepad:'mengendalikan perangkat ini (Mousepad)',keyboard:'mengetik ke perangkat ini',presenter:'mengendalikan presentasi di perangkat ini',screen:'melihat layar perangkat ini'};
+/* Tiga tampilan: desktop (Laptop melihat Pixel), HP v1 dan v2 (Pixel melihat Laptop). */
+const VW={
+  dsk:{self:'laptop',peer:'pixel',open:()=>dShow('feature'),back:()=>dShow('pixel')},
+  v1:{self:'pixel',peer:'laptop',open:()=>mShow('feature'),back:()=>mShow('peer')},
+  v2:{self:'pixel',peer:'laptop',open:()=>v2Show('feature'),back:()=>v2Show('kontrol')}
+};
+const VKS=['dsk','v1','v2'];
+
+/* ===== state (sesi saja) ===== */
+const S={
+  perms:{laptop:defPerms({tunnel:'allow'}),pixel:defPerms()},
+  ports:{laptop:[{port:3000,label:'Vite dev server',lan:'off'},{port:8080,label:'API lokal',lan:'off'}],pixel:[]},
+  conn:{on:true,by:null},
+  path:'wifi',
+  pend:{}, act:{},
+  log:{
+    laptop:[{t:'09.12',dev:'Pixel',cap:'Clipboard',d:'Diizinkan otomatis (Allow)',ok:true},{t:'08.55',dev:'Pixel',cap:'Bagi layar',d:'Ditolak',ok:false}],
+    pixel:[{t:'09.05',dev:'Laptop Ahmad',cap:'Terima file',d:'Diizinkan',ok:true}]
+  }
+};
+const FV={dsk:null,v1:null,v2:null};
+const CS={dsk:true,v1:true,v2:true};
+
+/* ===== navigation ===== */
+function dShow(n){
+  if(n!=='feature'&&FV.dsk) endFeature('dsk');
+  $$('[data-panel]').forEach(p=>p.classList.toggle('active',p.dataset.panel===n));
+  const side=n==='feature'?'pixel':n;
+  $$('[data-side]').forEach(b=>b.setAttribute('aria-current',b.dataset.side===side?'true':'false'));
+}
+function mShow(n){
+  if(n!=='feature'&&FV.v1) endFeature('v1');
+  $$('[data-mview]').forEach(v=>{v.hidden=v.dataset.mview!==n});
+  $('#v1Body').scrollTop=0;
+}
+function v2Show(n){
+  if(n!=='feature'&&FV.v2) endFeature('v2');
+  $$('[data-v2view]').forEach(v=>{v.hidden=v.dataset.v2view!==n});
+  const tab=n==='feature'?'kontrol':n;
+  $$('[data-v2tab]').forEach(t=>t.setAttribute('aria-current',t.dataset.v2tab===tab?'true':'false'));
+  $('#v2Body').scrollTop=0;
+}
+
+/* ===== permissions (this device) ===== */
+function permListHTML(host,onbKey){
+  return capsFor(host).filter(c=>!(onbKey&&c.r2)).map(c=>{
+    const m=onbKey?OB[onbKey].perms[c.id]:S.perms[host][c.id];
+    const btns=['allow','ask','deny'].map(x=>'<button type="button" data-act="'+(onbKey?'onbperm':'perm')+'" data-k="'+(onbKey||'')+'" data-host="'+host+'" data-cap="'+c.id+'" data-mode="'+x+'" data-perm="'+x+'" class="'+(m===x?'on':'')+'" aria-pressed="'+(m===x)+'">'+ML[x]+'</button>').join('');
+    return '<div class="perm-row"><span class="ic">'+svg(c.icon)+'</span><div class="pmeta"><b>'+c.label+(c.r2?' <span class="r2">Release 2</span>':'')+'</b><p>'+c.desc+'</p></div><div class="seg perm-seg" role="group" aria-label="Izin '+c.label+'">'+btns+'</div></div>';
+  }).join('');
+}
+function lanPorts(host){return S.ports[host].filter(p=>p.lan!=='off')}
+function portsHTML(host){
+  const m=S.perms[host].tunnel, ps=S.ports[host];
+  const rows=ps.map((p,i)=>{
+    const sel=p.pending||p.lan;
+    const lanTxt=p.lan==='1h'?' · <span class="lan-on">LAN terbuka sampai '+p.until+'</span>':p.lan==='always'?' · <span class="lan-on">LAN selalu terbuka</span>':'';
+    let warn='';
+    if(p.pending){
+      const always=p.pending==='always';
+      warn='<div class="lan-warn" role="alert">'+svg('alert')+'<div><b>localhost:'+p.port+' akan terbuka untuk semua perangkat di jaringan ini</b>, termasuk yang belum dipasangkan, dan tanpa enkripsi UrDevice.'
+        +(always?'<label class="ack"><input type="checkbox" data-act="lanack" data-host="'+host+'" data-i="'+i+'"'+(p.ack?' checked':'')+'> Saya paham. Biarkan terbuka sampai saya mematikannya, juga setelah restart.</label>':'<p>Mati otomatis setelah 1 jam.</p>')
+        +'<div class="lw-actions"><button class="btn brand sm" type="button" data-act="lanok" data-host="'+host+'" data-i="'+i+'"'+(always&&!p.ack?' disabled':'')+'>'+(always?'Buka selalu':'Buka 1 jam')+'</button><button class="btn secondary sm" type="button" data-act="lancancel" data-host="'+host+'" data-i="'+i+'">Batal</button></div></div></div>';
+    }
+    return '<div class="port-row"><div class="pmeta"><b class="mono">localhost:'+p.port+'</b><small>'+(p.label?esc(p.label):'Tanpa label')+lanTxt+'</small></div>'
+      +'<label class="lan-sel">Expose on LAN <select data-act="lan" data-host="'+host+'" data-i="'+i+'"><option value="off"'+(sel==='off'?' selected':'')+'>Mati</option><option value="1h"'+(sel==='1h'?' selected':'')+'>1 jam</option><option value="always"'+(sel==='always'?' selected':'')+'>Selalu aktif</option></select></label>'
+      +'<button class="icon-x" type="button" data-act="portdel" data-host="'+host+'" data-i="'+i+'" aria-label="Berhenti membagikan port '+p.port+'">×</button>'+warn+'</div>';
+  }).join('');
+  return '<div class="ports"><div class="feat-head"><h3>Localhost yang dibagikan</h3>'+(m==='deny'?'<span class="tag deny">Localhost: Deny</span>':'')+'</div>'
+    +'<p class="sub">Port ini bisa dibuka semua device yang terhubung, sesuai izin Localhost di atas.'+(m==='deny'?' Saat ini izinnya Deny, jadi belum ada device yang bisa membukanya.':'')+'</p>'
+    +(rows||'<p class="empty">Belum ada port yang dibagikan.</p>')
+    +'<div class="port-add"><input type="number" min="1" max="65535" placeholder="Port" data-portnum="'+host+'" aria-label="Nomor port"><input type="text" placeholder="Label (opsional)" data-portlabel="'+host+'" aria-label="Label port"><button class="btn secondary sm" type="button" data-act="portadd" data-host="'+host+'">Bagikan port</button></div></div>';
+}
+function permIntro(host){
+  return '<p class="sub">Berlaku untuk semua device yang terhubung ke '+DEV[host].name+'. <b>Allow</b>: langsung jalan. <b>Always Ask</b>: Anda konfirmasi dulu di sini. <b>Deny</b>: fitur itu mati di device lain.</p>';
+}
+function renderSelf(){
+  const d=DEV.laptop, lp=lanPorts('laptop');
+  $('#dskSelf').innerHTML='<div class="self-hero"><span class="big-ic">'+svg('laptop')+'</span><div><h2>'+d.name+'</h2><div class="chips"><span class="chip">'+d.os+'</span><span class="chip">Perangkat ini</span><span class="chip mono">'+d.ip+'</span>'+(lp.length?'<span class="chip warn">LAN terbuka: '+lp.map(p=>p.port).join(', ')+'</span>':'')+'</div></div><div class="hero-side"><div class="batt-big">'+d.batt+'%</div><small>sisa baterai</small></div></div>'
+    +'<div class="feat-head"><h3>Izin untuk device lain</h3></div>'+permIntro('laptop')
+    +'<div class="perm-list">'+permListHTML('laptop')+'</div>'+portsHTML('laptop');
+  $$('[data-selfsheet]').forEach(el=>{
+    const host=el.dataset.selfsheet;
+    el.innerHTML='<h3 class="m-title" style="font-size:15px;margin-top:4px">Izin untuk device lain</h3>'+permIntro(host)+'<div class="perm-list">'+permListHTML(host)+'</div>'+portsHTML(host);
+  });
+}
+function setPerm(host,cap,mode){
+  if(S.perms[host][cap]===mode) return;
+  S.perms[host][cap]=mode;
+  const p=S.pend[host];
+  if(mode==='deny'&&p&&FEAT[p.feat].cap===cap) cancelPend(host);
+  const a=S.act[host];
+  if(mode==='deny'&&a&&FEAT[a.feat].cap===cap) delete S.act[host];
+  VKS.forEach(vk=>{
+    if(VW[vk].peer!==host) return;
+    if(cap==='media'&&mode!=='allow'){P[vk].granted=false;P[vk].res=null}
+    const fv=FV[vk];
+    if(mode==='deny'&&fv&&fv.mode==='use'&&FEAT[fv.feat].cap===cap){clearFvTimers(fv);fv.status='revoked'}
+  });
+  renderAll();
+  toast('Izin '+CAP[cap].label+' di '+DEV[host].name+' sekarang '+ML[mode]+'. Device yang terhubung langsung mendapat perubahan ini.');
+}
+
+/* ===== peer view: actions, header, banner, tiles ===== */
+function pathInfo(){return S.path==='wifi'?{ic:'wifi',t:'Wi-Fi • 12ms'}:{ic:'bt',t:'Bluetooth LE • 48ms'}}
+function connText(viewerSelf){
+  if(S.conn.on) return pathInfo().t;
+  return S.conn.by===viewerSelf?'Terputus oleh Anda':'Terputus oleh '+DEV[S.conn.by].name;
+}
+function actionsHTML(vk){
+  const v2=vk==='v2';
+  const b=(cls,act,icon,label)=>v2
+    ?'<button class="v2-iconbtn '+cls+'" type="button" data-act="'+act+'" data-vk="'+vk+'" aria-label="'+label+'" title="'+label+'">'+svg(icon)+'</button>'
+    :'<button class="icon-action '+cls+'" type="button" data-act="'+act+'" data-vk="'+vk+'" aria-label="'+label+'">'+svg(icon)+'<span class="ia-label" aria-hidden="true">'+label+'</span></button>';
+  return (S.conn.on?b('danger','disc','power','Putuskan koneksi'):b('primary','reconn','link','Hubungkan lagi'))+b('','forget','trash','Lupakan device');
+}
+function heroHTML(vk){
+  const v=VW[vk], d=DEV[v.peer], on=S.conn.on, pi=pathInfo();
+  if(vk==='v2') return '<h3>'+d.name+'</h3><span class="v2-kchip'+(on?'':' off')+'"><i aria-hidden="true"></i>'+d.os+' · '+connText(v.self)+'</span><span class="v2-kmeta mono">'+d.ip+' · Baterai '+d.batt+'%'+(d.charging?' (diisi)':'')+'</span>';
+  const conn=on?svg(pi.ic)+pi.t:connText(v.self);
+  return '<div class="peer-hero'+(on?'':' dim')+'"><div class="hero-top"><span class="big-ic">'+svg(d.icon)+'</span><div><h2>'+d.name+'</h2><div class="chips"><span class="chip">'+d.os+'</span><span class="chip">'+conn+'</span><span class="chip mono">'+d.ip+'</span></div></div><div class="hero-side"><div class="batt-big">'+d.batt+'%</div><div class="batt-gauge" aria-hidden="true"><i style="width:'+d.batt+'%"></i></div><small>'+(d.charging?'sedang diisi':'sisa baterai')+'</small></div></div></div>';
+}
+function bannerHTML(vk){
+  const v=VW[vk], hn=DEV[v.peer].name;
+  if(!S.conn.on) return '<div class="conn-banner off" role="status">'+svg('power')+'<div><b>'+connText(v.self)+'</b><p>Pairing tetap tersimpan. '+hn+' tidak tersambung otomatis sampai salah satu device menekan Hubungkan lagi.</p></div></div>';
+  if(S.path==='ble'){
+    const na=[];FEATS[DEV[v.peer].kind].forEach(id=>{if(FEAT[id].noBle&&na.indexOf(FEAT[id].label)<0) na.push(FEAT[id].label)});
+    return '<div class="conn-banner ble" role="status">'+svg('bt')+'<div><b>Terhubung lewat Bluetooth LE</b><p>'+listJoin(na)+' tidak tersedia sampai Wi-Fi kembali. Remote control, media, dan clipboard teks tetap jalan.</p></div></div>';
+  }
+  return '';
+}
+function tileState(host,id){
+  const f=FEAT[id];
+  if(!S.conn.on) return {st:'off',note:'Tidak terhubung'};
+  if(S.path==='ble'&&f.noBle) return {st:'off',note:'Tidak tersedia lewat Bluetooth'};
+  const m=S.perms[host][f.cap];
+  if(m==='deny') return {st:'off',note:'Dimatikan oleh '+DEV[host].name};
+  if(m==='ask') return {st:'ask',note:'Perlu izin'};
+  return {st:'on',note:''};
+}
+function tilesHTML(vk){
+  const host=VW[vk].peer;
+  return FEATS[DEV[host].kind].map(id=>{
+    const f=FEAT[id], t=tileState(host,id), off=t.st==='off', gear=f.gear&&!off;
+    return '<div class="feat-cell '+t.st+(gear?' has-gear':'')+'"><button class="feat" type="button" data-act="tile" data-vk="'+vk+'" data-feat="'+id+'"'+(off?' disabled':'')+' aria-label="'+f.label+(t.note?', '+t.note:'')+'"><span class="ic">'+svg(f.icon)+'</span><span class="ft"><b>'+f.label+'</b>'+(t.note?'<small>'+t.note+'</small>':'')+'</span></button>'
+      +(gear?'<button class="feat-set" type="button" data-act="gear" data-vk="'+vk+'" data-feat="'+id+'" aria-label="Pengaturan '+f.label+'">'+svg('gear')+'</button>':'')+'</div>';
+  }).join('');
+}
+function renderPeer(vk){
+  $('#'+vk+'Actions').innerHTML=actionsHTML(vk);
+  $('#'+vk+'Hero').innerHTML=heroHTML(vk);
+  $('#'+vk+'Banner').innerHTML=bannerHTML(vk);
+  $('#'+vk+'Tiles').innerHTML=tilesHTML(vk);
+}
+function renderLists(){
+  const side=$('[data-sidepixel]');
+  side.classList.toggle('disc',!S.conn.on);
+  $('[data-sideline1]',side).textContent='Android · '+connText('laptop');
+  $('[data-sideline2]',side).textContent=S.conn.on?'Baterai 64% · sedang diisi':'Pairing tetap tersimpan';
+  $('[data-sidedot]',side).className='status-dot'+(S.conn.on?'':' off');
+  $$('[data-homelist]').forEach(el=>{
+    const vk=el.dataset.homelist, on=S.conn.on, go=vk==='v1'?'data-act="mgo" data-to="peer"':'data-act="v2go" data-to="kontrol"';
+    el.innerHTML='<button class="device'+(on?'':' disc')+'" type="button" '+go+'><span class="ic">'+svg('laptop')+'</span><span class="meta"><b>Laptop Ahmad</b><small>Windows 11 · '+connText('pixel')+'</small></span>'+(on?'<span class="pill ghost">82%</span>':'')+'<span class="status-dot'+(on?'':' off')+'"></span></button>'
+      +'<div class="device offline"><span class="ic">'+svg('laptop')+'</span><span class="meta"><b>MacBook Kantor</b><small>macOS · Offline · terlihat kemarin 17.20</small></span><span class="status-dot off"></span></div>';
+  });
+  const ble=S.path==='ble';
+  $$('[data-pathbadge]').forEach(b=>{b.textContent=ble?'Bluetooth LE · terenkripsi':'Wi-Fi · terenkripsi';b.className='badge '+(ble?'warn':'ok')});
+  $$('[data-phonepath]').forEach(b=>{b.textContent=ble?'Bluetooth ᛒ':'Wi-Fi ▂▄▆'});
+  $$('[data-act="simble"]').forEach(b=>{b.textContent=ble?'Simulasi: Wi-Fi kembali':'Simulasi: Wi-Fi putus, pindah ke Bluetooth LE'});
+}
+
+/* ===== requests, prompts, activities ===== */
+function ask(vk,feat){
+  const host=VW[vk].peer, m=S.perms[host][FEAT[feat].cap];
+  if(!S.conn.on) return;
+  if(m==='allow') return resolve(vk,feat,'allow',true);
+  if(m==='deny') return resolve(vk,feat,'deny',true);
+  if(S.pend[host]){toast(DEV[host].name+' masih menunggu jawaban untuk permintaan lain.');return}
+  const p={vk:vk,feat:feat,left:30};
+  p.timer=setInterval(()=>tick(host),1000);
+  S.pend[host]=p;
+  if(feat==='media') mpGate(vk); else {FV[vk].status='waiting';renderFV(vk)}
+  renderPrompts();
+}
+function tick(host){
+  const p=S.pend[host]; if(!p) return;
+  p.left--;
+  if(p.left<=0){clearInterval(p.timer);delete S.pend[host];resolve(p.vk,p.feat,'timeout');renderPrompts();return}
+  $$('[data-pleft="'+host+'"]').forEach(e=>{e.textContent=p.left});
+  $$('[data-left="'+p.vk+'"]').forEach(e=>{e.textContent=p.left});
+}
+function answer(host,ok){
+  const p=S.pend[host]; if(!p) return;
+  clearInterval(p.timer); delete S.pend[host];
+  resolve(p.vk,p.feat,ok?'allow':'deny');
+  renderPrompts();
+}
+function cancelPend(host){
+  const p=S.pend[host]; if(!p) return;
+  clearInterval(p.timer); delete S.pend[host];
+  if(p.feat==='media') mpGate(p.vk);
+  else if(FV[p.vk]&&FV[p.vk].feat===p.feat){FV[p.vk].status='idle';renderFV(p.vk)}
+  renderPrompts();
+}
+function resolve(vk,feat,res,auto){
+  const v=VW[vk], host=v.peer, f=FEAT[feat];
+  const capL=CAP[f.cap].label+(f.cap==='input'?' ('+f.label+')':'');
+  const d=res==='allow'?(auto?'Diizinkan otomatis (Allow)':'Diizinkan'):res==='timeout'?'Ditolak (tidak dijawab 30 dtk)':(auto?'Ditolak otomatis (Deny)':'Ditolak');
+  S.log[host].unshift({t:now(),dev:DEV[v.self].name,cap:capL,d:d,ok:res==='allow'});
+  renderLogs();
+  if(feat==='media'){P[vk].granted=res==='allow';P[vk].res=res;mpGate(vk);return}
+  const fv=FV[vk]; if(!fv||fv.feat!==feat) return;
+  fv.status=res==='allow'?'active':res;
+  if(res==='allow'){
+    if(f.act){S.act[host]={vk:vk,feat:feat};renderIndicators()}
+    startFeature(vk);
+  }
+  renderFV(vk);
+}
+function renderPrompts(){
+  $$('[data-prompt]').forEach(w=>{
+    const host=w.dataset.prompt, p=S.pend[host];
+    if(!p){w.innerHTML='';return}
+    const req=DEV[VW[p.vk].self].name, capL=CAP[FEAT[p.feat].cap].label;
+    const btns='<div class="pc-actions"><button class="btn brand'+(DEV[host].kind==='android'?' sm':'')+'" type="button" data-act="pallow" data-host="'+host+'">Izinkan</button><button class="btn secondary'+(DEV[host].kind==='android'?' sm':'')+'" type="button" data-act="pdeny" data-host="'+host+'">Tolak</button></div>';
+    w.innerHTML=DEV[host].kind==='android'
+      ?'<div class="hu" role="alertdialog" aria-label="Permintaan izin"><div class="hu-top">'+svg('shield')+'<span>UrDevice · sekarang</span><span class="pc-left"><b data-pleft="'+host+'">'+p.left+'</b> dtk</span></div><b>'+req+'</b><p>ingin '+REQV[p.feat]+'.</p>'+btns+'</div>'
+      :'<div class="prompt-card" role="alertdialog" aria-label="Permintaan izin"><div class="pc-head">'+svg('shield')+'<b>Permintaan izin · '+capL+'</b><span class="pc-left"><b data-pleft="'+host+'">'+p.left+'</b> dtk</span></div><p><b>'+req+'</b> ingin '+REQV[p.feat]+'.</p><small>Izin '+capL+' di perangkat ini: Always Ask. Kalau tidak dijawab dalam 30 detik, permintaan ditolak.</small>'+btns+'</div>';
+  });
+}
+function renderIndicators(){
+  $$('[data-ind]').forEach(el=>{
+    const host=el.dataset.ind, a=S.act[host];
+    el.innerHTML=a?'<div class="act-ind" role="status"><span class="rec" aria-hidden="true"></span><span><b>'+DEV[VW[a.vk].self].name+'</b> sedang '+ACTV[a.feat]+'</span><button class="btn stop sm" type="button" data-act="actstop" data-host="'+host+'">Stop</button></div>':'';
+  });
+}
+function stopAct(host){
+  const a=S.act[host]; if(!a) return;
+  delete S.act[host];
+  S.log[host].unshift({t:now(),dev:DEV[VW[a.vk].self].name,cap:CAP[FEAT[a.feat].cap].label+' ('+FEAT[a.feat].label+')',d:'Dihentikan dengan Stop',ok:false});
+  const fv=FV[a.vk];
+  if(fv&&fv.feat===a.feat){clearFvTimers(fv);fv.status='stopped';renderFV(a.vk)}
+  renderIndicators(); renderLogs();
+}
+
+/* ===== feature views ===== */
+function clearFvTimers(fv){if(!fv)return;clearInterval(fv.xfer);clearInterval(fv.pt);fv.xfer=null;fv.pt=null}
+function openFeature(vk,feat,mode){
+  if(FV[vk]) endFeature(vk);
+  FV[vk]={feat:feat,mode:mode,status:mode==='settings'?'settings':'idle',sel:{}};
+  VW[vk].open();
+  renderFV(vk);
+  if(mode==='use'&&FEAT[feat].req==='open') ask(vk,feat);
+}
+function endFeature(vk){
+  const fv=FV[vk]; if(!fv) return;
+  clearFvTimers(fv);
+  const host=VW[vk].peer;
+  if(S.act[host]&&S.act[host].vk===vk){delete S.act[host];renderIndicators()}
+  const p=S.pend[host];
+  FV[vk]=null;
+  if(p&&p.vk===vk&&p.feat===fv.feat) cancelPend(host);
+}
+function closeFeature(vk){endFeature(vk);VW[vk].back()}
+function startFeature(vk){
+  const fv=FV[vk];
+  if(fv.feat==='files'){
+    fv.note='';
+    fv.prog=[{n:'laporan-q4.pdf',sz:'2,1 MB',pct:0},{n:'foto-acara.jpg',sz:'1,3 MB',pct:0}];
+    clearInterval(fv.xfer);
+    fv.xfer=setInterval(()=>{
+      let done=true;
+      fv.prog.forEach((x,i)=>{if(x.pct<100){x.pct=Math.min(100,x.pct+(i?17:11));done=false}});
+      if(done){clearInterval(fv.xfer);fv.xfer=null}
+      renderFV(vk);
+    },350);
+  }
+  if(fv.feat==='clipboard') fv.sent=now();
+  if(fv.feat==='presenter'){
+    fv.t0=Date.now();
+    fv.pt=setInterval(()=>{$$('[data-ptimer="'+vk+'"]').forEach(e=>{e.textContent=fmt((Date.now()-fv.t0)/1000)})},1000);
+  }
+}
+function modeNote(m){return m==='allow'?'Allow: langsung jalan':m==='ask'?'Always Ask: perlu izin setiap sesi':'Deny: dimatikan'}
+function statusHTML(vk,fv,hn){
+  const capL=CAP[FEAT[fv.feat].cap].label, retry='<button class="btn secondary sm" type="button" data-act="fvaction" data-vk="'+vk+'">Coba lagi</button>';
+  switch(fv.status){
+    case 'waiting': return '<div class="fv-status wait"><span class="pair-dot" aria-hidden="true"></span><span>Menunggu izin dari '+hn+'… <b data-left="'+vk+'">'+(S.pend[VW[vk].peer]?S.pend[VW[vk].peer].left:30)+'</b> dtk</span><button class="btn secondary sm" type="button" data-act="fvcancel" data-vk="'+vk+'">Batal</button></div>';
+    case 'deny': return '<div class="fv-status err">'+hn+' menolak permintaan ini.'+retry+'</div>';
+    case 'timeout': return '<div class="fv-status err">Tidak ada jawaban dari '+hn+' dalam 30 detik, jadi permintaan ditolak.'+retry+'</div>';
+    case 'stopped': return '<div class="fv-status err">'+hn+' menekan Stop. Sesi berakhir.'+retry+'</div>';
+    case 'revoked': return '<div class="fv-status err">'+hn+' mengubah izin '+capL+' ke Deny. Sesi berakhir.</div>';
+    case 'ble': return '<div class="fv-status err">Koneksi pindah ke Bluetooth LE, jadi fitur ini berhenti.</div>';
+    case 'active': return S.perms[VW[vk].peer][FEAT[fv.feat].cap]==='ask'?'<div class="fv-status okk">'+svg('check').replace('<svg','<svg width="16" height="16"')+'Diizinkan oleh '+hn+' untuk sesi ini.</div>':'';
+  }
+  return '';
+}
+function bodyHTML(vk,fv,host){
+  const hn=DEV[host].name, self=VW[vk].self, waiting=fv.status==='waiting', dis=waiting?' disabled':'';
+  switch(fv.feat){
+    case 'clipboard':
+      return '<div class="fv-card"><b>Clipboard terakhir dari '+hn+'</b><p class="mono">https://urdevice.dev/docs/pairing</p><small>Diterima 09.40 · teks</small></div>'
+        +'<div class="fv-card"><b>Kirim clipboard perangkat ini</b><p class="mono">npm run dev -- --host</p><button class="btn brand sm" type="button" data-act="fvaction" data-vk="'+vk+'"'+dis+'>Kirim sekarang</button>'+(fv.status==='active'&&fv.sent?'<p class="ok">Terkirim ke '+hn+' pukul '+fv.sent+'.</p>':'')+'</div>'
+        +'<p class="hint">'+(DEV[self].kind==='android'?'Android tidak mengizinkan aplikasi membaca clipboard di latar belakang. Kirim lewat tombol ini, tile Quick Settings, atau menu Bagikan.':'Selama sinkron menyala (ikon gear), clipboard terkirim otomatis.')+'</p>';
+    case 'files': {
+      const rows=(fv.prog||[]).map(x=>'<div class="xfer"><div class="xfer-top"><span>'+x.n+'</span><span>'+x.sz+'</span></div><div class="xfer-bar"><i style="width:'+x.pct+'%"></i></div><small>'+(x.pct<100?x.pct+'% · 12,4 MB/dtk · sisa '+Math.max(1,Math.round((100-x.pct)/30))+' dtk':'Selesai · SHA-256 cocok')+'</small></div>').join('');
+      return '<div class="drop">'+svg('upload')+'<b>Seret file ke sini</b><span>atau</span><button class="btn brand sm" type="button" data-act="fvaction" data-vk="'+vk+'"'+dis+'>Pilih file</button><small>Contoh: laporan-q4.pdf dan foto-acara.jpg (3,4 MB)</small></div>'
+        +rows+(fv.xfer?'<button class="btn secondary sm" type="button" data-act="fvxfer" data-vk="'+vk+'">Batalkan transfer</button>':'')+(fv.note?'<p class="hint">'+fv.note+'</p>':'');
+    }
+    case 'gallery': {
+      const n=Object.keys(fv.sel).filter(k=>fv.sel[k]).length;
+      const th=[18,40,95,150,200,260,300,330,60].map((h,i)=>'<button class="thumb'+(fv.sel[i]?' sel':'')+'" type="button" data-act="gal" data-vk="'+vk+'" data-i="'+i+'" aria-pressed="'+!!fv.sel[i]+'" aria-label="Foto '+(i+1)+'" style="background:hsl('+h+' 45% 55%)"></button>').join('');
+      return '<div class="thumbs">'+th+'</div><button class="btn brand sm" type="button" data-act="toast" data-msg="Simulasi: '+n+' item diunduh lewat transfer file.">Unduh '+n+' item</button>';
+    }
+    case 'mousepad':
+      return '<div class="touchpad">Geser satu jari untuk menggerakkan kursor.<br>Ketuk = klik kiri · dua jari = klik kanan dan scroll</div><div class="mouse-btns"><button type="button">Klik kiri</button><button type="button">Klik kanan</button></div><label class="slider">Sensitivitas <input type="range" min="1" max="10" value="6"></label>';
+    case 'keyboard':
+      return '<textarea class="kb-input" placeholder="Ketik di sini, teks muncul di '+hn+'"></textarea><div class="keys">'+['Esc','Tab','Ctrl','Alt','Shift','←','↑','↓','→','Enter'].map(k=>'<button type="button">'+k+'</button>').join('')+'</div>'
+        +(DEV[host].kind==='android'?'<p class="hint">Butuh keyboard UrDevice aktif di '+hn+'.</p>':'');
+    case 'presenter':
+      return '<div class="pres"><button type="button">‹ Sebelumnya</button><button class="next" type="button">Berikutnya ›</button></div><div class="keys"><button type="button">Layar hitam (B)</button><button type="button">Mulai (F5)</button><button type="button">Akhiri (Esc)</button><button type="button">Tahan untuk laser</button></div><div class="ptimer">Waktu presentasi <b data-ptimer="'+vk+'">0:00</b></div><p class="hint">Tombol volume HP juga pindah slide selama layar ini terbuka.</p>';
+    case 'screen': {
+      const im=S.perms[host].input;
+      return '<div class="viewer '+DEV[host].kind+'"><div class="vscreen">Layar '+hn+' (langsung)<small>1080p · 30 fps · 62 ms</small></div></div>'
+        +(DEV[host].kind==='desktop'?'<label class="fld">Layar yang dilihat<select><option>Layar 1 (utama)</option><option>Layar 2</option></select></label>':'')
+        +'<p class="hint">Kendalikan dari layar ini: izin Remote control di '+hn+' adalah <b>'+ML[im]+'</b>.'+(im==='ask'?' Klik pertama di layar akan meminta izin.':'')+'</p>';
+    }
+    case 'tunnel': {
+      const ps=S.ports[host];
+      if(!ps.length) return '<p class="empty">'+hn+' belum membagikan port.</p>';
+      return ps.map(p=>'<div class="port-row"><div class="pmeta"><b class="mono">localhost:'+p.port+'</b><small>'+(p.label?esc(p.label):'Tanpa label')+' · dari '+hn+':'+p.port+' · 2 koneksi · 1,2 MB</small></div><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: http://localhost:'+p.port+' dibuka di browser.">Buka di browser</button></div>').join('')
+        +'<p class="hint">Port lokal sama dengan port di '+hn+'. Kalau port itu sudah dipakai, UrDevice memakai port kosong berikutnya.</p>';
+    }
+  }
+  return '';
+}
+function settingsBody(vk,fv,host){
+  const hn=DEV[host].name, desk=DEV[VW[vk].self].kind==='desktop';
+  switch(fv.feat){
+    case 'clipboard':
+      return '<div class="set-row"><span class="lbl"><b>Sinkron clipboard dengan '+hn+'</b><small>Mati: clipboard tidak dikirim ke dan diterima dari '+hn+'. Jeda untuk semua device ada di Settings.</small></span><label class="switch"><input type="checkbox" data-act="clipsync" data-vk="'+vk+'"'+(CS[vk]?' checked':'')+' aria-label="Sinkron clipboard dengan '+hn+'"><span class="track" aria-hidden="true"></span></label></div>';
+    case 'files':
+      return '<div class="set-row"><span class="lbl"><b>File dari '+hn+' disimpan di</b><small class="mono">'+(desk?'Downloads\\UrDevice':'Download/UrDevice')+'</small></span><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: pemilih folder terbuka.">Ubah</button></div><p class="hint">Folder ini berlaku untuk semua device dan juga ada di Settings.</p>';
+    case 'tunnel':
+      return S.ports[host].map(p=>'<div class="set-row"><span class="lbl"><b>Port lokal untuk '+hn+':'+p.port+'</b><small>Alamat yang dibuka browser di perangkat ini.</small></span><input class="set-in mono" type="number" value="'+p.port+'" style="width:100px" aria-label="Port lokal"></div>').join('')||'<p class="empty">'+hn+' belum membagikan port.</p>';
+  }
+  return '';
+}
+function renderFV(vk){
+  const el=$('#'+vk+'Feat'), fv=FV[vk];
+  if(!fv){el.innerHTML='';return}
+  const host=VW[vk].peer, hn=DEV[host].name, f=FEAT[fv.feat], m=S.perms[host][f.cap];
+  let h='<div class="fv-head"><button class="m-back" type="button" data-act="fvback" data-vk="'+vk+'" aria-label="Kembali">'+svg('back')+'</button><div><h3>'+(fv.mode==='settings'?'Pengaturan '+f.label:f.label)+'</h3><small>'+hn+' · '+(fv.mode==='settings'?'pengaturan di perangkat ini':modeNote(m))+'</small></div></div>';
+  if(fv.mode==='settings'){el.innerHTML=h+settingsBody(vk,fv,host);return}
+  h+=statusHTML(vk,fv,hn);
+  if(fv.status==='active'||(f.req==='action'&&['idle','waiting','active','deny','timeout'].indexOf(fv.status)>=0)) h+=bodyHTML(vk,fv,host);
+  el.innerHTML=h;
+}
+
+/* ===== connection: disconnect, reconnect, Bluetooth LE ===== */
+function disconnect(vk){
+  S.conn={on:false,by:VW[vk].self};
+  Object.keys(S.pend).forEach(h=>cancelPend(h));
+  S.act={};
+  VKS.forEach(k=>{if(FV[k]) closeFeature(k); if(P[k].playing) mpPlay(k,false)});
+  renderAll();
+  toast('Koneksi Laptop Ahmad dan Pixel diputus. Keduanya tidak tersambung otomatis sampai Hubungkan lagi ditekan.');
+}
+function reconnect(){
+  S.conn={on:true,by:null};
+  renderAll();
+  toast('Tersambung lagi lewat '+(S.path==='wifi'?'Wi-Fi':'Bluetooth LE')+'. Reconnect otomatis aktif lagi.');
+}
+function togglePath(){
+  S.path=S.path==='wifi'?'ble':'wifi';
+  if(S.path==='ble'){
+    Object.keys(S.pend).forEach(h=>{if(FEAT[S.pend[h].feat].noBle) cancelPend(h)});
+    Object.keys(S.act).forEach(h=>{if(FEAT[S.act[h].feat].noBle) delete S.act[h]});
+    VKS.forEach(vk=>{const fv=FV[vk];if(fv&&fv.mode==='use'&&FEAT[fv.feat].noBle){clearFvTimers(fv);fv.status='ble'}});
+  }
+  renderAll();
+}
+
+/* ===== media player ===== */
+const TR={
+  spotify:{app:'Spotify',cover:'note',seek:true,nav:true,pos:84,tracks:[{t:'Midnight Drive',a:'Neon Coast',d:225},{t:'Kota Pagi',a:'Arunika',d:204},{t:'Garis Pantai',a:'Senja Kala',d:241}]},
+  youtube:{app:'YouTube',cover:'yt',seek:true,nav:true,pos:437,tracks:[{t:'Tutorial Chord Dasar untuk Pemula',a:'MusikKita',d:754},{t:'Belajar Fingerstyle 10 Menit',a:'MusikKita',d:612}]},
+  chrome:{app:'Chrome',cover:'globe',seek:false,nav:false,pos:0,tracks:[{t:'Radio lofi: siaran langsung',a:'lofi.example.com',d:0}]}
+};
+const P={};
+function mpBuild(vk){
+  const hn=DEV[VW[vk].peer].name, el=$('#'+vk+'Mp');
+  P[vk]={on:true,src:'spotify',idx:0,pos:TR.spotify.pos,playing:false,vol:70,muted:false,granted:false,res:null,timer:null};
+  el.innerHTML='<div class="feat-head" style="margin-top:2px"><h3>Media player</h3><label class="switch"><span data-mpstate>Aktif</span><input type="checkbox" data-act="mptoggle" data-vk="'+vk+'" checked aria-label="Terima info media dari '+hn+'"><span class="track" aria-hidden="true"></span></label></div>'
+    +'<div class="mp-console" aria-label="Media player di '+hn+'"><p class="mp-msg" data-mpmsg hidden></p><div data-mpbody>'
+    +'<div class="mp-sources" role="tablist" aria-label="Sumber media di '+hn+'">'+Object.keys(TR).map(k=>'<button class="mp-src" type="button" role="tab" data-act="mpsrc" data-vk="'+vk+'" data-src="'+k+'"><span class="src-dot" aria-hidden="true"></span>'+TR[k].app+'<span class="src-state">Jeda</span></button>').join('')+'</div>'
+    +'<div class="mp-stage"><span class="mp-cover" data-mpcover aria-hidden="true"></span><div class="mp-main"><span class="mp-srcname" data-mpsrcname></span><b data-mptitle></b><span class="mp-artist" data-mpartist></span>'
+    +'<div data-mpprog><div class="mp-progress" role="slider" aria-label="Posisi putar" aria-valuemin="0" data-act="mpseek" data-vk="'+vk+'"><i data-mpbar></i></div><div class="mp-times"><span data-mpcur></span><span data-mpdur></span></div></div>'
+    +'<p class="mp-live" data-mplive hidden>Siaran langsung · posisi tidak bisa digeser</p>'
+    +'<div class="mp-controls"><button class="mp-btn" type="button" data-act="mpprev" data-vk="'+vk+'" aria-label="Sebelumnya">'+svg('prev')+'</button><button class="mp-btn play" type="button" data-act="mpplay" data-vk="'+vk+'" aria-label="Putar"></button><button class="mp-btn" type="button" data-act="mpnext" data-vk="'+vk+'" aria-label="Berikutnya">'+svg('next')+'</button>'
+    +'<span class="mp-volume"><button class="mp-btn" type="button" data-act="mpmute" data-vk="'+vk+'" aria-pressed="false" aria-label="Bisukan"></button><input type="range" min="0" max="100" value="70" data-act="mpvol" data-vk="'+vk+'" aria-label="Volume '+hn+'"></span></div>'
+    +'</div></div></div></div>';
+  mpRender(vk);
+}
+function mpRender(vk){
+  const p=P[vk], el=$('#'+vk+'Mp'), s=TR[p.src], t=s.tracks[p.idx], q=x=>el.querySelector(x);
+  q('[data-mpcover]').innerHTML=svg(s.cover);
+  q('[data-mpsrcname]').textContent=s.app;
+  q('[data-mptitle]').textContent=t.t;
+  q('[data-mpartist]').textContent=t.a;
+  const live=!t.d;
+  q('[data-mpprog]').hidden=live; q('[data-mplive]').hidden=!live;
+  if(!live){
+    q('[data-mpbar]').style.width=(p.pos/t.d*100)+'%';
+    q('[data-mpcur]').textContent=fmt(p.pos); q('[data-mpdur]').textContent=fmt(t.d);
+    const pr=q('.mp-progress'); pr.classList.toggle('seek',s.seek); pr.tabIndex=s.seek?0:-1;
+    pr.setAttribute('aria-valuemax',t.d); pr.setAttribute('aria-valuenow',Math.floor(p.pos)); pr.setAttribute('aria-disabled',s.seek?'false':'true');
+  }
+  q('[data-act="mpprev"]').hidden=!s.nav; q('[data-act="mpnext"]').hidden=!s.nav;
+  const pl=q('[data-act="mpplay"]'); pl.innerHTML=svg(p.playing?'pause':'play'); pl.setAttribute('aria-label',p.playing?'Jeda':'Putar');
+  $$('.mp-src',el).forEach(b=>{const on=b.dataset.src===p.src;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.querySelector('.src-state').textContent=on&&p.playing?'Diputar':'Jeda'});
+  const mu=q('[data-act="mpmute"]'); mu.innerHTML=svg(p.muted?'mute':'vol'); mu.setAttribute('aria-pressed',p.muted?'true':'false'); mu.setAttribute('aria-label',p.muted?'Bunyikan':'Bisukan'); mu.classList.toggle('on',p.muted);
+  q('[data-act="mpvol"]').value=p.vol;
+}
+function mpPlay(vk,on){
+  const p=P[vk]; p.playing=on; clearInterval(p.timer); p.timer=null;
+  if(on) p.timer=setInterval(()=>{
+    const s=TR[p.src], t=s.tracks[p.idx];
+    if(t.d){p.pos++; if(p.pos>=t.d){p.pos=0; if(s.nav) p.idx=(p.idx+1)%s.tracks.length}}
+    mpRender(vk);
+  },1000);
+  mpRender(vk);
+}
+function mpGate(vk){
+  const p=P[vk], host=VW[vk].peer, hn=DEV[host].name, m=S.perms[host].media, el=$('#'+vk+'Mp');
+  const msg=el.querySelector('[data-mpmsg]'), body=el.querySelector('[data-mpbody]'), tg=el.querySelector('[data-act="mptoggle"]');
+  let text='', btn='';
+  if(!S.conn.on) text='Tidak terhubung ke '+hn+'.';
+  else if(m==='deny') text='Media dimatikan oleh '+hn+'.';
+  else if(!p.on) text='Media player dimatikan. '+hn+' berhenti mengirim info media ke perangkat ini. Nyalakan lagi kapan saja.';
+  else if(m==='ask'&&!p.granted){
+    const pend=S.pend[host]&&S.pend[host].vk===vk&&S.pend[host].feat==='media';
+    text=pend?'Menunggu izin dari '+hn+'…':p.res==='deny'?hn+' menolak kontrol media.':p.res==='timeout'?'Tidak ada jawaban dari '+hn+' dalam 30 detik.':hn+' meminta konfirmasi sebelum media bisa dikontrol (Always Ask).';
+    if(!pend) btn='<button class="btn brand sm" type="button" data-act="mpask" data-vk="'+vk+'">Minta izin</button>';
+  }
+  msg.innerHTML=text?'<span>'+text+'</span>'+btn:'';
+  msg.hidden=!text; body.hidden=!!text;
+  tg.checked=p.on; tg.disabled=!S.conn.on||m==='deny';
+  el.querySelector('[data-mpstate]').textContent=p.on?'Aktif':'Mati';
+  if(text&&p.playing) mpPlay(vk,false);
+}
+
+/* ===== notifications (Release 2) ===== */
+const NAPPS={
+  pixel:[{id:'wa',name:'WhatsApp',icon:'msg'},{id:'cal',name:'Kalender',icon:'cal'},{id:'ig',name:'Instagram',icon:'insta'}],
+  laptop:[{id:'outlook',name:'Outlook',icon:'mail'},{id:'teams',name:'Teams',icon:'msg'},{id:'cal',name:'Kalender',icon:'cal'}]
+};
+const NITEMS={
+  pixel:[{id:'n1',app:'wa',title:'Rina',text:'Jadi rapat jam 1 kan?',time:'09.41',reply:true},{id:'n2',app:'cal',title:'Kalender',text:'Rapat tim pukul 13.00',time:'09.15'},{id:'n3',app:'ig',title:'Instagram',text:'3 notifikasi baru',time:'08.57'}],
+  laptop:[{id:'m1',app:'outlook',title:'Outlook · Budi',text:'Draf laporan Q4 sudah saya kirim',time:'09.38'},{id:'m2',app:'teams',title:'Teams',text:'Standup dimulai 5 menit lagi',time:'09.25'},{id:'m3',app:'cal',title:'Kalender',text:'Demo klien pukul 15.00',time:'08.50'}]
+};
+const N={dsk:{on:false,apps:{},reply:null,sent:{}},v1:{on:false,apps:{},reply:null,sent:{}},v2:{on:false,apps:{},reply:null,sent:{}}};
+function renderNotif(vk){
+  const host=VW[vk].peer, hn=DEV[host].name, n=N[vk], m=S.perms[host].notify, andro=DEV[host].kind==='android', dis=!S.conn.on||m==='deny';
+  let body='';
+  if(!S.conn.on) body='<p class="notif-off">Tidak terhubung ke '+hn+'.</p>';
+  else if(m==='deny') body='<p class="notif-off">'+hn+' tidak mengizinkan notifikasinya dibagikan.</p>';
+  else if(!n.on) body='<p class="notif-off">Notifikasi dari '+hn+' belum diterima. Nyalakan, lalu pilih aplikasi yang diteruskan.</p>';
+  else {
+    const apps=NAPPS[host], appBy={}; apps.forEach(a=>{appBy[a.id]=a});
+    const chips='<div class="napps"><span class="m-label">Aplikasi yang diteruskan dari '+hn+'</span>'+apps.map(a=>'<button class="napp'+(n.apps[a.id]?' on':'')+'" type="button" data-act="napp" data-vk="'+vk+'" data-app="'+a.id+'" aria-pressed="'+!!n.apps[a.id]+'">'+svg(a.icon)+a.name+'</button>').join('')+'</div>';
+    const items=NITEMS[host].filter(i=>n.apps[i.app]);
+    const list=items.length?'<div class="notif-list">'+items.map(i=>{
+      let rep='';
+      if(andro&&i.reply){
+        if(n.sent[i.id]) rep='<p class="ok">Balasan terkirim lewat '+hn+'.</p>';
+        else if(n.reply===i.id) rep='<div class="reply-row"><input type="text" placeholder="Balas…" aria-label="Balasan untuk '+i.title+'"><button class="btn brand sm" type="button" data-act="nsend" data-vk="'+vk+'" data-id="'+i.id+'">Kirim</button></div>';
+        else rep='<button class="linkbtn" type="button" data-act="nreply" data-vk="'+vk+'" data-id="'+i.id+'">Balas</button>';
+      }
+      return '<div class="notif-item"><span class="nic">'+svg(appBy[i.app].icon)+'</span><div class="nmeta"><b>'+i.title+'</b><p>'+i.text+'</p>'+rep+'</div><time>'+i.time+'</time></div>';
+    }).join('')+'</div>':'<p class="notif-off">Belum ada aplikasi yang dipilih. Aplikasi baru tidak diteruskan sampai Anda memilihnya.</p>';
+    body=chips+list+(andro?'':'<p class="hint">Notifikasi dari desktop hanya ditampilkan, tidak bisa dibalas. Desktop macOS tidak bisa meneruskan notifikasi.</p>');
+  }
+  $('#'+vk+'Notif').innerHTML='<div class="notif"><div class="notif-head"><h3>Notifikasi</h3><span class="r2">Release 2</span><label class="switch"><span>'+(n.on&&!dis?'Aktif':'Mati')+'</span><input type="checkbox" data-act="ntoggle" data-vk="'+vk+'"'+(n.on?' checked':'')+(dis?' disabled':'')+' aria-label="Terima notifikasi dari '+hn+'"><span class="track" aria-hidden="true"></span></label></div>'+body+'</div>';
+}
+
+/* ===== add device / pairing ===== */
+const DETS=[
+  {id:'pclab',name:'PC Lab',os:'Linux',ip:'192.168.1.20',icon:'monitor'},
+  {id:'imac',name:'iMac Ruang Multimedia',os:'macOS',ip:'192.168.1.31',icon:'monitor'},
+  {id:'galaxytab',name:'Galaxy Tab S9',os:'Android',ip:'192.168.1.24',icon:'tablet'}
+];
+const AD={dsk:{host:'laptop',open:null,st:{},code:{},left:120,scan:null,target:'galaxytab'},v1:{host:'pixel',open:null,st:{},code:{},left:120,scan:null,target:'imac'},v2:{host:'pixel',open:null,st:{},code:{},left:120,scan:null,target:'imac'}};
+function addHTML(px){
+  const d=DEV[AD[px].host];
+  return (px==='dsk'?'<h2>Tambah Device</h2>':'')
+    +'<p class="sub">Pindai QR di layar device lain, tunjukkan QR perangkat ini, atau pilih device di jaringan untuk mencocokkan kode. Pairing hanya bisa selama halaman ini terbuka.</p>'
+    +'<button class="btn brand wide" type="button" data-act="addscan" data-px="'+px+'">'+svg('cam')+'Scan QR untuk pairing</button>'
+    +(px==='dsk'?'<p class="hint">Desktop memakai kamera bawaan atau webcam. Tombol ini disembunyikan kalau tidak ada kamera.</p>':'')
+    +'<div class="scan-box" data-scan hidden><div class="scan-view" aria-hidden="true"><span class="scan-frame"></span><span class="scan-line"></span></div><p>Arahkan kamera ke QR di layar device lain…</p><button class="btn secondary sm" type="button" data-act="addscancancel" data-px="'+px+'">Batal</button></div>'
+    +'<p class="pair-msg" data-scanmsg role="status" hidden></p>'
+    +'<div class="host-qr"><span class="pair-label">QR perangkat ini</span><div class="pair-qr" data-qr role="img" aria-label="Kode QR '+d.name+'. Pindai dengan UrDevice di device lain."></div><div class="host-meta"><b>'+d.name+'</b> · <span class="mono">'+d.ip+'</span></div><div class="qr-exp">Berlaku <b data-qrleft>2:00</b> · <button class="linkbtn" type="button" data-act="qrrefresh" data-px="'+px+'">Buat ulang</button></div></div>'
+    +'<span class="m-label" style="padding-left:2px">Device di jaringan ini</span><div class="detect-list" data-detlist></div>'
+    +'<p class="hint">Kalau pairing gagal 5 kali dalam 5 menit, pairing dikunci selama 5 menit.</p>';
+}
+function renderDet(px){
+  const a=AD[px];
+  $('#'+px+'Add [data-detlist]').innerHTML=DETS.map(d=>{
+    const st=a.st[d.id], open=a.open===d.id, paired=st==='paired';
+    let drop='';
+    if(open){
+      const code=(a.code[d.id]||'').split('').map(c=>'<span>'+c+'</span>').join('');
+      if(paired) drop='<div class="pair-status done" role="status"><span class="pair-dot" aria-hidden="true"></span>Pairing selesai. '+d.name+' terhubung.</div>';
+      else if(st==='waitpeer') drop='<span class="pair-label">Kode verifikasi</span><div class="pair-code" role="img" aria-label="Kode '+a.code[d.id].split('').join(' ')+'">'+code+'</div><div class="pair-status" role="status"><span class="pair-dot" aria-hidden="true"></span>Menunggu konfirmasi di '+d.name+'…</div><div class="drop-actions"><button class="btn secondary sm" type="button" data-act="dcancel" data-px="'+px+'" data-id="'+d.id+'">Batal</button></div>';
+      else drop='<span class="pair-label">Kode verifikasi</span><div class="pair-code" role="img" aria-label="Kode '+a.code[d.id].split('').join(' ')+'">'+code+'</div><p class="drop-note">Pastikan kode yang sama tampil di '+d.name+', lalu tekan Kode cocok di kedua device.</p><div class="drop-actions"><button class="btn brand" type="button" data-act="dmatch" data-px="'+px+'" data-id="'+d.id+'">Kode cocok</button><button class="btn secondary" type="button" data-act="dcancel" data-px="'+px+'" data-id="'+d.id+'">Batal</button></div>';
+      drop='<div class="detect-drop">'+drop+'</div>';
+    }
+    return '<div class="detect-item'+(open?' open':'')+(paired?' connected':'')+'"><button class="detect-head" type="button" data-act="detect" data-px="'+px+'" data-id="'+d.id+'" aria-expanded="'+open+'"><span class="ic">'+svg(d.icon)+'</span><span class="meta"><b>'+d.name+'</b><small>'+d.os+' · '+d.ip+'</small></span><span class="detect-badge">'+(paired?'Terhubung':'Belum terhubung')+'</span><span class="chev" aria-hidden="true">'+svg('chev')+'</span></button>'+drop+'</div>';
+  }).join('');
+}
+function hex(n){let s='';for(let i=0;i<n;i++) s+=Math.floor(Math.random()*16).toString(16);return s}
+function genQr(px){
+  const a=AD[px], d=DEV[a.host];
+  a.left=120;
+  const invite={v:1,name:d.name,addrs:[d.ip],port:47811,token:hex(32),exp:Math.floor(Date.now()/1000)+120};
+  const payload='urdevice://pair?d='+btoa(JSON.stringify(invite)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  renderQr($('#'+px+'Add [data-qr]'),payload);
+  $('#'+px+'Add [data-qrleft]').textContent=fmt(a.left);
+}
+function renderQr(el,payload){
+  if(window.qrcode){
+    try{const qr=qrcode(0,'M');qr.addData(payload);qr.make();el.innerHTML=qr.createSvgTag({cellSize:4,margin:4,scalable:true});return}catch(e){/* fallback below */}
+  }
+  let seed=7;for(let i=0;i<payload.length;i++) seed=(seed*31+payload.charCodeAt(i))>>>0;
+  const n=25,c=8,rnd=()=>{seed=(seed*1103515245+12345)>>>0;return (seed>>>8)/16777216};
+  const fz=(x,y)=>'<rect x="'+x+'" y="'+y+'" width="56" height="56"/><rect x="'+(x+8)+'" y="'+(y+8)+'" width="40" height="40" fill="#fff"/><rect x="'+(x+16)+'" y="'+(y+16)+'" width="24" height="24"/>';
+  let r='';for(let y=0;y<n;y++)for(let x=0;x<n;x++){const f=(x<8&&y<8)||(x>=n-8&&y<8)||(x<8&&y>=n-8);if(!f&&rnd()<.44) r+='<rect x="'+x*c+'" y="'+y*c+'" width="8" height="8"/>'}
+  el.innerHTML='<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" fill="#111"><rect width="200" height="200" fill="#fff"/>'+r+fz(0,0)+fz(144,0)+fz(0,144)+'</svg>';
+}
+function qrTick(){
+  Object.keys(AD).forEach(px=>{
+    const a=AD[px]; a.left--;
+    if(a.left<=0) genQr(px); else $('#'+px+'Add [data-qrleft]').textContent=fmt(a.left);
+  });
+}
+
+/* ===== onboarding ===== */
+const OB={}, OBH={dsk:'laptop',v1:'pixel',v2:'pixel'};
+function onbOpen(k){OB[k]={step:0,name:DEV[OBH[k]].name,perms:defPerms()};renderOnb(k);$('#'+k+'Onb').hidden=false}
+function renderOnb(k){
+  const o=OB[k], host=OBH[k], d=DEV[host];
+  const dots=[0,1,2].map(i=>'<i class="'+(i===o.step?'on':'')+'"></i>').join('');
+  let c='';
+  if(o.step===0) c='<span class="onb-ic">'+svg(d.icon)+'</span><h2>Selamat datang di UrDevice</h2><p>UrDevice menghubungkan perangkat Anda sendiri di jaringan lokal. Semua lalu lintas terenkripsi, tanpa server cloud.</p><label class="fld">Nama perangkat ini<input type="text" data-onbname="'+k+'" value="'+esc(o.name)+'"></label><div class="onb-actions"><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Lanjut</button></div>';
+  else if(o.step===1) c='<h2>Izin untuk device lain</h2><p>Atur apa yang boleh dilakukan device lain di '+esc(o.name)+'. Pengaturan ini berlaku untuk semua device yang nanti dipasangkan, dan bisa diubah kapan saja di <b>Perangkat ini</b>.</p><ul class="legend-list"><li><b>Allow</b>: langsung jalan.</li><li><b>Always Ask</b>: Anda konfirmasi dulu di perangkat ini.</li><li><b>Deny</b>: fitur itu mati di device lain.</li></ul><div class="perm-list">'+permListHTML(host,k)+'</div><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbback" data-k="'+k+'">Kembali</button><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Lanjut</button></div>';
+  else c='<span class="onb-ic">'+svg('check')+'</span><h2>Siap dipakai</h2><p>Sekarang pasangkan device lain: pindai QR-nya, tunjukkan QR perangkat ini, atau pilih device di jaringan lalu cocokkan kodenya.</p><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbdone" data-k="'+k+'">Nanti saja</button><button class="btn brand" type="button" data-act="onbdone" data-k="'+k+'" data-next="add">Tambah device</button></div>';
+  $('#'+k+'Onb').innerHTML='<div class="onb-card" role="dialog" aria-modal="true" aria-label="Onboarding UrDevice"><div class="onb-top"><span class="onb-dots" aria-hidden="true">'+dots+'</span><button class="m-sheet-close" type="button" data-act="onbclose" data-k="'+k+'" aria-label="Tutup onboarding">'+svg('close')+'</button></div>'+c+'<p class="onb-note">Demo: tombol di langkah terakhir menerapkan pilihan izin ini ke mockup.</p></div>';
+}
+
+/* ===== settings ===== */
+const DID={laptop:'K7QM-2X9D-H4TR-8WVA-5NBE-J3LC-Q6PF-Z2YU',pixel:'P3NA-7QDX-M2KC-9FRT-4WLB-H8EJ-T5VS-C6ZG'};
+function sw(label,small,on){return '<div class="set-row"><span class="lbl"><b>'+label+'</b>'+(small?'<small>'+small+'</small>':'')+'</span><label class="switch"><input type="checkbox"'+(on?' checked':'')+' aria-label="'+label+'"><span class="track" aria-hidden="true"></span></label></div>'}
+function settingsHTML(host,k){
+  const d=DEV[host], desk=d.kind==='desktop';
+  return '<div class="set-row"><span class="lbl"><b>Nama perangkat ini</b></span><input class="set-in" type="text" value="'+d.name+'" aria-label="Nama perangkat ini"></div>'
+    +'<div class="set-row"><span class="lbl"><b>Device ID</b><small>Sidik jari identitas perangkat ini</small><span class="mono did">'+DID[host]+'</span></span></div>'
+    +sw('Hidden mode','Tidak mengumumkan diri di jaringan. Device yang sudah dipasangkan tetap bisa tersambung.',false)
+    +(desk?sw('Mulai saat login','',true):'')
+    +'<div class="set-row"><span class="lbl"><b>Folder unduhan</b><small class="mono">'+(desk?'Downloads\\UrDevice':'Download/UrDevice')+'</small></span><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: pemilih folder terbuka.">Ubah</button></div>'
+    +sw('Jeda clipboard di semua device','Clipboard berhenti dikirim dan diterima sampai dinyalakan lagi.',false)
+    +'<div class="set-row"><span class="lbl"><b>Bahasa</b></span><span class="val">Indonesia</span></div>'
+    +'<div class="set-row"><span class="lbl"><b>Izin untuk device lain</b><small>Ubah di '+(desk?'halaman Perangkat ini':'kartu Perangkat ini di beranda')+', atau ulangi onboarding.</small></span><button class="btn secondary sm" type="button" data-act="onbopen" data-k="'+k+'">Buka onboarding</button></div>'
+    +'<div class="set-block"><b>Activity log</b><small>Permintaan yang diizinkan dan ditolak selama 30 hari terakhir, tanpa isi clipboard atau file.</small><ul class="log" data-log="'+host+'"></ul></div>'
+    +'<div class="set-row"><span class="lbl"><b>Data</b><small>Semua data lokal UrDevice di perangkat ini.</small></span><span class="btn-row"><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: data diekspor ke urdevice-export.zip.">Export data</button><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: konfirmasi hapus semua data muncul.">Hapus semua data</button></span></div>'
+    +'<div class="set-row" style="border-bottom:0"><span class="lbl"><b>Reset identity</b><small>Membuat kunci identitas baru dan menghapus semua pairing. Semua device harus dipasangkan ulang.</small></span><button class="btn danger sm" type="button" data-act="toast" data-msg="Simulasi: peringatan muncul sebelum kunci identitas baru dibuat.">Reset</button></div>';
+}
+function renderLogs(){
+  $$('[data-log]').forEach(ul=>{ul.innerHTML=S.log[ul.dataset.log].slice(0,6).map(l=>'<li><time>'+l.t+'</time><span><b>'+l.dev+'</b> · '+l.cap+'</span><em class="'+(l.ok?'ok':'no')+'">'+l.d+'</em></li>').join('')});
+}
+
+/* ===== render all ===== */
+function renderAll(){
+  renderSelf(); renderLists();
+  VKS.forEach(vk=>{renderPeer(vk);mpGate(vk);renderNotif(vk);renderFV(vk)});
+  renderPrompts(); renderIndicators(); renderLogs();
+}
+
+/* ===== events ===== */
+const ACT={
+  dgo:t=>dShow(t.dataset.to), mgo:t=>mShow(t.dataset.to), v2go:t=>v2Show(t.dataset.to),
+  perm:t=>setPerm(t.dataset.host,t.dataset.cap,t.dataset.mode),
+  onbperm:t=>{OB[t.dataset.k].perms[t.dataset.cap]=t.dataset.mode;renderOnb(t.dataset.k)},
+  tile:t=>openFeature(t.dataset.vk,t.dataset.feat,'use'),
+  gear:t=>openFeature(t.dataset.vk,t.dataset.feat,'settings'),
+  fvback:t=>closeFeature(t.dataset.vk),
+  fvaction:t=>{const vk=t.dataset.vk;if(FV[vk]) ask(vk,FV[vk].feat)},
+  fvcancel:t=>cancelPend(VW[t.dataset.vk].peer),
+  fvxfer:t=>{const fv=FV[t.dataset.vk];clearFvTimers(fv);fv.prog=null;fv.note='Transfer dibatalkan. File yang belum selesai dihapus.';renderFV(t.dataset.vk)},
+  gal:t=>{const fv=FV[t.dataset.vk];fv.sel[t.dataset.i]=!fv.sel[t.dataset.i];renderFV(t.dataset.vk)},
+  pallow:t=>answer(t.dataset.host,true), pdeny:t=>answer(t.dataset.host,false),
+  actstop:t=>stopAct(t.dataset.host),
+  disc:t=>disconnect(t.dataset.vk), reconn:()=>reconnect(),
+  forget:t=>{const name=t.dataset.name||DEV[VW[t.dataset.vk].peer].name;if(window.confirm('Lupakan '+name+'? Pairing dihapus, dan device ini harus dipasangkan ulang.')) toast('Simulasi: di aplikasi asli '+name+' hilang dari daftar. Di mockup ini device tetap ditampilkan.')},
+  mpplay:t=>mpPlay(t.dataset.vk,!P[t.dataset.vk].playing),
+  mpnext:t=>{const p=P[t.dataset.vk],s=TR[p.src];p.idx=(p.idx+1)%s.tracks.length;p.pos=0;mpRender(t.dataset.vk)},
+  mpprev:t=>{const p=P[t.dataset.vk],s=TR[p.src];p.idx=(p.idx-1+s.tracks.length)%s.tracks.length;p.pos=0;mpRender(t.dataset.vk)},
+  mpsrc:t=>{const p=P[t.dataset.vk];p.src=t.dataset.src;p.idx=0;p.pos=TR[p.src].pos;mpRender(t.dataset.vk)},
+  mpmute:t=>{const p=P[t.dataset.vk];p.muted=!p.muted;mpRender(t.dataset.vk)},
+  mpseek:(t,e)=>{const p=P[t.dataset.vk],s=TR[p.src],tr=s.tracks[p.idx];if(!s.seek||!tr.d)return;const r=t.getBoundingClientRect();p.pos=Math.round(tr.d*Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)));mpRender(t.dataset.vk)},
+  mpask:t=>ask(t.dataset.vk,'media'),
+  napp:t=>{const n=N[t.dataset.vk];n.apps[t.dataset.app]=!n.apps[t.dataset.app];renderNotif(t.dataset.vk)},
+  nreply:t=>{N[t.dataset.vk].reply=t.dataset.id;renderNotif(t.dataset.vk);const i=$('#'+t.dataset.vk+'Notif .reply-row input');if(i)i.focus()},
+  nsend:t=>{const n=N[t.dataset.vk];n.sent[t.dataset.id]=true;n.reply=null;renderNotif(t.dataset.vk)},
+  addscan:t=>{
+    const px=t.dataset.px,a=AD[px],box=$('#'+px+'Add [data-scan]'),msg=$('#'+px+'Add [data-scanmsg]');
+    box.hidden=false;msg.hidden=true;clearTimeout(a.scan);
+    a.scan=setTimeout(()=>{
+      box.hidden=true;a.st[a.target]='paired';a.open=a.target;renderDet(px);
+      const d=DETS.find(x=>x.id===a.target);
+      msg.textContent='QR '+d.name+' terbaca. Pairing selesai tanpa kode, karena QR sudah memuat identitas '+d.name+'. Kamera langsung dimatikan.';
+      msg.hidden=false;
+    },2400);
+  },
+  addscancancel:t=>{const px=t.dataset.px;clearTimeout(AD[px].scan);$('#'+px+'Add [data-scan]').hidden=true},
+  detect:t=>{
+    const px=t.dataset.px,id=t.dataset.id,a=AD[px];
+    if(a.open&&a.open!==id&&a.st[a.open]!=='paired') a.st[a.open]=undefined;
+    if(a.open===id){if(a.st[id]!=='paired') a.st[id]=undefined;a.open=null}
+    else{a.open=id;if(a.st[id]!=='paired'){a.st[id]='confirm';a.code[id]=String(Math.floor(Math.random()*1e6)).padStart(6,'0')}}
+    renderDet(px);
+  },
+  dmatch:t=>{
+    const px=t.dataset.px,id=t.dataset.id,a=AD[px];a.st[id]='waitpeer';renderDet(px);
+    setTimeout(()=>{if(a.st[id]==='waitpeer'){a.st[id]='paired';renderDet(px);toast(DETS.find(x=>x.id===id).name+' juga menekan Kode cocok. Pairing selesai (simulasi).')}},1800);
+  },
+  dcancel:t=>{const a=AD[t.dataset.px];a.st[t.dataset.id]=undefined;a.open=null;renderDet(t.dataset.px)},
+  qrrefresh:t=>genQr(t.dataset.px),
+  onbopen:t=>onbOpen(t.dataset.k),
+  onbnext:t=>{const k=t.dataset.k,o=OB[k];if(o.step===0){const i=$('[data-onbname="'+k+'"]');if(i&&i.value.trim()) o.name=i.value.trim()}o.step++;renderOnb(k)},
+  onbback:t=>{OB[t.dataset.k].step--;renderOnb(t.dataset.k)},
+  onbclose:t=>{$('#'+t.dataset.k+'Onb').hidden=true},
+  onbdone:t=>{
+    const k=t.dataset.k,host=OBH[k];
+    capsFor(host).filter(c=>!c.r2).forEach(c=>{S.perms[host][c.id]=OB[k].perms[c.id]});
+    $('#'+k+'Onb').hidden=true;renderAll();
+    if(t.dataset.next==='add'){if(k==='dsk')dShow('add');else if(k==='v1')mShow('add');else v2Show('tambah')}
+    toast('Pilihan izin dari onboarding diterapkan ke '+DEV[host].name+'.');
+  },
+  sheetopen:t=>{$('#'+t.dataset.sheet).hidden=false},
+  sheetclose:t=>{$('#'+t.dataset.sheet).hidden=true},
+  lanok:t=>{
+    const p=S.ports[t.dataset.host][t.dataset.i];
+    p.lan=p.pending;
+    if(p.lan==='1h'){const d=new Date(Date.now()+3600e3);p.until=String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0')}
+    p.pending=null;p.ack=false;renderSelf();
+  },
+  lancancel:t=>{const p=S.ports[t.dataset.host][t.dataset.i];p.pending=null;p.ack=false;renderSelf()},
+  portadd:t=>{
+    const host=t.dataset.host,num=parseInt($('[data-portnum="'+host+'"]',t.closest('.ports')).value,10),label=$('[data-portlabel="'+host+'"]',t.closest('.ports')).value.trim();
+    if(!(num>=1&&num<=65535)){toast('Isi nomor port antara 1 dan 65535.');return}
+    if(S.ports[host].some(p=>p.port===num)){toast('Port '+num+' sudah dibagikan.');return}
+    S.ports[host].push({port:num,label:label,lan:'off'});renderAll();
+  },
+  portdel:t=>{S.ports[t.dataset.host].splice(+t.dataset.i,1);renderAll()},
+  simble:()=>togglePath(),
+  toast:t=>toast(t.dataset.msg)
+};
+const CHG={
+  mptoggle:t=>{P[t.dataset.vk].on=t.checked;mpGate(t.dataset.vk)},
+  ntoggle:t=>{N[t.dataset.vk].on=t.checked;renderNotif(t.dataset.vk)},
+  clipsync:t=>{CS[t.dataset.vk]=t.checked;toast('Sinkron clipboard dengan '+DEV[VW[t.dataset.vk].peer].name+' '+(t.checked?'menyala':'mati')+'.')},
+  lan:t=>{
+    const p=S.ports[t.dataset.host][t.dataset.i];
+    if(t.value==='off'){p.lan='off';p.pending=null;p.ack=false}else{p.pending=t.value;p.ack=false}
+    renderSelf();
+  },
+  lanack:t=>{S.ports[t.dataset.host][t.dataset.i].ack=t.checked;renderSelf()}
+};
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]'); if(!t) return;
+  if(t.tagName==='INPUT'||t.tagName==='SELECT') return;
+  if(t.disabled) return;
+  const f=ACT[t.dataset.act]; if(f) f(t,e);
+});
+document.addEventListener('change',e=>{
+  const t=e.target.closest('[data-act]'); if(!t) return;
+  const f=CHG[t.dataset.act]; if(f) f(t,e);
+});
+document.addEventListener('input',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.act==='mpvol'){const p=P[t.dataset.vk];p.vol=+t.value;if(p.muted&&p.vol>0){p.muted=false;mpRender(t.dataset.vk)}}
+});
+document.addEventListener('keydown',e=>{
+  const t=e.target;
+  if(t.dataset&&t.dataset.act==='mpseek'&&(e.key==='ArrowRight'||e.key==='ArrowLeft')){
+    const p=P[t.dataset.vk],s=TR[p.src],tr=s.tracks[p.idx];if(!s.seek||!tr.d) return;
+    p.pos=Math.min(tr.d,Math.max(0,p.pos+(e.key==='ArrowRight'?5:-5)));mpRender(t.dataset.vk);e.preventDefault();
+  }
+  if(e.key==='Escape') $$('.m-sheet').forEach(s=>{s.hidden=true});
+});
+
+/* ===== init ===== */
+$$('[data-icon]').forEach(e=>{e.innerHTML=svg(e.dataset.icon)});
+Object.keys(AD).forEach(px=>{$('#'+px+'Add').innerHTML=addHTML(px);renderDet(px);genQr(px)});
+VKS.forEach(vk=>mpBuild(vk));
+$$('[data-settings]').forEach(el=>{el.innerHTML=settingsHTML(el.dataset.settings,el.dataset.k)});
+renderAll();
+setInterval(qrTick,1000);
+</script>
+</body>
+</html>

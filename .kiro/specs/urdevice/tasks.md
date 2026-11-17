@@ -17,23 +17,25 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 - [ ] T1.2 Identity: create the Ed25519 key and the `rcgen` certificate, compute the Device ID and readable fingerprint, store the key through `keyring` (with an encrypted-file fallback), and support reset. _Req: R1_
 - [ ] T1.3 Trust store: SQLite schema from design §4.2 with row HMACs. Add CRUD for paired devices, permissions, the activity log (30-day pruning), and shared ports. _Req: R3.6, R3.9, R5.1, R5.6_
 - [ ] T1.4 Transport: quinn endpoint, ALPN `urdevice/1`, custom client and server certificate verifiers with pinning, a pairing-context hook, a rule for duplicate connections, and keep-alive. _Req: R4.1, R4.2_
-- [ ] T1.5 Session: Hello/Welcome handshake, capability negotiation, version rejection, the stream multiplexer, the datagram channel, and reconnect with backoff. _Req: R4.3–R4.5_
+- [ ] T1.5 Session: Hello/Welcome handshake, capability negotiation, version rejection, the stream multiplexer, the datagram channel, reconnect with backoff, `PermissionState` and `DeviceStatus` messages, user Disconnect/Reconnect with `auto_connect`, and RTT reporting. _Req: R4.3–R4.9, R5.7_
 - [ ] T1.6 Discovery: mDNS advertise and browse, UDP broadcast announcements, a rate-limited parser, the PeerTable, auto-connect to paired peers, and hidden mode. _Req: R2_
-- [ ] T1.7 QR pairing: create the invite and token, encode the URI, verify the HMAC over the TLS exporter, make tokens single-use with expiry, and add the lockout counter. _Req: R3.1–R3.4, R3.7, R3.8_
+- [ ] T1.7 QR pairing: create the invite and token, encode the URI, verify the HMAC over the TLS exporter, make tokens single-use with expiry, create a new token when one expires while the Pair screen is open, and add the lockout counter. _Req: R3.1–R3.4, R3.7, R3.8, R3.11_
 - [ ] T1.8 Code-confirmation pairing: derive the 6-digit code from the exporter and require confirmation on both sides. _Req: R3.5_
 - [ ] T1.9 Write `docs/security/threat-model.md` from design §15. _Req: R4, R5_
-- [ ] T1.10 Permission engine and ActivityMonitor: Allow/Ask/Deny/Not set, the first-use prompt (R5.2) with the warning and extra confirmation for terminal and file changes, the 30 s timeout, and revoke and stop. _Req: R5_
+- [ ] T1.10 Permission engine and ActivityMonitor: one Allow/Always Ask/Deny setting per capability for all paired devices, onboarding defaults (design §7.4), the Always Ask prompt with the 30 s timeout, `Denied` replies, the `PermissionState` push within 1 s of a change, the warning and extra confirmation before Allow for terminal and file changes, and revoke and stop. _Req: R5_
 - [ ] T1.11 Logging with `tracing` and a redaction layer. _Req: R16.2_
 - [ ]* T1.12 Integration tests: both pairing flows, wrong-fingerprint rejection, token replay, lockout, reconnect, and unpair-then-reject.
 - [ ]* T1.13 Fuzz targets: control-message framing, Announce parser, and QR payload parser.
 
 ## Phase 2: App shells
 
-- [ ] T2.1 Desktop: Slint app with a tray icon and start at login. Add the Devices list, the Pair screen (QR display and code confirmation), Device detail with permission settings, and the Settings screen (name, hidden mode, reset identity, data export and delete). _Req: R1.4, R1.5, R2, R3, R5, R14.1, R14.2, R16.3_
-- [ ] T2.2 Desktop: permission prompt dialog, a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.3–R5.6_
-- [ ] T2.3 Android: foreground service that hosts the core, NsdManager discovery adapter, and Compose Devices/Pair screens (CameraX + ML Kit QR scanner, the app's own QR display, code confirmation). _Req: R2, R3, R15.1_
-- [ ] T2.4 Android: permission screens, a notification with Stop, the permission prompt UI, and the Settings screen. _Req: R5, R15.2, R16.3_
+- [ ] T2.1 Desktop: Slint app with a tray icon and start at login, following the layout in `docs/mockup/urdevice-layout.html` (design §12). Add onboarding, the sidebar device list (connected, disconnected, offline with last seen), the "This device" view with permission settings, the paired-device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`), the Pair screen (QR display with countdown, available devices with code confirmation), and the Settings screen (name, Device ID, hidden mode, start at login, download folder, clipboard pause, language, activity log, reset identity, data export and delete). _Req: R1.4, R1.5, R2, R3, R4.7–R4.9, R5, R14.1, R14.2, R16.3_
+- [ ] T2.2 Desktop: Always Ask prompt window (Allow / Deny, 30 s timeout), the warning and extra confirmation when the user sets terminal or file changes to Allow, a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.2–R5.6_
+- [ ] T2.3 Android: foreground service that hosts the core, NsdManager discovery adapter, and Compose Devices/Pair screens (CameraX + ML Kit QR scanner, the app's own QR display with countdown, code confirmation), and the device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`). _Req: R2, R3, R4.7–R4.9, R15.1_
+- [ ] T2.4 Android: onboarding with the permission defaults (including Gallery), the "This device" permission sheet, OS permission explanation screens, a notification with Stop, the Always Ask notification with Allow and Deny, and the Settings screen. _Req: R5, R15.2, R16.3_
 - [ ] T2.5 Localization setup on both platforms (Slint `@tr`, Android `strings.xml`). _Req: R16.4_
+- [ ] T2.6 Desktop QR scanner: camera frames with `nokhwa`, decoding with `rqrr`, the OS camera permission on each OS, hiding "Scan QR" when there is no camera, and stopping the camera when the Pair screen closes. _Req: R3.10_
+- [ ] T2.7 Battery status adapters (`starship-battery` on desktop, `BatteryManager` on Android) and the connection-path chip with latency. _Req: R4.8, R4.9_
 
 ## Phase 3: Clipboard and files
 
@@ -62,9 +64,9 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 5: Media control
 
-- [ ] T5.1 Media protocol (MediaCmd, NowPlaying push) and the core service. _Req: R11.1_
-- [ ] T5.2 Hosts: Windows SMTC, Linux MPRIS, macOS media keys and CoreAudio volume, Android MediaSession with a NotificationListener. _Req: R11.2–R11.4_
-- [ ] T5.3 Media remote UI on Android and desktop. _Req: R11.1, R11.2_
+- [ ] T5.1 Media protocol (MediaSubscribe, MediaState with sessions and capability flags, MediaCmd with Seek, VolumeCmd with Mute) and the core service. _Req: R11.1, R11.5, R11.6_
+- [ ] T5.2 Hosts: Windows SMTC sessions, Linux MPRIS players, macOS "System" session with media keys and CoreAudio volume, Android MediaSession with a NotificationListener. _Req: R11.2–R11.5_
+- [ ] T5.3 Media player UI on Android and desktop: source tabs, seek bar, controls shown only when supported, volume and mute, and the on/off switch. _Req: R11.1, R11.2, R11.5, R11.6_
 
 ## Phase 6: Screen sharing
 
@@ -78,17 +80,17 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 7: Localhost sharing
 
-- [ ] T7.1 Host side: shared-port allow-list per device, TunnelOpen checks, connections to loopback only. _Req: R13.1, R13.5_
+- [ ] T7.1 Host side: shared ports offered to every paired device, TunnelOpen checks against `shared_port` and the Localhost setting, connections to loopback only. _Req: R13.1, R13.5_
 - [ ] T7.2 Viewer side: loopback listener, choosing a free port when P is taken, bidirectional copying over QUIC streams, connection and traffic stats. _Req: R13.2–R13.4, R13.7_
-- [ ] T7.3 Optional LAN exposure with a warning and 1-hour expiry. _Req: R13.6_
-- [ ] T7.4 Localhost UI on both platforms, including "Open in browser". _Req: R13.1, R13.7_
+- [ ] T7.3 Optional per-port LAN exposure on the host, with a warning, a choice of "1 hour" or "Always on" (extra confirmation, kept after restart), and a persistent indicator. _Req: R13.6_
+- [ ] T7.4 Localhost UI on both platforms: shared ports on the "This device" view (add, label, remove, Expose on LAN) and the viewer's Localhost view with the local port and "Open in browser". _Req: R13.1, R13.6, R13.7_
 - [ ]* T7.5 Integration tests: refusal of ports that aren't shared, WebSocket and HTTP/2 traffic, and hot reload with a Vite dev server.
 
 ## Phase 8: Bluetooth fallback
 
 - [ ] T8.1 Interface watcher and PAN path selection, with QUIC migration and reconnect. _Req: R6.1, R6.5_
 - [ ] T8.2 BLE channel: Android GATT server and `btleplug` central, Noise IK with the pairing-time static keys, MTU framing and reassembly. _Req: R6.2, R6.3_
-- [ ] T8.3 Routing of only the allowed features over BLE, `Unavailable(FallbackPath)` messages in the UI, and the guide to Bluetooth tethering settings. _Req: R6.2, R6.4, R6.6_
+- [ ] T8.3 Routing of only the allowed features over BLE, the BLE banner and grey "Not available over Bluetooth" tiles in the device view, and the guide to Bluetooth tethering settings. _Req: R6.2, R6.4, R6.6_
 - [ ]* T8.4 Fuzz target for BLE reassembly.
 
 ## Phase 9: Hardening and release
@@ -111,10 +113,11 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 - [ ] T10.2 Spike: virtual cameras: a macOS Camera Extension, `MFCreateVirtualCamera` on Windows 11, and `v4l2loopback` on Linux, each showing a test pattern in a video-call app. _Req: R17.2_
 - [ ] T10.3 Spike: virtual displays: the ScreenCast virtual source on GNOME and KDE, a sample IddCx driver on Windows (including the signing steps and cost), and `CGVirtualDisplay` on the current macOS. _Req: R20.2_
 - [ ] T10.4 Spike: Google Play policy for full-screen intents, SMS, and call permissions. Confirm the `play`/`full` build split. _Req: R25.1, R29.3_
+- [ ] T10.5 Spike: read notifications on desktop hosts: Windows `UserNotificationListener` (including the package identity it needs) and the Linux D-Bus monitor on GNOME and KDE. _Req: R18.1_
 
 ## Phase 11: Phone-centered features
 
-- [ ] T11.1 Notification mirroring: listener service changes, per-app and visibility filtering, desktop native notifications, reply and actions, dismissal sync, 24 h retention. _Req: R18_
+- [ ] T11.1 Notification mirroring: NotifSubscribe and the app picker on the receiver, listener service changes, visibility filtering, desktop native notifications, reply and actions for Android hosts, desktop → Android mirroring from the T10.5 results, dismissal sync, 24 h retention. _Req: R18_
 - [ ] T11.2 Find my device: Ring messages, Android alarm-stream ringing with the full-screen fallback, desktop ringing window, last-seen display. _Req: R25_
 - [ ] T11.3 Webcam: CameraX → MediaCodec stream, camera controls, desktop viewer window. _Req: R17.1, R17.3, R17.5, R17.6_
 - [ ] T11.4 Virtual camera back-ends on macOS, Windows 11, and Linux. _Req: R17.2_
@@ -162,5 +165,5 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 - [ ] T16.1 Spike: capture system audio on each OS (WASAPI loopback, PipeWire/PulseAudio monitor, macOS ScreenCaptureKit or a loopback driver, Android `AudioPlaybackCapture`). Record which OS and version works. _Req: R31.1, R31.7_
 - [ ] T16.2 Audio protocol: Opus stream over a QUIC stream or datagrams, with a small jitter buffer and `audio.out.v1` capability negotiation. _Req: R31.1, R31.2_
 - [ ] T16.3 Target playback on each OS, with volume, mute, and the "playing from X" indicator and Stop button. _Req: R31.5, R31.6_
-- [ ] T16.4 `audio.out.v1` uses the first-use prompt (R5.2), a per-device setting in the UI, and activity-log entries. _Req: R31.3, R31.4, R31.8_
+- [ ] T16.4 `audio.out.v1` follows the permission settings (R5): a default chosen when the feature is built and added to onboarding, the setting on the "This device" view, and activity-log entries. _Req: R31.3, R31.4, R31.8_
 - [ ] T16.5 Measure audio delay between host and target on Wi-Fi. _Req: R31.1_

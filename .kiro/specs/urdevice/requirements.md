@@ -17,6 +17,7 @@ Acceptance criteria use EARS phrasing (WHEN / IF / WHILE ... THEN the system SHA
 - **Controller**: the device sending input or viewing a screen.
 - **Session**: one authenticated, encrypted connection between two paired devices.
 - **Capability**: a feature one device grants another, such as clipboard, files, input, screen, localhost, or media.
+- **Permission setting**: the host's choice for one capability: Allow, Always Ask, or Deny. It applies to every paired device that requests that capability on the host (R5).
 
 ### Scope
 
@@ -25,7 +26,7 @@ Platforms: Windows 10+, macOS 13+, Linux (X11 and Wayland), and Android 10+ (API
 Releases and order of work:
 
 - **Release 1 (R1–R16):** project setup, then Android ↔ desktop, then desktop ↔ desktop.
-- **Release 2 (R17–R30):** additional features, built after Release 1 is stable.
+- **Release 2 (R17–R31):** additional features, built after Release 1 is stable.
 
 Out of scope for v1: iOS, use over the internet or across subnets (no relay or NAT traversal), multiple user accounts sharing one mesh, audio streaming during screen sharing, and Bluetooth fallback between two desktops.
 
@@ -48,7 +49,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 1. WHILE the app is running and discovery is on THEN the system SHALL advertise itself over mDNS/DNS-SD as service type `_urdevice._udp.local.`.
 2. WHILE the app is running and discovery is on THEN the system SHALL also send a UDP broadcast announcement every 5 seconds on a fixed port, for networks that block multicast.
 3. Announcements SHALL include only the protocol version, a short Device ID prefix, the display name, the listening port, and the platform type. They SHALL NOT include secrets or pairing tokens.
-4. WHEN an announcement arrives from a paired device THEN the system SHALL connect to it automatically within 3 seconds.
+4. WHEN an announcement arrives from a paired device THEN the system SHALL connect to it automatically within 3 seconds, unless the user disconnected that device (R4.7).
 5. WHEN an announcement arrives from an unpaired device THEN the system SHALL list it as "available to pair" and SHALL NOT connect without the user's action.
 6. The system SHALL rate-limit inbound discovery packets (at most 20 per second per source address) and ignore malformed ones.
 7. WHERE the user enables "Hidden mode" THEN the system SHALL stop announcing itself and accept connections only from paired devices.
@@ -66,6 +67,8 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 7. IF pairing fails 5 times in 5 minutes THEN the system SHALL stop accepting pairing attempts for 5 minutes and tell the user.
 8. The system SHALL accept pairing attempts only while the "Pair new device" screen is open.
 9. WHEN the user removes a paired device THEN the system SHALL delete its record, close any open session with it, and refuse its future connections until it pairs again.
+10. Any device with a camera SHALL be able to scan another device's pairing QR code from its "Pair new device" screen. This includes desktops: WHERE a desktop has a camera THEN the screen SHALL offer "Scan QR" and SHALL ask for the OS camera permission the first time it is used. WHERE no camera is available THEN the screen SHALL hide the scan option, and the QR code and code confirmation SHALL still work. Camera frames SHALL be processed in memory only and SHALL NOT be stored or sent.
+11. WHEN a pairing token expires while the "Pair new device" screen is open THEN the system SHALL show a new QR code with a new token, and the screen SHALL show how long the current code is valid.
 
 ## Requirement 4: Secure connections
 
@@ -77,17 +80,33 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 4. WHEN a session is established THEN the devices SHALL exchange their supported capabilities, and each side SHALL use only features both support and the user has allowed.
 5. WHEN a connection drops THEN the system SHALL try to reconnect with exponential backoff (1 s up to 30 s) and SHALL resume the session without asking the user again.
 6. The system SHALL treat every received message as untrusted. It SHALL validate sizes and fields and close the session IF a message is malformed.
+7. WHEN the user chooses "Disconnect" for a paired device THEN both devices SHALL close the session and SHALL NOT reconnect automatically. The pairing SHALL stay stored. WHEN the user chooses "Reconnect" on either device THEN the devices SHALL connect again and resume automatic reconnection.
+8. WHILE a session is open THEN each device SHALL show, for that peer, the current connection path (Wi-Fi/LAN, Bluetooth PAN, or Bluetooth LE) and the round-trip latency.
+9. Each device SHALL send its battery level and charging state to connected paired devices when the session starts and when the level changes by at least 1%, at most once a minute. The peer SHALL show it. A device without a battery SHALL send nothing, and the UI SHALL show no battery for it.
 
-## Requirement 5: Per-device permissions
+## Requirement 5: Access permissions
 
-**User story:** As a user, I want to choose what each paired device may do on this device, so that a lost phone can't silently control my computer.
+**User story:** As a user, I want to choose what my other devices may do on this device, so that a lost phone can't silently control my computer.
 
-1. The system SHALL keep a separate permission setting for each capability for each paired device. The options are Allow, Ask every time, and Deny.
-2. A newly paired device SHALL have every capability in the state "Not set". WHEN a paired device first requests a capability that is Not set THEN the target device SHALL show a first-use prompt naming the requesting device and the capability, with three choices: "Allow always" (the feature starts and later requests run with no prompt), "Ask every time", and "Deny" (the feature is not activated). The choice SHALL be saved for that device and capability. IF the user does not answer within 30 seconds THEN the request SHALL be denied and the capability SHALL stay Not set. For the remote terminal (R21) and file changes (R26: upload, rename, delete), the first-use prompt SHALL show a clear warning that the other device gets full control of this device's shell or files, and "Allow always" SHALL need one extra confirmation.
-3. WHEN a capability set to Ask is requested THEN the host SHALL show a prompt naming the requesting device and the capability. IF the user does not answer within 30 seconds THEN the system SHALL deny the request.
-4. WHILE another device is controlling input or viewing the screen THEN the host SHALL show a persistent, visible indicator and a one-click "Stop" control.
+1. Each device SHALL keep one permission setting for each capability. The setting applies to every paired device that requests that capability on this device. The options are Allow, Always Ask, and Deny.
+2. WHEN UrDevice starts for the first time THEN it SHALL show an onboarding screen where the user sets each capability, starting from these defaults:
+
+   | Capability | Default |
+   |---|---|
+   | Clipboard | Allow |
+   | Receive files | Always Ask |
+   | Gallery (Android hosts only) | Always Ask |
+   | Remote control (pointer, keyboard, and presenter) | Always Ask |
+   | Media | Allow |
+   | Screen sharing | Always Ask |
+   | Localhost | Deny |
+
+   The user SHALL be able to change any setting later. Release 2 capabilities SHALL get their default when they are built, except the remote terminal (R21) and file changes (R26: upload, rename, delete), which default to Deny. For these two, choosing Allow SHALL show a clear warning that the other device gets full control of this device's shell or files, and SHALL need one extra confirmation.
+3. WHEN a capability set to Allow is requested THEN the feature SHALL start with no prompt. WHEN a capability set to Always Ask is requested THEN the host SHALL show a confirmation (a prompt window on desktop, a notification on Android) naming the requesting device and the feature, with Allow and Deny. IF the user does not answer within 30 seconds THEN the system SHALL deny the request. Each approval covers one activity: one transfer, one screen session, or one remote-control session.
+4. WHILE another device is controlling input, viewing the screen, or playing its audio on this device (R31.5) THEN the host SHALL show a persistent, visible indicator and a one-click "Stop" control.
 5. WHEN the user presses Stop or revokes a permission THEN the system SHALL end the affected activity within 1 second.
 6. The system SHALL keep a local activity log of granted and denied requests (device, capability, time) for the last 30 days. Log entries SHALL NOT contain clipboard or file contents.
+7. WHEN a capability is set to Deny THEN the host SHALL refuse every request for it, and connected devices SHALL show that feature as turned off by the host. The host SHALL send its permission settings to each connected paired device when the session starts and within 1 second of any change. The host SHALL still check every request itself and SHALL NOT rely on the peer's copy of the settings.
 
 ## Requirement 6: Bluetooth fallback
 
@@ -96,7 +115,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 1. WHEN a paired session loses its LAN path and both devices have a Bluetooth PAN link available THEN the system SHALL move the session to the PAN network path without asking the user to pair again.
 2. WHERE PAN is not available (for example, macOS has no Bluetooth PAN since Monterey) AND one side is Android THEN the system SHALL fall back to a Bluetooth LE control channel. This channel carries only low-bandwidth features: input, presenter commands, media control, and clipboard text up to 64 KB.
 3. The Bluetooth fallback SHALL use the same identity keys and SHALL be end-to-end encrypted and authenticated just like the LAN path.
-4. WHILE running on the fallback path THEN the system SHALL tell the user which features are unavailable (for example, screen sharing and large file transfers).
+4. WHILE running on the Bluetooth LE fallback path THEN the view of that device SHALL show a banner that names the features that are unavailable (for example, screen sharing, file transfers, and localhost), and those features SHALL appear turned off with the reason. WHILE running on the PAN path THEN all features SHALL stay available, and the connection path (R4.8) SHALL show Bluetooth.
 5. WHEN the LAN path returns THEN the system SHALL move the session back to it within 10 seconds.
 6. WHERE the OS does not let the app turn on Bluetooth tethering itself (for example, Android) THEN the system SHALL guide the user to the right settings screen.
 
@@ -162,10 +181,12 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 
 **User story:** As a user, I want to control media playing on another device.
 
-1. The controller SHALL be able to send Play/Pause, Next, Previous, Volume up/down/set, and Mute to a host.
-2. WHERE the host OS exposes now-playing information (Windows SMTC, Linux MPRIS, Android MediaSession) THEN the controller SHALL show the title, artist, artwork, and playback state.
-3. WHERE now-playing information is not available (macOS) THEN the host SHALL fall back to sending system media keys and controlling the system volume.
+1. The controller SHALL be able to send Play/Pause, Next, Previous, Seek, Volume up/down/set, and Mute to a host. Volume and Mute act on the host's system output.
+2. WHERE the host OS exposes media sessions (Windows SMTC, Linux MPRIS, Android MediaSession) THEN the host SHALL send the list of active sessions, each with its app name, title, artist, artwork, playback state, position, and duration. The controller SHALL show them as sources the user can switch between (for example Spotify, YouTube, Chrome), and SHALL send commands to the session the user selected.
+3. WHERE now-playing information is not available (macOS) THEN the host SHALL offer one "System" session that sends system media keys (Play/Pause, Next, Previous) and controls the system volume and mute.
 4. On Android hosts, the system SHALL need the notification-listener permission to read media sessions and SHALL explain why.
+5. Each session SHALL report which commands it supports (for example Seek, Next, Previous). The controller SHALL show only the controls the selected session supports.
+6. The user SHALL be able to turn the media player for a host off and on again on the controller. WHILE it is off THEN the host SHALL stop sending media updates to that controller.
 
 ## Requirement 12: Screen sharing
 
@@ -183,18 +204,18 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 
 **User story:** As a developer, I want to open a dev server running on one device from my other devices, without deploying it.
 
-1. The user SHALL be able to share a local TCP port (for example `localhost:3000`) on the host with selected paired devices.
+1. The user SHALL be able to share a local TCP port (for example `localhost:3000`) on the host, with an optional label. A shared port SHALL be available to every paired device, subject to the host's Localhost permission setting (R5).
 2. WHEN a paired device opens a shared port THEN the system SHALL create a listener on that device's loopback (`127.0.0.1:<port>`, or the next free port) and tunnel connections over the encrypted session to the host's `localhost:<port>`.
 3. Because the tunnel ends at `localhost` on the viewing device, browsers SHALL treat the page as a secure context, so service workers, camera access, and similar APIs work the same as on the host.
 4. The tunnel SHALL support HTTP/1.1, HTTP/2, WebSockets, and any other TCP protocol, including dev-server hot reload.
 5. The host SHALL only forward to the ports the user shared. It SHALL refuse requests for any other port or host.
-6. By default, shared ports SHALL NOT be reachable from the LAN by unpaired devices. An optional "Expose on LAN" setting SHALL show a clear warning and turn itself off after 1 hour.
+6. By default, shared ports SHALL NOT be reachable from the LAN by unpaired devices. The host SHALL offer an optional "Expose on LAN" setting for each shared port. Turning it on SHALL show a clear warning and let the user choose "1 hour" or "Always on". The 1-hour choice SHALL turn itself off after 1 hour. "Always on" SHALL need one extra confirmation and SHALL stay on, including after a restart, until the user turns it off. WHILE any port is exposed on the LAN THEN the host SHALL show a persistent indicator.
 7. The system SHALL show active tunnels, how many connections each has, and the traffic used, and SHALL let the user stop any of them.
 
 ## Requirement 14: Desktop app
 
 1. The desktop app SHALL run in the system tray or menu bar and SHALL be able to start at login.
-2. The main window SHALL list paired and available devices with their connection state and the features open to each.
+2. The main window SHALL list this device and the paired devices with their state (connected, disconnected by the user, or offline with the time they were last seen) and the features each host allows (R5.7). Devices available to pair SHALL be listed on the "Pair new device" screen.
 3. The app SHALL ship as a signed, notarized `.dmg` (macOS), a signed `.msi` (Windows), and `.deb`, `.rpm`, and AppImage/Flatpak packages (Linux).
 
 ## Requirement 15: Android app
@@ -215,7 +236,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 
 # Release 2: Additional features
 
-These requirements build on the Release 1 core: the encrypted session, per-device permissions (R5), the video pipeline (R12), input injection (R9), and tunnels (R13). Every new capability goes through the permission engine and follows the indicator and Stop rules in R5.4 and R5.5 when it is active.
+These requirements build on the Release 1 core: the encrypted session, access permissions (R5), the video pipeline (R12), input injection (R9), and tunnels (R13). Every new capability goes through the permission engine and follows the indicator and Stop rules in R5.4 and R5.5 when it is active.
 
 ## Requirement 17: Phone as webcam and microphone
 
@@ -230,14 +251,14 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 
 ## Requirement 18: Notification mirroring
 
-**User story:** As a user, I want to see and answer my phone's notifications on my desktop, so that I don't have to pick up my phone.
+**User story:** As a user, I want to see and answer my phone's notifications on my desktop, and see my desktop's notifications on my phone, so that I don't have to switch devices.
 
-1. WHEN a notification is posted on Android and mirroring is on THEN the system SHALL send its app name, title, text, and icon to paired desktops that have the notifications permission, and the desktop SHALL show it as a native notification.
-2. The user SHALL choose which apps are mirrored, and whether newly installed apps are mirrored by default. The default SHALL be off.
+1. WHEN a notification is posted on a host and the receiving device has turned on receiving from that host THEN the system SHALL send its app name, title, text, and icon to that device, subject to the host's notifications permission setting (R5). The receiver SHALL show it as a native notification and in that host's device view. Supported directions: Android → desktop, and desktop → Android WHERE the desktop OS lets the app read notifications (Windows and Linux). macOS hosts SHALL NOT mirror their notifications, because macOS has no public API for it, and the UI SHALL say so.
+2. Receiving SHALL be off by default for each host. On the receiver, the user SHALL turn receiving on and off for each host and SHALL choose which of the host's apps are mirrored. Newly seen apps SHALL NOT be mirrored by default.
 3. The system SHALL NOT send the content of notifications marked `VISIBILITY_SECRET`, and SHALL send only "New notification from <app>" for `VISIBILITY_PRIVATE` notifications unless the user allows full content.
-4. WHERE a notification has a reply action (`RemoteInput`) THEN the desktop SHALL allow an inline reply. WHERE it has other action buttons THEN the desktop SHALL show them.
+4. WHERE a notification from an Android host has a reply action (`RemoteInput`) THEN the receiver SHALL allow an inline reply. WHERE it has other action buttons THEN the receiver SHALL show them. Notifications from desktop hosts SHALL be display-only in this release.
 5. WHEN a mirrored notification is dismissed on either device THEN the system SHALL dismiss it on the other device, if the user turned on dismissal sync.
-6. Notification contents SHALL NOT be stored on the desktop after they are dismissed or after 24 hours.
+6. Notification contents SHALL NOT be stored on the receiver after they are dismissed or after 24 hours.
 
 ## Requirement 19: Shared mouse and keyboard across desktops
 
@@ -265,8 +286,8 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 **User story:** As a user, I want to open a shell on another of my computers without setting up SSH.
 
 1. A paired device with the terminal permission SHALL be able to open an interactive terminal on a desktop host, running as the host's logged-in user and never with elevated rights.
-2. The terminal permission SHALL default to Deny, and the user SHALL be able to change it only on the host itself, not from a remote device.
-3. Each terminal session SHALL follow R5.3 (Ask) and R5.4 (indicator and Stop) unless the user set Always allow on the host.
+2. The terminal permission SHALL default to Deny (R5.2). Choosing Allow SHALL show a warning and need one extra confirmation. The user SHALL be able to change the permission only on the host itself, not from a remote device.
+3. Each terminal session SHALL follow R5.3 (Always Ask) and R5.4 (indicator and Stop) unless the host's terminal permission is Allow.
 4. The host SHALL use a pseudo-terminal: `openpty` on macOS and Linux, ConPTY on Windows.
 5. The desktop and Android apps SHALL provide a terminal view with resizing, copy and paste, and on Android an extra row of keys (Esc, Tab, Ctrl, arrows).
 6. The activity log SHALL record when a session starts and ends, and SHALL NOT record what was typed or shown.
@@ -315,7 +336,7 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 1. A paired device with the file browsing permission SHALL be able to list folders and files on a host, inside folders the host user has chosen to share. The default on desktop is the home folder. On Android, the user picks folders through the system folder picker.
 2. The host SHALL refuse any path outside the shared folders, including through symbolic links.
 3. The user SHALL be able to search shared folders by file name, with results shown as they are found.
-4. The user SHALL be able to download files and see image thumbnails. Uploading, renaming, and deleting SHALL need the separate file changes permission (default Deny).
+4. The user SHALL be able to download files and see image thumbnails. Uploading, renaming, and deleting SHALL need the separate file changes permission. It defaults to Deny, and choosing Allow SHALL show a warning and need one extra confirmation (R5.2).
 5. Downloads SHALL use the R8 transfer mechanism, including progress and hash checks.
 
 ## Requirement 27: Shared clipboard history
@@ -364,8 +385,8 @@ These requirements build on the Release 1 core: the encrypted session, per-devic
 
 1. The source device (Host) SHALL be able to send its system audio to any paired target device. Host and target MAY each be Windows, macOS, Linux, or Android.
 2. The audio SHALL travel over the existing encrypted session. No new connection or pairing step SHALL be needed.
-3. The `audio.out.v1` permission SHALL follow R5.2: the first time a paired device sends audio, the target asks once (Allow always, Ask every time, or Deny). WHEN the choice is Allow always THEN later audio from that device SHALL play at once, with no prompt.
-4. The user SHALL be able to change `audio.out.v1` per device at any time, and a change SHALL take effect within 1 second (R5.5).
+3. The `audio.out.v1` permission SHALL follow R5: the target's setting (Allow, Always Ask, or Deny) applies to every paired source. WHEN it is Allow THEN audio SHALL play at once, with no prompt. Its default SHALL be chosen when the feature is built (R5.2).
+4. The user SHALL be able to change `audio.out.v1` at any time, and a change SHALL take effect within 1 second (R5.5).
 5. WHILE a device is playing audio from another device THEN the target SHALL show a visible indicator naming the source and a one-click "Stop" control.
 6. The target SHALL keep its own volume control, and the user SHALL be able to mute a source from the target.
 7. WHERE the host OS cannot capture system audio THEN the UI SHALL say so and explain what the user must enable.

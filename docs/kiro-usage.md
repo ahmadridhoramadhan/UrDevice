@@ -51,7 +51,10 @@ Two Kiro products were used:
 
 The Kiro IDE and CLI were not used.
 
-**TODO:** how the two differed in practice (speed, control, quality of results), in the owner's words.
+How they differ, in the owner's words:
+
+- **Kiro Web:** more limited but flexible. It can be used from a phone or anywhere, with no setup.
+- **Kiro Crew:** can run locally or on a VM, and has many more features, but needs setup.
 
 ## Third-party licenses
 
