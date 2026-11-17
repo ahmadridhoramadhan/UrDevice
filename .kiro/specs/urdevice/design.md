@@ -85,12 +85,16 @@ paired_device(
   name             TEXT, platform TEXT,
   paired_at        INTEGER, last_seen INTEGER,
   last_addrs       TEXT,               -- JSON list of SocketAddr
+  auto_connect     INTEGER NOT NULL DEFAULT 1,  -- 0 after the user chose Disconnect (R4.7)
   row_mac          BLOB NOT NULL
 )
-permission(device_id, capability, mode /* unset|allow|ask|deny */, PRIMARY KEY(device_id, capability))
+permission(capability PRIMARY KEY, mode /* allow|ask|deny */, local_only INTEGER)  -- one row per capability, applies to every paired device (R5.1)
 activity_log(id, device_id, capability, decision, ts)   -- pruned after 30 days (R5.6)
-shared_port(port, label, allowed_devices JSON, lan_expose_until INTEGER NULL)
+shared_port(port PRIMARY KEY, label, lan_expose_until INTEGER NULL)  -- NULL = off, 0 = always on, otherwise a Unix time (R13.6)
+notif_subscription(host_device_id, app_id, PRIMARY KEY(host_device_id, app_id))  -- apps this device receives from each host (R18.2)
 ```
+
+The `permission` table is filled during onboarding (R5.2), so it never has a missing row for a Release 1 capability. `local_only` marks settings that only the local UI may change (R21.2).
 
 ## 5. Discovery (R2)
 
@@ -99,6 +103,7 @@ shared_port(port, label, allowed_devices JSON, lan_expose_until INTEGER NULL)
 - **Receiving:** packets are parsed with a hard size limit and rate-limited per source with a token bucket (R2.6). Results go into a `PeerTable` keyed by short ID. If a short ID matches a paired device, the core connects and then checks the full fingerprint during TLS, so a forged announcement can't do more than cause a failed connection attempt.
 - **Android:** the app holds a `WifiManager.MulticastLock` only while the app is in the foreground or a session is being looked for, to save battery (R15.4).
 - **Hidden mode (R2.7):** stops sending announcements. Known peers can still be reached at their `last_addrs`.
+- **Disconnected devices (R2.4, R4.7):** the core does not auto-connect to a paired device whose `auto_connect` is 0.
 
 Discovery data is unauthenticated by design. It only tells devices where to try connecting. All trust decisions happen in TLS.
 
@@ -133,9 +138,27 @@ Server → Client: Welcome { proto, capabilities[], session_id }
 
 Capabilities are strings such as `clipboard.v1`, `files.v1`, `input.v1`, `screen.h264.v1`, `tunnel.v1`, `media.v1`, `ble.fallback.v1`. The session enables only the capabilities both sides list. Local permissions (§7) are then checked for each request.
 
+Right after `Welcome`, and again whenever something changes, each side sends:
+
+```
+PermissionState { entries[{ capability, mode: allow|ask|deny }] }   // within 1 s of a change (R5.7)
+DeviceStatus    { battery_pct?, charging? }                          // omitted on devices without a battery (R4.9)
+```
+
+The peer uses `PermissionState` only to draw its UI: features set to `deny` appear turned off, and features set to `ask` show that the host will ask. The host still checks every request with its own engine (§7.4).
+
 ### 6.4 Reconnect (R4.5)
 
 When a session drops, the core tries `last_addrs`, any newly discovered addresses, and then fallback paths, waiting 1, 2, 4, … up to 30 s between attempts. QUIC connection migration covers address changes such as Wi-Fi to PAN while the connection is still alive. Without it, a fresh handshake runs with the pinned keys and needs no user action.
+
+### 6.5 Disconnect and reconnect by the user (R4.7)
+
+- **Disconnect:** the device sends `Disconnect {}` on the control stream, sets `auto_connect = 0`, and closes the connection. The peer that receives `Disconnect` also sets `auto_connect = 0` and shows the device as "Disconnected by <name>". Neither side reconnects on its own.
+- **Reconnect:** the user taps "Reconnect" on either device. That device sets `auto_connect = 1` and connects. The peer accepts the connection because the device is still paired, and sets `auto_connect = 1` again.
+
+### 6.6 Connection path and latency (R4.8)
+
+The UI shows the path the session uses (Wi-Fi/LAN, Bluetooth PAN, or Bluetooth LE, §8) and the round-trip time. On QUIC paths the RTT comes from quinn's `Connection::rtt()`, read every 2 s. On the BLE channel it comes from the keep-alive round trip.
 
 ## 7. Pairing and permissions
 
@@ -157,25 +180,49 @@ Flow:
 
 The channel binding ties the proof to this specific TLS session, so a captured proof can't be replayed or relayed.
 
+Either device can be the scanner (B): Android, or a desktop with a camera (§7.5, R3.10). The QR flow needs no code confirmation, because the fingerprint pinning and the token proof already authenticate both sides.
+
 ### 7.2 Code-confirmation pairing (R3.5)
 
-This flow is used for devices found by discovery. Both pairing contexts accept any certificate. After TLS completes, each side computes `code = u32(TLS-Exporter("EXPORTER-urdevice-sas", 4)) mod 10^6` and shows it. The pair is stored only after **both** users tap "Codes match". A man-in-the-middle would end up with two different TLS sessions and two different codes. The chance of guessing a matching code is 1 in 10⁶ per attempt, and the lockout (R3.7) makes repeated guessing impractical.
+This flow is used for devices found by discovery. The user selects a device in the "available to pair" list on the Pair screen. Both pairing contexts accept any certificate. After TLS completes, each side computes `code = u32(TLS-Exporter("EXPORTER-urdevice-sas", 4)) mod 10^6` and shows it under that device, with "Codes match" and "Cancel" buttons. The pair is stored only after **both** users tap "Codes match". The code is compared by eye on the two screens, never typed in. A man-in-the-middle would end up with two different TLS sessions and two different codes. The chance of guessing a matching code is 1 in 10⁶ per attempt, and the lockout (R3.7) makes repeated guessing impractical.
 
 ### 7.3 Pairing limits
 
-- Pairing contexts exist only while the pairing screen is open (R3.8), and each lasts at most 120 s.
+- Pairing contexts exist only while the pairing screen is open (R3.8), and each lasts at most 120 s. When a QR token expires while the screen is still open, the core creates a new token and the UI shows the new QR code with a countdown (R3.11).
 - Failure counter: 5 failures within a 5-minute window locks pairing for 5 minutes (R3.7).
 
 ### 7.4 Permission engine (R5)
 
-`PermissionEngine::check(device_id, capability) -> Allow | Deny | Ask(Future<Decision>)`. A capability that has never been set (`unset`) is handled like `Ask`, but with the first-use prompt below.
+`PermissionEngine::check(requester, capability) -> Allow | Deny | Ask(Future<Decision>)`. The setting is looked up by capability only. It is the same for every paired device (R5.1). `requester` is used for the prompt text and the activity log.
 
-- `Ask` sends a prompt to the UI through a `UiDelegate` trait. If the user doesn't answer within 30 s, the request is denied.
-- Each grant applies to one *activity* (one transfer, one screen session, one input session), unless the user chose "Allow always".
-- **First-use prompt (R5.2):** a newly paired device starts with every capability `unset`. The first request for an `unset` capability shows a prompt with three choices: "Allow always" (stored as `allow`), "Ask every time" (stored as `ask`), and "Deny" (stored as `deny`; the feature does not start). If the user does not answer within 30 s, the request is denied and the capability stays `unset`.
-- For `term.v1` and `fs.write.v1`, the first-use prompt shows a warning that the other device gets full control of this device's shell or files, and "Allow always" needs one extra confirmation (R5.2).
+Settings, UI labels, and onboarding defaults (R5.2):
+
+| Setting (UI label) | Capability | Default |
+|---|---|---|
+| Clipboard | `clipboard.v1` | `allow` |
+| Receive files | `files.v1` | `ask` |
+| Gallery (Android hosts only) | `gallery.v1` | `ask` |
+| Remote control (pointer, keyboard, presenter) | `input.v1` | `ask` |
+| Media | `media.v1` | `allow` |
+| Screen sharing | `screen.h264.v1` | `ask` |
+| Localhost | `tunnel.v1` | `deny` |
+
+The UI shows the modes as **Allow**, **Always Ask**, and **Deny**.
+
+- **Onboarding:** on first start, the app shows the table above with its defaults and saves the user's choices. The user can change any of them later on the "This device" view. There is no separate "default permission" setting.
+- **Allow:** the activity starts at once.
+- **Always Ask (`ask`):** the engine sends a prompt to the UI through the `UiDelegate` trait (a prompt window on desktop, a notification with Allow and Deny on Android). If the user doesn't answer within 30 s, the request is denied. Each approval applies to one *activity* (one transfer, one screen session, one remote-control session).
+- **Deny:** the request is refused with `Denied { capability }`. Peers already show the feature as off, because the host sends `PermissionState` (§6.3).
+- **Changes:** a new setting is sent to every connected peer within 1 s (R5.7). Changing a setting to Deny also revokes running activities of that capability (R5.5).
+- **Terminal and file changes:** `term.v1` and `fs.write.v1` default to `deny`. Switching either one to `allow` shows a warning that other devices get full control of this device's shell or files, and needs one extra confirmation (R5.2). Both are `local_only` (§4.2).
 - Active input, screen, and audio activities register with an `ActivityMonitor`. It drives the on-screen indicator and the Stop button. Calling `revoke()` cancels the activity's tokio tasks and closes its streams. The target is under 1 s, and in practice it is immediate (R5.4, R5.5).
-- There are no per-capability defaults. All capabilities start as `unset` (R5.2).
+
+### 7.5 Scanning QR codes on desktop (R3.10)
+
+- **Camera:** the `nokhwa` crate reads frames through Media Foundation (Windows), AVFoundation (macOS), and V4L2 (Linux). The `rqrr` crate decodes QR codes from those frames. After a code is read, the flow continues at step 2 of §7.1.
+- **OS permission:** macOS asks for camera access the first time (the app declares `NSCameraUsageDescription`). On Windows, if desktop apps are blocked from the camera, the app explains this and opens `ms-settings:privacy-webcam`. On Linux the user needs access to `/dev/video*`; inside Flatpak the app uses the Camera portal.
+- **No camera:** the Pair screen hides "Scan QR". Showing this device's QR code and code confirmation still work.
+- **Privacy:** frames stay in memory, are never written or sent, and the camera stops as soon as a code is read or the Pair screen closes.
 
 ## 8. Bluetooth fallback (R6)
 
@@ -197,6 +244,7 @@ Platform reality:
 - Security: **Noise IK** (`snow`, `Noise_IK_25519_ChaChaPoly_SHA256`) using the BLE static keys exchanged and signed during pairing (§4.1). It does not depend on Bluetooth-level pairing security.
 - Framing: Noise messages split to fit the negotiated MTU, with a 2-byte sequence number and reassembly.
 - Allowed messages: input, presenter, media, keyboard, and clipboard text up to 64 KB (R6.2). Everything else returns `Unavailable(FallbackPath)` to the UI (R6.4).
+- **UI on the BLE path (R6.4):** the device view shows a banner under the device header, for example "Connected over Bluetooth LE. Screen sharing, file transfers, and localhost are unavailable until Wi-Fi returns." The affected feature tiles turn grey with the reason "Not available over Bluetooth". The banner and the grey tiles go away when the session moves back to the LAN (R6.5). On the PAN path there is no banner, because every feature still works; only the connection chip changes to Bluetooth (R4.8).
 - When the LAN or PAN path comes back, the session is moved to it within 10 s (R6.5).
 
 ## 9. Feature services
@@ -269,7 +317,32 @@ TextInput    { text }    // Unicode text, sent as-is (R10.4)
 | macOS | Media keys sent through `NSEvent` system-defined events, and system volume through CoreAudio. Now-playing info is not shown, because the MediaRemote framework is private API (R11.3) |
 | Android | `MediaSessionManager.getActiveSessions` with a `NotificationListenerService` (R11.4), and `AudioManager` for volume |
 
-Messages: `MediaCmd { PlayPause | Next | Prev | VolSet(f32) | VolStep(i8) | Mute }` and `NowPlaying { title, artist, artwork_png ≤256px, state, position }`. The host pushes `NowPlaying` updates when they change.
+Messages:
+
+```
+MediaSubscribe { on: bool }                         // controller → host (R11.6)
+MediaState {                                        // host → controller, pushed on change while subscribed
+  sessions[{ id, app_name, title?, artist?, artwork_png? ≤256px,
+             state: playing|paused|stopped, position_ms?, duration_ms?,
+             can_seek, can_next, can_prev }],
+  volume: f32, muted: bool }
+MediaCmd { session_id, cmd: PlayPause | Next | Prev | Seek(ms) }   // R11.1, R11.2
+VolumeCmd { VolSet(f32) | VolStep(i8) | Mute(bool) }               // system output of the host
+```
+
+- **Sessions (R11.2):** one entry per media app. Windows lists `GetSessions()`, Linux lists each `org.mpris.MediaPlayer2.*` bus name, and Android lists `getActiveSessions`. The controller shows them as source tabs and sends commands with the selected `session_id`. Selecting a source only changes the controller's view, so no extra message is needed.
+- **Capability flags (R11.5):** `can_seek` comes from SMTC `IsPlaybackPositionEnabled`, MPRIS `CanSeek`, and Android `PlaybackState.ACTION_SEEK_TO`, and the next/previous flags come from the matching properties. The controller hides controls whose flag is false. Shuffle and repeat are not part of the protocol.
+- **macOS (R11.3):** the host sends one session named "System" with no title or artwork, `can_seek = false`, and next and previous set to true. Its commands become media keys.
+- **On and off (R11.6):** the controller sends `MediaSubscribe { on: false }` when the user turns the player off. The host then stops sending `MediaState` to that controller. Turning it on again sends `MediaSubscribe { on: true }`, and the host replies with the current state.
+
+### 9.5 Battery status (R4.9)
+
+| Device | Source |
+|---|---|
+| Windows, macOS, Linux | The `starship-battery` crate, which reads `GetSystemPowerStatus` / IOKit power sources / UPower and `/sys/class/power_supply` |
+| Android | The sticky `ACTION_BATTERY_CHANGED` broadcast and `BatteryManager` |
+
+The core sends `DeviceStatus` (§6.3) when the session starts and when the level changes by at least 1%, at most once a minute. Desktops without a battery leave the fields empty, and the peer's UI shows no battery.
 
 ## 10. Screen sharing (R12)
 
@@ -297,17 +370,24 @@ Device B (viewer)                                   Device A (host)
 browser → 127.0.0.1:3000 ─► B listener ─► QUIC stream ─► A: check port in shared_port ─► TCP 127.0.0.1:3000
 ```
 
-- **Host A:** the user shares port P with a label and a list of allowed devices. A accepts `TunnelOpen { port }` only if P is shared with the requesting device (R13.5), and then connects only to `127.0.0.1:P` / `[::1]:P`. Remote devices can't choose the target host, so this can't be turned into an open proxy.
+- **Host A:** the user shares port P with an optional label. Shared ports are offered to every paired device (R13.1), and the Localhost setting `tunnel.v1` (§7.4) decides whether a request is allowed, asked, or denied. A accepts `TunnelOpen { port }` only if P is in `shared_port` and the permission check passes (R13.5), and then connects only to `127.0.0.1:P` / `[::1]:P`. Remote devices can't choose the target host, so this can't be turned into an open proxy.
 - **Viewer B:** when B starts using a share, it binds `127.0.0.1:P`, or the next free port if P is taken, which the UI shows. Each accepted TCP connection opens a new QUIC stream with `TunnelOpen` and then copies bytes in both directions (`tokio::io::copy_bidirectional`). This works for any TCP protocol, including HTTP/2, WebSockets, and hot-reload (R13.4).
 - **Secure context (R13.3):** the browser on B sees `http://localhost:P`, which browsers treat as a secure context.
 - **Android viewer:** the core binds the loopback listener inside the app's foreground service, so Chrome on the phone can open `http://localhost:P`.
-- **LAN exposure (R13.6):** an optional setting binds `0.0.0.0:P` on B instead, after a warning. It turns off after 1 h (`lan_expose_until`).
+- **LAN exposure (R13.6):** a per-port setting on the host A. When it is on, A opens a listener on its LAN interfaces that forwards to `127.0.0.1:P`. The user picks "1 hour" (`lan_expose_until` = now + 1 h, then it turns off) or "Always on" (`lan_expose_until` = 0, kept after restart). Always on needs one extra confirmation. While any port is exposed, the tray icon and the "This device" view show an indicator. Viewers keep using their loopback listeners.
 - **Stats (R13.7):** each tunnel counts active connections and bytes moved and reports them to the UI.
 - **Known issue:** dev servers that check the `Host` header (for example Vite's `server.allowedHosts`) only need changes when LAN exposure is on.
 
 ## 12. Desktop app (R14)
 
-- **Slint UI** (`.slint` files in `crates/urdevice-desktop/ui/`): Devices list, Device detail (feature buttons, permissions), Pair (QR display via the `qrcode` crate, code confirm), Transfers, Remote view (screen plus input capture), Localhost shares, Settings, Activity log.
+- **Slint UI** (`.slint` files in `crates/urdevice-desktop/ui/`). The layout follows the mockup in [`docs/mockup/urdevice-layout.html`](../../../docs/mockup/urdevice-layout.html). The mockup is a guide, not a final design. A sidebar lists this device, the paired devices (connected, disconnected, or offline with last seen), "Add device", and "Settings" at the bottom. The main area shows:
+  - **Onboarding** (first start): device name and the permission settings with their defaults (§7.4).
+  - **This device:** name, platform, IP, battery; the permission settings (Allow / Always Ask / Deny) for other devices; shared localhost ports with "Expose on LAN"; running activities with Stop.
+  - **Paired device:** Disconnect / Reconnect and Forget device at the top; a header with platform, connection path and latency, IP, and battery; the BLE banner when needed (§8.2); the media player (§9.4); feature tiles (Clipboard, Send files, Gallery for Android hosts, Remote control, Keyboard, Screen sharing, Localhost) that open the feature views and reflect the host's `PermissionState`: normal for Allow, a "Needs approval" mark for Always Ask, grey for Deny; notifications (Release 2, §18.2).
+  - **Add device (Pair):** "Scan QR" when a camera exists (§7.5), this device's QR code (`qrcode` crate) with a countdown, and the "available to pair" list where selecting a device shows the 6-digit code with "Codes match" and "Cancel" (§7.2).
+  - **Feature views:** Transfers, Gallery, Remote view (screen plus input capture), Localhost.
+  - **Settings:** device name, Device ID, hidden mode, start at login, download folder, pause clipboard on all devices, language, activity log, export data, delete all data, and reset identity.
+  - **Prompts and indicators:** the Always Ask prompt window, and the "X is controlling / viewing this device" indicator with Stop (R5.3, R5.4).
 - **Tray and menu bar:** `tray-icon`. Start at login: `auto-launch`.
 - **Threads:** the Slint event loop runs on the main thread, and the core runs on a tokio runtime in background threads. They exchange messages through `slint::invoke_from_event_loop` and `tokio::sync::mpsc`.
 - **Packaging (R14.3):** `cargo-packager` or `cargo-bundle` plus platform signing. CI also handles notarization (macOS) and Authenticode signing (Windows).
@@ -315,7 +395,8 @@ browser → 127.0.0.1:3000 ─► B listener ─► QUIC stream ─► A: check 
 ## 13. Android app (R15)
 
 - **Structure:** `MainActivity` (Compose, Navigation) and `UrDeviceService` (foreground service, `connectedDevice` type; adds the `mediaProjection` type while sharing the screen). The core runs inside the service.
-- **Screens:** Devices, Pair (CameraX + ML Kit barcode scanning, plus the app's own QR for desktop scanning), Mousepad, Presenter, Keyboard, Media remote, Screen viewer, Send files, Localhost.
+- **Screens:** Onboarding (as on desktop, plus Gallery), Devices (this device, then paired devices), a bottom sheet with this device's permission settings and shared ports, Device view (same parts as on desktop, §12), Pair (CameraX + ML Kit barcode scanning, the app's own QR with a countdown, and code confirmation), Mousepad, Presenter, Keyboard, Media remote, Screen viewer, Send files, Localhost, and Settings (gear icon at the top right of the app bar). The mockup in `docs/mockup/urdevice-layout.html` shows two navigation options: v1 with pages and a back button, and v2 with a bottom tab bar.
+- **Always Ask prompts (R5.3):** a high-priority notification with Allow and Deny actions, and the same prompt in the app when it is open.
 - **Platform services:** `UrDeviceAccessibilityService` (input when the phone is the host), `UrDeviceIme` (text input), `MediaListenerService` (notification listener), a Quick Settings `TileService`, and the share-sheet target `ACTION_SEND` / `ACTION_SEND_MULTIPLE`.
 - **Permissions asked when first needed (R15.2):** camera (QR), notifications, nearby devices/Bluetooth, media read access, and the special accessibility, IME, and notification-listener settings. Each is introduced by an explanation screen.
 - **Battery (R15.4):** discovery stops when the app is in the background and all paired devices are connected; QUIC keep-alive is sent every 25 s while idle.
@@ -331,7 +412,9 @@ browser → 127.0.0.1:3000 ─► B listener ─► QUIC stream ─► A: check 
 | Missing OS permission | `PermStatus::Missing(kind)` → UI explanation plus a button that opens settings |
 | Hash mismatch during transfer | Delete the part file, retry that file once, then report a failure |
 | Port conflict on the viewer | Bind the next free port and show it |
-| Permission prompt times out | Deny and record it in the activity log. A capability that was Not set stays Not set; one set to Ask keeps its value |
+| Permission prompt times out | Deny and record it in the activity log. The setting stays Always Ask |
+| Peer requests a capability the host set to Deny | Reply `Denied { capability }`; record it in the activity log; no prompt |
+| No camera on the desktop | Hide "Scan QR"; QR display and code confirmation still work |
 
 Errors in the core use `thiserror` enums. They cross UniFFI as typed Kotlin exceptions.
 
@@ -344,11 +427,13 @@ The full threat model goes in `docs/security/threat-model.md` (task T1.9). Summa
 | Someone on the same Wi-Fi tries to connect | Mutual TLS with pinned keys; pairing only while the pairing screen is open; lockout |
 | MITM during pairing | QR: fingerprint pinning plus token HMAC over channel binding. Discovery: 6-digit code shown on both screens |
 | Spoofed discovery announcements | Discovery only suggests addresses; identity is checked in TLS |
-| Stolen or lost device | Unpair it from any other device; under Requirement 5 the user chooses each capability for each device (Allow always, Ask every time, or Deny); the identity key is in secure storage and protected by the OS lock screen |
+| Stolen or lost device | Unpair it from any other device. Remote control and screen sharing default to Always Ask (R5.2), so a lost device can't take control without a confirmation on the host, unless the user changed them to Allow. Because settings apply to every paired device, Allow also applies to a lost one; the indicator and Stop (R5.4) stay as the last safeguard. The identity key is in secure storage and protected by the OS lock screen |
+| Modified peer ignores the host's Deny | The host's engine checks every request (§7.4); `PermissionState` only drives the peer's UI |
 | Malicious peer sends crafted messages | Size limits, protobuf validation, fuzzed parsers, path cleaning, no remote control over tunnel targets |
-| Silent surveillance through screen or input | A first-use prompt for each capability and device, then the user's choice (Allow always, Ask every time, or Deny), a persistent indicator, a one-click Stop, and an activity log |
+| Silent surveillance through screen or input | Always Ask by default for screen sharing and remote control, a persistent indicator, a one-click Stop, and an activity log |
+| Desktop camera used for QR scanning | Camera on only while scanning on the Pair screen; frames stay in memory and are never stored or sent (R3.10) |
 | Clipboard leaks passwords | Sensitive flags respected; global pause |
-| Localhost tunnel used as a pivot | Allow-list per port and device; loopback targets only; no LAN exposure by default, and it expires when enabled |
+| Localhost tunnel used as a pivot | Only ports the host shared; Localhost defaults to Deny; loopback targets only; no LAN exposure by default. When it is on, it is either limited to 1 hour or "Always on" after an extra confirmation, with a persistent indicator |
 | Logs leak data | Logging (`tracing`) redacts content; field allow-list |
 
 The project also runs `cargo audit` and `cargo deny` in CI, uses only well-known crypto libraries and no custom primitives, and should get an external security review before 1.0.
@@ -357,7 +442,7 @@ The project also runs `cargo audit` and `cargo deny` in CI, uses only well-known
 
 - **Unit tests:** protocol encode/decode, the permission engine, path cleaning, pairing state machines, and backoff timing.
 - **Property tests (`proptest`):** path cleaning never leaves the incoming folder; encode→decode returns the same message; framing handles arbitrary splits.
-- **Integration tests:** two or three in-process cores on loopback test pairing (both flows), the first-use permission prompt (three choices, 30 s timeout), wrong-fingerprint rejection, token replay, lockout, reconnect, file resume, and tunnel allow-listing.
+- **Integration tests:** two or three in-process cores on loopback test pairing (both flows), permission settings (Allow, Always Ask with the 30 s timeout, Deny, and the `PermissionState` push), Disconnect and Reconnect, wrong-fingerprint rejection, token replay, lockout, reconnect, file resume, and tunnel allow-listing.
 - **Fuzzing (`cargo-fuzz`):** control-message parser, discovery packet parser, BLE reassembly, and QR payload parser.
 - **Platform smoke tests:** a device matrix checklist (Windows 11, macOS 14/15, Ubuntu GNOME Wayland, KDE X11, Android 10/13/15) for each feature.
 - **Performance checks:** input latency (R9.5), file throughput (R8.8), screen latency (R12.4), and audio delay (T16.5) measured with timestamps embedded in the stream.
@@ -367,28 +452,39 @@ The project also runs `cargo audit` and `cargo deny` in CI, uses only well-known
 1. **Ports:** UDP 47810 for discovery and UDP 47811 for QUIC are final. If 47811 is taken, the app picks another port and advertises it.
 2. **Wayland:** supported. The portals come first, with a `uinput` fallback for input injection (§9.3).
 3. **Order of work:** project setup ([#1](https://github.com/ahmadridhoramadhan/UrDevice/issues/1)), then Android ↔ desktop ([#2](https://github.com/ahmadridhoramadhan/UrDevice/issues/2)), then desktop ↔ desktop, then the Release 2 features (§18).
+4. **Owner decisions after the UI mockup review (17 Nov 2026):**
+   - Permissions are one setting per capability on each host, applied to every paired device, with the labels Allow, Always Ask, and Deny. Defaults are set in onboarding (§7.4). Deny turns the feature off on the requesting device.
+   - Desktops with a camera can scan pairing QR codes (§7.5).
+   - Pairing uses the two flows in §7.1 and §7.2 only. Typing in a code is not supported.
+   - Bluetooth is an automatic fallback, not a transport the user picks.
+   - Media control has source tabs, seek, and mute, but no shuffle or repeat (§9.4).
+   - Localhost "Expose on LAN" offers "1 hour" and "Always on" (§11).
+   - Battery level, connection latency, and Disconnect without unpairing are part of the spec (R4.7–R4.9).
+   - Notification mirroring also works from desktop to Android (§18.2).
 
 ## 18. Release 2 features
 
 Each feature below is a core service with its own capability string, which is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). Section 18.N covers Requirement 16+N.
 
-| Requirement | Capability | Initial state and notes |
+"Default when built" means the default is chosen when the feature is implemented and then added to onboarding (R5.2).
+
+| Requirement | Capability | Default and notes |
 |---|---|---|
-| R17 Webcam and microphone | `camera.v1`, `mic.v1` | Not set |
-| R18 Notification mirroring | `notify.v1` | Not set |
-| R19 Shared mouse and keyboard | `kvm.v1` | Not set (uses input permission) |
-| R20 Second display | `display.v1` | Not set |
-| R21 Remote terminal | `term.v1` | Not set; first-use warning and extra confirmation; changed only on the host |
-| R22 DevTools and ADB | `adb.v1` | Not set |
+| R17 Webcam and microphone | `camera.v1`, `mic.v1` | Default when built |
+| R18 Notification mirroring | `notify.v1` | Default when built; receiving is also off per host on the receiver (R18.2) |
+| R19 Shared mouse and keyboard | `kvm.v1` | Default when built (uses the input setting) |
+| R20 Second display | `display.v1` | Default when built |
+| R21 Remote terminal | `term.v1` | Deny; warning and extra confirmation before Allow; changed only on the host |
+| R22 DevTools and ADB | `adb.v1` | Default when built |
 | R23 Port profiles | `tunnel.v1` (existing) | Follows localhost |
 | R24 Request inspector | local only | Off |
-| R25 Find my device | `ring.v1` | Not set |
-| R26 File browser | `fs.browse.v1`, `fs.write.v1` | Not set; `fs.write.v1` has the first-use warning and extra confirmation |
+| R25 Find my device | `ring.v1` | Default when built |
+| R26 File browser | `fs.browse.v1`, `fs.write.v1` | `fs.browse.v1` default when built; `fs.write.v1` Deny, with a warning and extra confirmation before Allow |
 | R27 Clipboard history | `cliphist.v1` | Follows clipboard |
-| R28 Proximity lock | `lock.v1` | Not set |
-| R29 SMS and calls | `telephony.v1` | Not set |
+| R28 Proximity lock | `lock.v1` | Default when built |
+| R29 SMS and calls | `telephony.v1` | Default when built |
 | R30 Automations | local only | n/a |
-| R31 Speaker | `audio.out.v1` | Not set |
+| R31 Speaker | `audio.out.v1` | Default when built |
 
 ### 18.1 Phone as webcam and microphone (R17)
 
@@ -405,11 +501,21 @@ The camera service runs in the foreground service with the `camera` and `microph
 
 ### 18.2 Notification mirroring (R18)
 
-- **Android:** the existing `MediaListenerService` (a `NotificationListenerService`) also handles `onNotificationPosted` and `onNotificationRemoved`. It sends `Notif { key, app, title, text, icon_png ≤64px, actions[], reply_capable, visibility }`. Filtering by visibility and app happens on the phone before sending (R18.2, R18.3).
-- **Desktop:** native notifications through `notify-rust` (Linux, macOS) and WinRT toast notifications (Windows).
-- **Reply (R18.4):** the desktop sends `NotifAction { key, action_index, reply_text? }`. The phone fills the `RemoteInput` results and fires the action's `PendingIntent`.
-- **Dismissal sync (R18.5):** `NotifDismiss { key }` in both directions. The phone calls `cancelNotification(key)`.
-- **Retention (R18.6):** the desktop keeps notifications in memory only and drops them after dismissal or 24 h.
+- **Subscription (R18.2):** the receiver sends `NotifSubscribe { on, apps[] }` to the host. Receiving is off until the user turns it on for that host, and `apps[]` lists the apps the user picked (`notif_subscription`, §4.2). The host sends its app list with `NotifApps { apps[{ id, name, icon_png ≤64px }] }` so the receiver can show the picker. The host filters before sending, so notifications from other apps never leave the host. The host's `notify.v1` setting (§7.4) is checked as well.
+- **Android host:** the existing `MediaListenerService` (a `NotificationListenerService`) also handles `onNotificationPosted` and `onNotificationRemoved`. It sends `Notif { key, app, title, text, icon_png ≤64px, actions[], reply_capable, visibility }`. Filtering by visibility happens on the phone before sending (R18.3).
+- **Desktop host (desktop → Android):**
+
+| Desktop | How notifications are read | Notes |
+|---|---|---|
+| Windows 10 1709+ | `UserNotificationListener` (WinRT) | Needs package identity (MSIX or a sparse package) and the user's consent. Checked in spike T10.5 |
+| Linux | D-Bus monitor (`BecomeMonitor`) on `org.freedesktop.Notifications.Notify` with `zbus` | Works on desktops that use the standard notification service. Checked in spike T10.5 |
+| macOS | Not supported | No public API. The UI says so (R18.1) |
+
+  Desktop notifications are sent without actions or reply (R18.4).
+- **Receiver:** desktop shows native notifications through `notify-rust` (Linux, macOS) and WinRT toast notifications (Windows). Android posts them in a "From <device>" notification channel. Both also list them in the host's device view.
+- **Reply (R18.4):** for Android hosts only. The receiver sends `NotifAction { key, action_index, reply_text? }`. The phone fills the `RemoteInput` results and fires the action's `PendingIntent`.
+- **Dismissal sync (R18.5):** `NotifDismiss { key }` in both directions. An Android host calls `cancelNotification(key)`. Desktop hosts can't dismiss another app's notification on every OS, so on desktop hosts dismissal sync only works from host to receiver.
+- **Retention (R18.6):** the receiver keeps notifications in memory only and drops them after dismissal or 24 h.
 
 ### 18.3 Shared mouse and keyboard across desktops (R19)
 
@@ -508,7 +614,7 @@ The tunnel targets the phone's own loopback only, as in §11. UrDevice uses the 
 
 ### 18.15 Speaker (R31)
 
-- **Capability:** `audio.out.v1`. It is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). The first request from a paired device shows the first-use prompt (R5.2). When the stored choice is `allow`, later audio from that device plays at once with no prompt (R31.3). A change to the setting takes effect within 1 s (R31.4, R5.5).
+- **Capability:** `audio.out.v1`. It is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). The target's single setting applies to every paired source. When it is `allow`, audio plays at once with no prompt; `ask` shows the Always Ask prompt (R31.3). A change to the setting takes effect within 1 s (R31.4, R5.5).
 - **Platforms (R31.1):** host and target can each be Windows, macOS, Linux, or Android.
 - **Transport:** audio travels over the existing session (R31.2). The codec is Opus. Whether it uses a QUIC stream or datagrams is decided after T16.2.
 - **Host (source):** a per-OS adapter captures system audio. Whether each OS can do this is the result of spike T16.1. IF an OS cannot capture audio THEN the UI says so and explains what the user must enable (R31.7).
@@ -524,4 +630,5 @@ The tunnel targets the phone's own loopback only, as in §11. UrDevice uses the 
 | Windows driver signing (IddCx, virtual audio) | R17.4, R20 | Get an EV certificate. Virtual audio waits until the IddCx process is in place |
 | Wayland InputCapture portal not available on all desktops | R19 | Spike T10.1 and document which desktops work |
 | Google Play policy (SMS, call permissions, full-screen intents) | R25, R29 | Separate `full` build, with fallbacks in the Play build |
-| New attack surface (terminal, file browser, run command) | R21, R26, R30 | Not set until the user decides, with a first-use warning and extra confirmation for terminal and file changes, settings changeable only on the device itself, `cap-std` sandboxing, fuzzing, and a second external security review before Release 2 |
+| Reading notifications on desktop hosts (Windows package identity, Linux D-Bus monitoring) | R18 | Spike T10.5; macOS stays unsupported |
+| New attack surface (terminal, file browser, run command) | R21, R26, R30 | Terminal and file changes default to Deny, with a warning and extra confirmation before Allow, settings changeable only on the device itself, `cap-std` sandboxing, fuzzing, and a second external security review before Release 2 |

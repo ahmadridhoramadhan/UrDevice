@@ -5,6 +5,7 @@
 - [Requirements](../.kiro/specs/urdevice/requirements.md): what UrDevice must do, as user stories with acceptance criteria.
 - [Design](../.kiro/specs/urdevice/design.md): architecture, protocol, security model, and how each platform implements each feature.
 - [Tasks](../.kiro/specs/urdevice/tasks.md): the implementation plan, in phases.
+- [UI mockup](mockup/urdevice-layout.html): an interactive layout guide for desktop and Android (two navigation options). Open it in a browser from a clone of the repo. It is a guide, not a final design.
 
 ## Kiro
 
