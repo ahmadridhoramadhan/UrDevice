@@ -22,6 +22,6 @@ The mockups are a guide, not a final design. Build the UI to match them. You may
 
 ## Text and look
 
-- All UI text goes through translation (Slint `@tr`, Android `strings.xml`). English is the first language (R16.4). The mockups are written in Indonesian; translate their text, do not copy it as the English source.
+- All UI text goes through translation (Slint `@tr`, Android `strings.xml`). English is the first language (R16.4). The mockups are written in English, and their text can be used as the English source strings.
 - Brand colors: dark green `#0F1F10` and lime `#C6F19D`. Logos are in `assets/`. Support light and dark themes.
 - Touch targets are at least 44 px on Android. Respect reduced-motion settings.

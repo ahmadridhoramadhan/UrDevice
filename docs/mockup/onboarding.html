@@ -1,15 +1,15 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
-<title>UrDevice: mockup onboarding</title>
+<title>UrDevice: onboarding mockup</title>
 <!--
-  Mockup alur onboarding (pertama kali dibuka), desktop dan Android.
-  Panduan layout, bukan desain final. Tanpa script dan tanpa CDN, jadi
-  bisa dibuka di penampil file mana pun. Semua interaksi memakai
-  radio dan checkbox CSS. Catatan dan keputusan: onboarding.md.
+  Onboarding (first launch) mockup for desktop and Android.
+  A layout guide, not a final design. No scripts and no CDN, so it opens
+  in any file viewer. All interactions use CSS radio buttons and
+  checkboxes. Notes and decisions: onboarding.md.
 -->
 <style>
 :root{
@@ -162,8 +162,8 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 #dm1:checked ~ #pm1:checked ~ .stage .pn0 .w,#dm1:checked ~ #pm1:checked ~ .stage .preq .w{display:none}
 #dm1:checked ~ #pm1:checked ~ .stage .pn0 .ok,#dm1:checked ~ #pm1:checked ~ .stage .preq .ok{display:block}
 #dm1:checked ~ #pm1:checked ~ .stage .it0 .st{background:rgba(198,241,157,.15);color:var(--lime)}
-#dm1:checked ~ #pm1:checked ~ .stage .it0 .st::after{content:"Terhubung"}
-.it0 .st::after{content:"Belum terhubung"}
+#dm1:checked ~ #pm1:checked ~ .stage .it0 .st::after{content:"Connected"}
+.it0 .st::after{content:"Not connected"}
 #dm1:checked ~ #pm1:checked ~ .stage .it0 .fi{background:rgba(198,241,157,.15);color:var(--lime)}
 @media(prefers-reduced-motion:reduce){.wait i{animation:none}}
 </style>
@@ -196,8 +196,8 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 <div class="wrap">
 <div class="top">
   <img src="../../assets/urdevice-logo-dark-bg.svg" alt="UrDevice" width="223" height="64">
-  <h1>Mockup onboarding</h1>
-  <p>Alur saat UrDevice pertama kali dibuka, di desktop (Laptop Ahmad) dan Android (Pixel). Panduan layout, bukan desain final. Klik nomor langkah atau tombol di dalam layar. Catatan ada di <span class="mono">onboarding.md</span>.</p>
+  <h1>Onboarding mockup</h1>
+  <p>The flow when UrDevice opens for the first time, on desktop (Laptop Ahmad) and Android (Pixel). A layout guide, not a final design. Click a step number or the buttons inside the screens. Notes are in <span class="mono">onboarding.md</span>.</p>
 </div>
 
 <input class="r" type="radio" name="step" id="s1" checked>
@@ -218,211 +218,211 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 <input class="r" type="checkbox" id="dm1">
 <input class="r" type="checkbox" id="pm1">
 
-<div class="tabs" aria-label="Langkah onboarding">
-  <label class="tb" for="s1"><b>1</b>Selamat datang</label>
-  <label class="tb" for="s2"><b>2</b>Aman dan lokal</label>
-  <label class="tb" for="s3"><b>3</b>Izin</label>
-  <label class="tb" for="s4"><b>4</b>Pasangkan</label>
-  <label class="tb" for="s5"><b>5</b>Device di jaringan</label>
-  <label class="tb" for="s6"><b>6</b>Selesai</label>
+<div class="tabs" aria-label="Onboarding steps">
+  <label class="tb" for="s1"><b>1</b>Welcome</label>
+  <label class="tb" for="s2"><b>2</b>Safe and local</label>
+  <label class="tb" for="s3"><b>3</b>Permissions</label>
+  <label class="tb" for="s4"><b>4</b>Pair</label>
+  <label class="tb" for="s5"><b>5</b>Nearby devices</label>
+  <label class="tb" for="s6"><b>6</b>Done</label>
 </div>
 
 <div class="stage">
 
-<!-- 1. Selamat datang -->
+<!-- 1. Welcome -->
 <section class="step st1"><div class="row">
   <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
     <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-hand"/></svg></span></div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
-      <h2 class="t">Selamat datang di UrDevice</h2>
-      <p class="p">Hubungkan perangkat milik Anda sendiri dalam satu jaringan lokal. Tanpa akun, tanpa server cloud.</p>
-      <label class="fld">Nama perangkat ini<input type="text" value="Laptop Ahmad"></label>
-      <p class="small">Nama ini tampil di device lain. Bisa diubah nanti di Settings.</p>
-      <div class="acts"><label class="bt" for="s2">Lanjut</label></div>
+      <h2 class="t">Welcome to UrDevice</h2>
+      <p class="p">Connect your own devices on one local network. No account and no cloud server.</p>
+      <label class="fld">Name this device<input type="text" value="Laptop Ahmad"></label>
+      <p class="small">Other devices see this name. You can change it later in Settings.</p>
+      <div class="acts"><label class="bt" for="s2">Continue</label></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
     <span class="badge-ic"><svg class="i"><use href="#i-hand"/></svg></span>
-    <h2 class="t">Selamat datang di UrDevice</h2>
-    <p class="p">Hubungkan perangkat milik Anda sendiri dalam satu jaringan lokal. Tanpa akun, tanpa server cloud.</p>
-    <label class="fld">Nama perangkat ini<input type="text" value="Pixel"></label>
-    <div class="acts"><label class="bt" for="s2">Lanjut</label></div>
+    <h2 class="t">Welcome to UrDevice</h2>
+    <p class="p">Connect your own devices on one local network. No account and no cloud server.</p>
+    <label class="fld">Name this device<input type="text" value="Pixel"></label>
+    <div class="acts"><label class="bt" for="s2">Continue</label></div>
   </div></div>
 </div></section>
 
-<!-- 2. Aman dan lokal -->
+<!-- 2. Safe and local -->
 <section class="step st2"><div class="row">
   <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
     <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-shield"/></svg></span></div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
-      <h2 class="t">Aman dan tetap lokal</h2>
-      <div class="fact"><span class="fi"><svg class="i"><use href="#i-wifi"/></svg></span><span><b>Jaringan yang sama</b>Device saling menemukan di Wi-Fi yang sama. Kalau Wi-Fi putus, UrDevice pindah ke Bluetooth sendiri.</span></div>
-      <div class="fact"><span class="fi"><svg class="i"><use href="#i-cloudoff"/></svg></span><span><b>Tanpa server</b>Data langsung dari device ke device, terenkripsi. Tidak ada yang dikirim ke internet.</span></div>
-      <div class="fact"><span class="fi"><svg class="i"><use href="#i-key"/></svg></span><span><b>Kunci perangkat sudah dibuat</b>Kunci ini disimpan di keychain sistem dan tidak pernah keluar dari perangkat ini.</span></div>
-      <div class="box">Device ID perangkat ini<br><span class="did">K7QM-2X9D-H4TR-8WVA-5NBE-J3LC-Q6PF-Z2YU</span></div>
-      <div class="acts"><label class="bt g" for="s1">Kembali</label><label class="bt" for="s3">Lanjut</label></div>
+      <h2 class="t">Safe and local</h2>
+      <div class="fact"><span class="fi"><svg class="i"><use href="#i-wifi"/></svg></span><span><b>Same network</b>Devices find each other on the same Wi-Fi. If Wi-Fi drops, UrDevice switches to Bluetooth on its own.</span></div>
+      <div class="fact"><span class="fi"><svg class="i"><use href="#i-cloudoff"/></svg></span><span><b>No server</b>Data goes straight from device to device, encrypted. Nothing is sent to the internet.</span></div>
+      <div class="fact"><span class="fi"><svg class="i"><use href="#i-key"/></svg></span><span><b>The device key is ready</b>It is stored in the system keychain and never leaves this device.</span></div>
+      <div class="box">Device ID of this device<br><span class="did">K7QM-2X9D-H4TR-8WVA-5NBE-J3LC-Q6PF-Z2YU</span></div>
+      <div class="acts"><label class="bt g" for="s1">Back</label><label class="bt" for="s3">Continue</label></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
-    <h2 class="t">Aman dan tetap lokal</h2>
-    <div class="fact"><span class="fi"><svg class="i"><use href="#i-wifi"/></svg></span><span><b>Jaringan yang sama</b>Kalau Wi-Fi putus, pindah ke Bluetooth sendiri.</span></div>
-    <div class="fact"><span class="fi"><svg class="i"><use href="#i-cloudoff"/></svg></span><span><b>Tanpa server</b>Langsung dari device ke device, terenkripsi.</span></div>
-    <div class="fact"><span class="fi"><svg class="i"><use href="#i-key"/></svg></span><span><b>Kunci perangkat sudah dibuat</b>Disimpan di Android Keystore.</span></div>
+    <h2 class="t">Safe and local</h2>
+    <div class="fact"><span class="fi"><svg class="i"><use href="#i-wifi"/></svg></span><span><b>Same network</b>If Wi-Fi drops, it switches to Bluetooth on its own.</span></div>
+    <div class="fact"><span class="fi"><svg class="i"><use href="#i-cloudoff"/></svg></span><span><b>No server</b>Straight from device to device, encrypted.</span></div>
+    <div class="fact"><span class="fi"><svg class="i"><use href="#i-key"/></svg></span><span><b>The device key is ready</b>Stored in the Android Keystore.</span></div>
     <div class="box">Device ID<br><span class="did">P3NA-7QDX-M2KC-9FRT-4WLB-H8EJ-T5VS-C6ZG</span></div>
-    <div class="acts"><label class="bt" for="s3">Lanjut</label><label class="bt g" for="s1">Kembali</label></div>
+    <div class="acts"><label class="bt" for="s3">Continue</label><label class="bt g" for="s1">Back</label></div>
   </div></div>
 </div></section>
 
-<!-- 3. Izin untuk device lain -->
+<!-- 3. Permissions for other devices -->
 <section class="step st3"><div class="row">
   <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
     <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-sliders"/></svg></span></div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
-      <h2 class="t">Izin untuk device lain</h2>
-      <p class="p">Atur apa yang boleh dilakukan device lain di Laptop Ahmad. Berlaku untuk semua device yang nanti dipasangkan, dan bisa diubah kapan saja di <b>Perangkat ini</b>.</p>
-      <p class="legend"><span><b>Allow</b>: langsung jalan</span><span><b>Always Ask</b>: Anda konfirmasi dulu di sini</span><span><b>Deny</b>: fitur mati di device lain</span></p>
+      <h2 class="t">Permissions for other devices</h2>
+      <p class="p">Choose what other devices may do on Laptop Ahmad. This applies to every device you pair later, and you can change it any time on <b>This device</b>.</p>
+      <p class="legend"><span><b>Allow</b>: starts right away</span><span><b>Always Ask</b>: you confirm here first</span><span><b>Deny</b>: the feature is off on other devices</span></p>
       <div class="perms">
-        <div class="pr"><span class="fi"><svg class="i"><use href="#i-clip"/></svg></span><span class="pm">Clipboard<small>Salin di device lain, tempel di sini</small></span><span class="seg"><label><input type="radio" name="dp1" value="allow" checked><span>Allow</span></label><label><input type="radio" name="dp1" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp1" value="deny"><span>Deny</span></label></span></div>
-        <div class="pr"><span class="fi"><svg class="i"><use href="#i-folder"/></svg></span><span class="pm">Terima file<small>Device lain mengirim file ke sini</small></span><span class="seg"><label><input type="radio" name="dp2" value="allow"><span>Allow</span></label><label><input type="radio" name="dp2" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp2" value="deny"><span>Deny</span></label></span></div>
-        <div class="pr"><span class="fi"><svg class="i"><use href="#i-mouse"/></svg></span><span class="pm">Remote control<small>Mouse, keyboard, dan presenter</small></span><span class="seg"><label><input type="radio" name="dp3" value="allow"><span>Allow</span></label><label><input type="radio" name="dp3" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp3" value="deny"><span>Deny</span></label></span></div>
-        <div class="pr"><span class="fi"><svg class="i"><use href="#i-media"/></svg></span><span class="pm">Media<small>Kontrol musik dan video</small></span><span class="seg"><label><input type="radio" name="dp4" value="allow" checked><span>Allow</span></label><label><input type="radio" name="dp4" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp4" value="deny"><span>Deny</span></label></span></div>
-        <div class="pr"><span class="fi"><svg class="i"><use href="#i-screen"/></svg></span><span class="pm">Bagi layar<small>Layar ini dilihat dari device lain</small></span><span class="seg"><label><input type="radio" name="dp5" value="allow"><span>Allow</span></label><label><input type="radio" name="dp5" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp5" value="deny"><span>Deny</span></label></span></div>
-        <div class="pr"><span class="fi"><svg class="i"><use href="#i-code"/></svg></span><span class="pm">Localhost<small>Port yang dibagikan dibuka dari device lain</small></span><span class="seg"><label><input type="radio" name="dp6" value="allow"><span>Allow</span></label><label><input type="radio" name="dp6" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp6" value="deny" checked><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-clip"/></svg></span><span class="pm">Clipboard<small>Copy on another device, paste here</small></span><span class="seg"><label><input type="radio" name="dp1" value="allow" checked><span>Allow</span></label><label><input type="radio" name="dp1" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp1" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-folder"/></svg></span><span class="pm">Receive files<small>Other devices send files here</small></span><span class="seg"><label><input type="radio" name="dp2" value="allow"><span>Allow</span></label><label><input type="radio" name="dp2" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp2" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-mouse"/></svg></span><span class="pm">Remote control<small>Mouse, keyboard, and presenter</small></span><span class="seg"><label><input type="radio" name="dp3" value="allow"><span>Allow</span></label><label><input type="radio" name="dp3" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp3" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-media"/></svg></span><span class="pm">Media<small>Control music and video</small></span><span class="seg"><label><input type="radio" name="dp4" value="allow" checked><span>Allow</span></label><label><input type="radio" name="dp4" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp4" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-screen"/></svg></span><span class="pm">Screen sharing<small>Other devices view this screen</small></span><span class="seg"><label><input type="radio" name="dp5" value="allow"><span>Allow</span></label><label><input type="radio" name="dp5" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp5" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-code"/></svg></span><span class="pm">Localhost<small>Other devices open the ports you share</small></span><span class="seg"><label><input type="radio" name="dp6" value="allow"><span>Allow</span></label><label><input type="radio" name="dp6" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp6" value="deny" checked><span>Deny</span></label></span></div>
       </div>
-      <p class="small">Galeri hanya ada di Android. Fitur Release 2 mendapat nilai awalnya saat dibuat. Terminal dan ubah file selalu mulai dari Deny.</p>
-      <div class="acts"><label class="bt g" for="s2">Kembali</label><label class="bt" for="s4">Simpan dan lanjut</label></div>
+      <p class="small">Gallery exists on Android only. Release 2 features get their defaults when they are built. Terminal and file changes always start at Deny.</p>
+      <div class="acts"><label class="bt g" for="s2">Back</label><label class="bt" for="s4">Save and continue</label></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
-    <h2 class="t">Izin untuk device lain</h2>
-    <p class="small">Berlaku untuk semua device. Bisa diubah di kartu Perangkat ini.</p>
+    <h2 class="t">Permissions for other devices</h2>
+    <p class="small">Applies to every device. Change it later on the This device card.</p>
     <div class="perms">
       <div class="pr"><span class="fi"><svg class="i"><use href="#i-clip"/></svg></span><span class="pm">Clipboard</span><span class="seg"><label><input type="radio" name="pp1" value="allow" checked><span>Allow</span></label><label><input type="radio" name="pp1" value="ask"><span>Always Ask</span></label><label><input type="radio" name="pp1" value="deny"><span>Deny</span></label></span></div>
-      <div class="pr"><span class="fi"><svg class="i"><use href="#i-folder"/></svg></span><span class="pm">Terima file</span><span class="seg"><label><input type="radio" name="pp2" value="allow"><span>Allow</span></label><label><input type="radio" name="pp2" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp2" value="deny"><span>Deny</span></label></span></div>
-      <div class="pr"><span class="fi"><svg class="i"><use href="#i-image"/></svg></span><span class="pm">Galeri</span><span class="seg"><label><input type="radio" name="pp3" value="allow"><span>Allow</span></label><label><input type="radio" name="pp3" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp3" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-folder"/></svg></span><span class="pm">Receive files</span><span class="seg"><label><input type="radio" name="pp2" value="allow"><span>Allow</span></label><label><input type="radio" name="pp2" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp2" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-image"/></svg></span><span class="pm">Gallery</span><span class="seg"><label><input type="radio" name="pp3" value="allow"><span>Allow</span></label><label><input type="radio" name="pp3" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp3" value="deny"><span>Deny</span></label></span></div>
       <div class="pr"><span class="fi"><svg class="i"><use href="#i-mouse"/></svg></span><span class="pm">Remote control</span><span class="seg"><label><input type="radio" name="pp4" value="allow"><span>Allow</span></label><label><input type="radio" name="pp4" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp4" value="deny"><span>Deny</span></label></span></div>
       <div class="pr"><span class="fi"><svg class="i"><use href="#i-media"/></svg></span><span class="pm">Media</span><span class="seg"><label><input type="radio" name="pp5" value="allow" checked><span>Allow</span></label><label><input type="radio" name="pp5" value="ask"><span>Always Ask</span></label><label><input type="radio" name="pp5" value="deny"><span>Deny</span></label></span></div>
-      <div class="pr"><span class="fi"><svg class="i"><use href="#i-screen"/></svg></span><span class="pm">Bagi layar</span><span class="seg"><label><input type="radio" name="pp6" value="allow"><span>Allow</span></label><label><input type="radio" name="pp6" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp6" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-screen"/></svg></span><span class="pm">Screen sharing</span><span class="seg"><label><input type="radio" name="pp6" value="allow"><span>Allow</span></label><label><input type="radio" name="pp6" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp6" value="deny"><span>Deny</span></label></span></div>
       <div class="pr"><span class="fi"><svg class="i"><use href="#i-code"/></svg></span><span class="pm">Localhost</span><span class="seg"><label><input type="radio" name="pp7" value="allow"><span>Allow</span></label><label><input type="radio" name="pp7" value="ask"><span>Always Ask</span></label><label><input type="radio" name="pp7" value="deny" checked><span>Deny</span></label></span></div>
     </div>
-    <div class="acts"><label class="bt" for="s4">Simpan dan lanjut</label><label class="bt g" for="s2">Kembali</label></div>
+    <div class="acts"><label class="bt" for="s4">Save and continue</label><label class="bt g" for="s2">Back</label></div>
   </div></div>
 </div></section>
 
-<!-- 4. Pasangkan dengan QR -->
+<!-- 4. Pair with a QR code -->
 <section class="step st4"><div class="row">
   <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
     <div class="art">
-      <div class="dqr dqr-art"><div class="qr"><svg viewBox="0 0 200 200" role="img" aria-label="Contoh kode QR Laptop Ahmad"><use href="#qr"/></svg></div><span class="qrmeta">Berlaku <b class="mono">1:52</b></span></div>
-      <div class="dscan" style="flex-direction:column;align-items:center;gap:6px;color:var(--lime)"><svg class="i" style="width:44px;height:44px"><use href="#i-cam"/></svg><span class="qrmeta">Kamera menyala</span></div>
+      <div class="dqr dqr-art"><div class="qr"><svg viewBox="0 0 200 200" role="img" aria-label="Sample QR code for Laptop Ahmad"><use href="#qr"/></svg></div><span class="qrmeta">Valid for <b class="mono">1:52</b></span></div>
+      <div class="dscan" style="flex-direction:column;align-items:center;gap:6px;color:var(--lime)"><svg class="i" style="width:44px;height:44px"><use href="#i-cam"/></svg><span class="qrmeta">Camera on</span></div>
     </div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
-      <h2 class="t">Pasangkan device pertama</h2>
+      <h2 class="t">Pair your first device</h2>
       <div class="dqr dqr-txt">
-        <p class="p">Pindai QR ini dengan UrDevice di device lain. Pairing selesai tanpa kode, karena QR sudah memuat identitas perangkat ini.</p>
-        <p class="small">QR hanya bisa dipakai sekali, berlaku 2 menit, dan diperbarui sendiri selama halaman ini terbuka.</p>
-        <label class="bt g" for="dsc1" style="align-self:flex-start"><svg class="i"><use href="#i-cam"/></svg>Scan QR device lain</label>
-        <p class="small">Tombol ini memakai kamera bawaan atau webcam, dan disembunyikan kalau desktop tidak punya kamera.</p>
+        <p class="p">Scan this QR code with UrDevice on another device. Pairing finishes without a code, because the QR code already carries this device's identity.</p>
+        <p class="small">The QR code works once, is valid for 2 minutes, and renews itself while this screen is open.</p>
+        <label class="bt g" for="dsc1" style="align-self:flex-start"><svg class="i"><use href="#i-cam"/></svg>Scan another device's QR</label>
+        <p class="small">This uses the built-in camera or a webcam, and is hidden when the desktop has no camera.</p>
       </div>
       <div class="dscan" style="flex-direction:column;gap:10px">
-        <div class="cam"><span class="vf"></span><small>Arahkan ke QR di layar device lain</small></div>
-        <p class="small">Izin kamera dari sistem diminta hanya saat ini. Gambar kamera tidak disimpan atau dikirim.</p>
-        <div class="acts" style="justify-content:flex-start"><label class="bt" for="s6">Simulasi: QR Pixel terbaca</label><label class="bt g" for="dsc0">Batal</label></div>
+        <div class="cam"><span class="vf"></span><small>Point at the QR code on the other device</small></div>
+        <p class="small">The system asks for camera access only now. Camera images are never stored or sent.</p>
+        <div class="acts" style="justify-content:flex-start"><label class="bt" for="s6">Simulate: Pixel QR read</label><label class="bt g" for="dsc0">Cancel</label></div>
       </div>
-      <div class="acts"><label class="bt q" for="s6b">Lewati dulu</label><label class="bt g" for="s5"><svg class="i"><use href="#i-radar"/></svg>Pilih device di jaringan</label></div>
+      <div class="acts"><label class="bt q" for="s6b">Skip for now</label><label class="bt g" for="s5"><svg class="i"><use href="#i-radar"/></svg>Pick a device on the network</label></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
-    <h2 class="t">Pasangkan device pertama</h2>
+    <h2 class="t">Pair your first device</h2>
     <div class="pscan" style="display:flex;flex-direction:column;gap:10px">
-      <div class="cam"><span class="vf"></span><small>Arahkan ke QR di layar Laptop Ahmad</small></div>
-      <p class="small">Izin kamera diminta hanya saat ini.</p>
-      <label class="bt" for="s6">Simulasi: QR Laptop Ahmad terbaca</label>
-      <label class="bt g" for="pm-qr"><svg class="i"><use href="#i-qr"/></svg>Tunjukkan QR perangkat ini</label>
+      <div class="cam"><span class="vf"></span><small>Point at the QR code on Laptop Ahmad</small></div>
+      <p class="small">Camera access is asked only now.</p>
+      <label class="bt" for="s6">Simulate: Laptop Ahmad QR read</label>
+      <label class="bt g" for="pm-qr"><svg class="i"><use href="#i-qr"/></svg>Show this device's QR</label>
     </div>
     <div class="pqr" style="flex-direction:column;gap:10px">
-      <div class="qr"><svg viewBox="0 0 200 200" role="img" aria-label="Contoh kode QR Pixel"><use href="#qr"/></svg></div>
-      <p class="qrmeta"><b>Pixel</b> · berlaku <b class="mono">1:52</b></p>
+      <div class="qr"><svg viewBox="0 0 200 200" role="img" aria-label="Sample QR code for Pixel"><use href="#qr"/></svg></div>
+      <p class="qrmeta"><b>Pixel</b> · valid for <b class="mono">1:52</b></p>
       <label class="bt g" for="pm-scan"><svg class="i"><use href="#i-cam"/></svg>Scan QR</label>
     </div>
-    <div class="acts"><label class="bt g" for="s5">Pilih device di jaringan</label><label class="bt q" for="s6b">Lewati dulu</label></div>
+    <div class="acts"><label class="bt g" for="s5">Pick a device on the network</label><label class="bt q" for="s6b">Skip for now</label></div>
   </div></div>
 </div></section>
 
-<!-- 5. Device di jaringan -->
+<!-- 5. Nearby devices -->
 <section class="step st5"><div class="row">
   <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
     <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-radar"/></svg></span></div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
-      <h2 class="t">Device di jaringan</h2>
-      <p class="p">Pilih device. Kode 6 digit yang sama muncul di kedua layar. Pairing selesai setelah kedua device menekan <b>Kode cocok</b>.</p>
+      <h2 class="t">Nearby devices</h2>
+      <p class="p">Pick a device. The same 6-digit code appears on both screens. Pairing finishes after both devices tap <b>Codes match</b>.</p>
       <div class="list">
         <div class="it it0"><label class="hd" for="d0"><span class="fi"><svg class="i"><use href="#i-phone"/></svg></span><span>Pixel<small>Android · 192.168.1.12</small></span><span class="st"></span></label>
-          <div class="pn pn0">Pastikan kode ini sama dengan di Pixel
+          <div class="pn pn0">Check that this code matches on Pixel
             <div class="code"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>5</span></div>
-            <div class="act"><div class="acts"><label class="bt" for="dm1">Kode cocok</label><label class="bt g" for="dn">Batal</label></div></div>
-            <div class="w"><span class="wait"><i></i>Menunggu konfirmasi di Pixel…</span></div>
-            <div class="ok"><span class="okk"><svg class="i"><use href="#i-check"/></svg>Pixel terhubung</span><div class="acts"><label class="bt" for="s6">Lanjut</label></div></div>
+            <div class="act"><div class="acts"><label class="bt" for="dm1">Codes match</label><label class="bt g" for="dn">Cancel</label></div></div>
+            <div class="w"><span class="wait"><i></i>Waiting for Pixel to confirm…</span></div>
+            <div class="ok"><span class="okk"><svg class="i"><use href="#i-check"/></svg>Pixel connected</span><div class="acts"><label class="bt" for="s6">Continue</label></div></div>
           </div></div>
-        <div class="it it1"><label class="hd" for="d1"><span class="fi"><svg class="i"><use href="#i-tablet"/></svg></span><span>Galaxy Tab S9<small>Android · 192.168.1.24</small></span><span class="st">Belum terhubung</span></label>
-          <div class="pn pn1">Pastikan kode ini sama dengan di Galaxy Tab S9
+        <div class="it it1"><label class="hd" for="d1"><span class="fi"><svg class="i"><use href="#i-tablet"/></svg></span><span>Galaxy Tab S9<small>Android · 192.168.1.24</small></span><span class="st">Not connected</span></label>
+          <div class="pn pn1">Check that this code matches on Galaxy Tab S9
             <div class="code"><span>7</span><span>0</span><span>3</span><span>1</span><span>6</span><span>8</span></div>
-            <div class="acts"><label class="bt g" for="dn">Batal</label></div>
-            <p class="small">Di mockup ini hanya Pixel yang punya layar contoh.</p></div></div>
-        <div class="it it2"><label class="hd" for="d2"><span class="fi"><svg class="i"><use href="#i-monitor"/></svg></span><span>PC Lab<small>Linux · 192.168.1.20</small></span><span class="st">Belum terhubung</span></label>
-          <div class="pn pn2">Pastikan kode ini sama dengan di PC Lab
+            <div class="acts"><label class="bt g" for="dn">Cancel</label></div>
+            <p class="small">In this mockup only Pixel has a sample screen.</p></div></div>
+        <div class="it it2"><label class="hd" for="d2"><span class="fi"><svg class="i"><use href="#i-monitor"/></svg></span><span>PC Lab<small>Linux · 192.168.1.20</small></span><span class="st">Not connected</span></label>
+          <div class="pn pn2">Check that this code matches on PC Lab
             <div class="code"><span>2</span><span>5</span><span>9</span><span>0</span><span>4</span><span>7</span></div>
-            <div class="acts"><label class="bt g" for="dn">Batal</label></div>
-            <p class="small">Di mockup ini hanya Pixel yang punya layar contoh.</p></div></div>
+            <div class="acts"><label class="bt g" for="dn">Cancel</label></div>
+            <p class="small">In this mockup only Pixel has a sample screen.</p></div></div>
       </div>
-      <p class="small">Gagal 5 kali dalam 5 menit mengunci pairing selama 5 menit.</p>
-      <div class="acts"><label class="bt g" for="s4">Kembali ke QR</label><label class="bt q" for="s6b">Lewati dulu</label></div>
+      <p class="small">5 failures within 5 minutes lock pairing for 5 minutes.</p>
+      <div class="acts"><label class="bt g" for="s4">Back to QR</label><label class="bt q" for="s6b">Skip for now</label></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
-    <h2 class="t">Device di jaringan</h2>
-    <div class="pwait"><svg class="i"><use href="#i-radar"/></svg>Menunggu permintaan pairing…<br>Pilih Pixel di layar desktop.</div>
+    <h2 class="t">Nearby devices</h2>
+    <div class="pwait"><svg class="i"><use href="#i-radar"/></svg>Waiting for a pairing request…<br>Pick Pixel on the desktop screen.</div>
     <div class="preq">
-      <b>Laptop Ahmad ingin dipasangkan</b>
-      <span class="small">Pastikan kode ini sama dengan di Laptop Ahmad</span>
+      <b>Laptop Ahmad wants to pair</b>
+      <span class="small">Check that this code matches on Laptop Ahmad</span>
       <div class="code"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>5</span></div>
-      <div class="act"><div class="acts2"><label class="bt" for="pm1">Kode cocok</label><label class="bt g" for="dn">Batal</label></div></div>
-      <div class="w"><span class="wait"><i></i>Menunggu konfirmasi di Laptop Ahmad…</span></div>
-      <div class="ok"><span class="okk"><svg class="i"><use href="#i-check"/></svg>Laptop Ahmad terhubung</span></div>
+      <div class="act"><div class="acts2"><label class="bt" for="pm1">Codes match</label><label class="bt g" for="dn">Cancel</label></div></div>
+      <div class="w"><span class="wait"><i></i>Waiting for Laptop Ahmad to confirm…</span></div>
+      <div class="ok"><span class="okk"><svg class="i"><use href="#i-check"/></svg>Laptop Ahmad connected</span></div>
     </div>
-    <p class="small">Izin Perangkat sekitar (Nearby devices) dari Android diminta hanya saat ini.</p>
-    <div class="acts"><label class="bt g" for="s4">Kembali ke QR</label></div>
+    <p class="small">Android asks for the Nearby devices permission only now.</p>
+    <div class="acts"><label class="bt g" for="s4">Back to QR</label></div>
   </div></div>
 </div></section>
 
-<!-- 6. Selesai -->
+<!-- 6. Done -->
 <section class="step st6"><div class="row">
   <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
     <div class="art"><div class="pair-art"><span class="badge-ic"><svg class="i"><use href="#i-laptop"/></svg></span><span class="wire"></span><span class="badge-ic"><svg class="i"><use href="#i-phone"/></svg></span></div></div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
-      <h2 class="t">Laptop Ahmad dan Pixel terhubung</h2>
-      <p class="p">Pixel sekarang ada di daftar device. Fiturnya mengikuti izin yang dipilih di Pixel, dan fitur di sini mengikuti izin yang Anda pilih tadi.</p>
-      <div class="box">Tambah device lain kapan saja lewat <b>Add Device</b> di sidebar.</div>
-      <div class="acts"><span class="bt">Buka UrDevice</span></div>
+      <h2 class="t">Laptop Ahmad and Pixel are connected</h2>
+      <p class="p">Pixel is now in your device list. Its features follow the permissions chosen on Pixel, and the features here follow the permissions you just chose.</p>
+      <div class="box">Add more devices any time with <b>Add Device</b> in the sidebar.</div>
+      <div class="acts"><span class="bt">Open UrDevice</span></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
     <div class="pair-art" style="justify-content:center"><span class="badge-ic"><svg class="i"><use href="#i-phone"/></svg></span><span class="wire"></span><span class="badge-ic"><svg class="i"><use href="#i-laptop"/></svg></span></div>
-    <h2 class="t">Pixel dan Laptop Ahmad terhubung</h2>
-    <p class="p">UrDevice menyala di latar belakang dengan notifikasi tetap, supaya koneksi tidak diputus Android.</p>
-    <div class="acts"><span class="bt">Buka UrDevice</span></div>
+    <h2 class="t">Pixel and Laptop Ahmad are connected</h2>
+    <p class="p">UrDevice keeps running in the background with an ongoing notification, so Android does not cut the connection.</p>
+    <div class="acts"><span class="bt">Open UrDevice</span></div>
   </div></div>
 </div></section>
 
@@ -431,17 +431,17 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
     <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-check"/></svg></span></div>
     <div class="cont">
       <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
-      <h2 class="t">Siap dipakai</h2>
-      <p class="p">Belum ada device yang dipasangkan. UrDevice tetap terbuka, dan device di jaringan yang sama akan muncul di halaman Add Device.</p>
-      <div class="acts"><label class="bt g" for="s4">Pasangkan sekarang</label><span class="bt">Buka UrDevice</span></div>
+      <h2 class="t">Ready to go</h2>
+      <p class="p">No device is paired yet. UrDevice still opens, and devices on the same network show up on the Add Device page.</p>
+      <div class="acts"><label class="bt g" for="s4">Pair now</label><span class="bt">Open UrDevice</span></div>
     </div></div></div></div>
   <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
-    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="ph-top"><span>09:41</span><span>Wi-Fi</span></div>
     <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
     <span class="badge-ic"><svg class="i"><use href="#i-check"/></svg></span>
-    <h2 class="t">Siap dipakai</h2>
-    <p class="p">Belum ada device. Tambah kapan saja lewat Add Device di beranda.</p>
-    <div class="acts"><span class="bt">Buka UrDevice</span><label class="bt g" for="s4">Pasangkan sekarang</label></div>
+    <h2 class="t">Ready to go</h2>
+    <p class="p">No devices yet. Add one any time with Add Device on the home screen.</p>
+    <div class="acts"><span class="bt">Open UrDevice</span><label class="bt g" for="s4">Pair now</label></div>
   </div></div>
 </div></section>
 

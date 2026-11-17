@@ -2,7 +2,7 @@
 
 The first-launch flow, for desktop and Android. This is a layout mockup, not final art. Open [`onboarding.html`](onboarding.html) in a browser. It has no scripts and loads nothing from the internet, so it also works in file viewers. Click the step tabs or the buttons inside the screens.
 
-The look follows the brand colors (dark green `#0F1F10`, lime `#C6F19D`) in a dark theme, with dashed "stitch" borders as a nod to the Frankenstein category. Mockup text is in Indonesian, like [`urdevice-layout.html`](urdevice-layout.html). The app's first language is English (R16.4).
+The look follows the brand colors (dark green `#0F1F10`, lime `#C6F19D`) in a dark theme, with dashed "stitch" borders as a nod to the Frankenstein category. Mockup text is in English, like [`urdevice-layout.html`](urdevice-layout.html), because English is the app's first language (R16.4).
 
 ## Steps
 
