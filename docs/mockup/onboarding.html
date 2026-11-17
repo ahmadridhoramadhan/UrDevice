@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<title>UrDevice: mockup onboarding</title>
+<!--
+  Mockup alur onboarding (pertama kali dibuka), desktop dan Android.
+  Panduan layout, bukan desain final. Tanpa script dan tanpa CDN, jadi
+  bisa dibuka di penampil file mana pun. Semua interaksi memakai
+  radio dan checkbox CSS. Catatan dan keputusan: onboarding.md.
+-->
+<style>
+:root{
+  --bg:#0B1A0C; --panel:#112417; --panel2:#0D1D11; --stitch:rgba(198,241,157,.28); --line:rgba(246,241,230,.12);
+  --ink:#F1EBDC; --soft:#C9D6C4; --muted:#93AC90; --lime:#C6F19D; --green:#0F1F10;
+  --amber:#E8B34B; --amber-bg:rgba(232,179,75,.16); --deny:#F2A49A; --deny-bg:rgba(242,164,154,.15);
+  --font:"Sora",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5;padding:20px 16px 40px}
+.wrap{max-width:1120px;margin:0 auto}
+input.r{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mono{font-family:var(--mono)}
+
+/* header + step tabs */
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.top img{height:34px;width:auto}
+.top h1{margin:0;font-size:19px;font-weight:700}
+.top p{margin:0;color:var(--muted);font-size:12.5px;flex-basis:100%}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px}
+.tb{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 12px 6px 6px;border-radius:999px;border:1.5px dashed var(--stitch);color:var(--muted);cursor:pointer;min-height:36px}
+.tb b{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--panel);font-size:11.5px}
+
+/* stage */
+.step{display:none}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+@media(max-width:860px){.row{grid-template-columns:minmax(0,1fr)}.phone{justify-self:center}}
+.cap{font-size:11.5px;font-weight:700;color:var(--muted);margin:0 0 6px;letter-spacing:.03em;text-transform:uppercase}
+.win{border:1.5px dashed var(--stitch);border-radius:18px;background:var(--panel);overflow:hidden}
+.bar{display:flex;gap:7px;align-items:center;padding:9px 12px;border-bottom:1.5px dashed var(--stitch);font-size:11.5px;color:var(--muted)}
+.bar i{width:10px;height:10px;border-radius:50%;background:rgba(246,241,230,.14)}
+.bar img{height:18px;margin-left:6px}
+.dbody{display:grid;grid-template-columns:200px minmax(0,1fr);min-height:400px}
+@media(max-width:620px){.dbody{grid-template-columns:minmax(0,1fr)}.art{min-height:120px;border-right:0!important;border-bottom:1.5px dashed var(--stitch)}}
+.art{display:grid;place-items:center;border-right:1.5px dashed var(--stitch);background:var(--panel2);padding:16px}
+.badge-ic{width:84px;height:84px;border-radius:24px;background:var(--lime);color:var(--green);display:grid;place-items:center}
+.badge-ic svg.i{width:40px;height:40px}
+.cont{padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.phone{width:300px;max-width:100%;background:#050B06;border-radius:34px;padding:9px}
+.ph{background:var(--panel);border-radius:26px;padding:12px 14px 16px;display:flex;flex-direction:column;gap:11px;min-height:600px}
+.ph-top{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.ph .badge-ic{width:58px;height:58px;border-radius:18px}
+.ph .badge-ic svg.i{width:28px;height:28px}
+
+/* type + parts */
+.dots{display:flex;gap:5px}
+.dots i{flex:1;height:4px;border-radius:2px;background:rgba(246,241,230,.13)}
+.dots i.on{background:var(--lime)}
+.t{margin:0;font-size:19px;font-weight:700;color:var(--ink);line-height:1.25}
+.ph .t{font-size:17px}
+.p{margin:0;font-size:13px;color:var(--soft)}
+.small{font-size:11.5px;color:var(--muted);margin:0}
+.box{border:1.5px dashed var(--stitch);border-radius:12px;padding:10px 12px;background:var(--panel2);font-size:12.5px;color:var(--soft)}
+.box b{color:var(--ink)}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;color:var(--soft)}
+.fld input{font:inherit;font-size:14px;font-weight:600;padding:10px 12px;border-radius:10px;border:1.5px solid var(--stitch);background:var(--panel2);color:var(--ink)}
+.fact{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--soft)}
+.fact .fi{width:32px;height:32px;border-radius:10px;background:rgba(198,241,157,.13);color:var(--lime);display:grid;place-items:center;flex:none}
+.fact .fi svg.i{width:17px;height:17px}
+.fact b{display:block;color:var(--ink);font-size:13px}
+.did{font-family:var(--mono);font-size:12.5px;color:var(--lime);word-break:break-all;letter-spacing:.02em}
+.acts{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.ph .acts{flex-direction:column;align-items:stretch}
+.bt{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:700;padding:9px 15px;border-radius:999px;border:1.5px solid var(--lime);background:var(--lime);color:var(--green);cursor:pointer;min-height:40px;text-align:center}
+.bt svg.i{width:17px;height:17px}
+.bt.g{background:transparent;color:var(--ink);border-color:var(--stitch)}
+.bt.q{background:transparent;border-color:transparent;color:var(--muted);text-decoration:underline}
+
+/* permissions (step 3) */
+.perms{display:grid;gap:6px}
+.pr{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.pr .fi{width:30px;height:30px;border-radius:9px;background:rgba(198,241,157,.13);color:var(--lime);display:grid;place-items:center;flex:none}
+.pr .fi svg.i{width:16px;height:16px}
+.pr .pm{flex:1;min-width:0;font-size:12.5px;font-weight:700}
+.pr .pm small{display:block;font-weight:400;color:var(--muted);font-size:11px;line-height:1.35}
+.seg{display:inline-flex;border:1.5px solid var(--stitch);border-radius:999px;overflow:hidden;flex:none}
+.seg label{cursor:pointer;position:relative}
+.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg span{display:block;padding:5px 9px;font-size:11px;font-weight:700;color:var(--soft);white-space:nowrap}
+.seg input[value=allow]:checked + span{background:var(--lime);color:var(--green)}
+.seg input[value=ask]:checked + span{background:var(--amber-bg);color:var(--amber)}
+.seg input[value=deny]:checked + span{background:var(--deny-bg);color:var(--deny)}
+.seg input:focus-visible + span{outline:2px solid var(--lime);outline-offset:-2px}
+.ph .pr{flex-wrap:wrap}
+.ph .seg{width:100%}
+.ph .seg label{flex:1}
+.ph .seg span{text-align:center}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:0}
+.legend b{color:var(--ink)}
+
+/* pairing (steps 4-5) */
+.qr{width:150px;height:150px;padding:8px;background:#fff;border-radius:12px}
+.ph .qr{width:170px;height:170px;margin:0 auto}
+.qr svg{width:100%;height:100%;display:block}
+.cam{position:relative;height:200px;border-radius:14px;background:#030603;display:grid;place-items:center;overflow:hidden}
+.cam .vf{width:120px;height:120px;border:3px solid var(--lime);border-radius:16px}
+.cam small{position:absolute;bottom:8px;left:0;right:0;text-align:center;color:var(--muted);font-size:11px}
+.qrmeta{font-size:12px;color:var(--muted);text-align:center}
+.qrmeta b{color:var(--ink)}
+.list{display:grid;gap:8px}
+.it{border:1.5px solid var(--line);border-radius:14px;background:var(--panel2);overflow:hidden}
+.hd{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;font-size:13.5px;font-weight:700}
+.hd .fi{width:34px;height:34px;border-radius:10px;background:var(--amber-bg);color:var(--amber);display:grid;place-items:center;flex:none}
+.hd .fi svg.i{width:18px;height:18px}
+.hd small{display:block;color:var(--muted);font-size:11.5px;font-weight:400}
+.hd .st{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--amber);background:var(--amber-bg);padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pn{display:none;padding:12px;border-top:1.5px dashed var(--stitch);text-align:center;font-size:12.5px;color:var(--soft)}
+.code{display:flex;gap:5px;justify-content:center;margin:8px 0}
+.code span{width:34px;height:42px;display:grid;place-items:center;border:1.5px solid var(--stitch);border-radius:10px;background:var(--panel);font-family:var(--mono);font-size:20px;color:var(--ink)}
+.pn .acts,.preq .acts2{justify-content:center;margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.wait{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--amber-bg);color:var(--amber);font-size:12px;font-weight:700}
+.wait i{width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1.2s ease-in-out infinite}
+.okk{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:rgba(198,241,157,.15);color:var(--lime);font-size:12px;font-weight:700}
+.okk svg.i{width:15px;height:15px}
+@keyframes pulse{50%{opacity:.35}}
+.pwait{border:1.5px dashed var(--stitch);border-radius:14px;padding:28px 12px;text-align:center;color:var(--muted);font-size:12.5px;display:grid;justify-items:center;gap:8px}
+.pwait svg.i{width:30px;height:30px;color:var(--lime)}
+.preq{display:none;flex-direction:column;gap:8px;border:1.5px solid var(--lime);border-radius:14px;padding:12px;background:var(--panel2);text-align:center}
+.preq .acts2 .bt{flex:1}
+.w,.ok{display:none}
+
+/* done (step 6) */
+.pair-art{display:flex;align-items:center;gap:10px}
+.pair-art .badge-ic{width:56px;height:56px;border-radius:16px}
+.pair-art .badge-ic svg.i{width:26px;height:26px}
+.pair-art .wire{width:36px;border-top:2px dashed var(--lime)}
+
+/* ===== state wiring (CSS only) ===== */
+#s1:checked ~ .stage .st1,#s2:checked ~ .stage .st2,#s3:checked ~ .stage .st3,#s4:checked ~ .stage .st4,#s5:checked ~ .stage .st5,#s6:checked ~ .stage .st6,#s6b:checked ~ .stage .st6b{display:block}
+#s1:checked ~ .tabs [for=s1],#s2:checked ~ .tabs [for=s2],#s3:checked ~ .tabs [for=s3],#s4:checked ~ .tabs [for=s4],#s5:checked ~ .tabs [for=s5],#s6:checked ~ .tabs [for=s6],#s6b:checked ~ .tabs [for=s6]{border-style:solid;border-color:var(--lime);color:var(--lime)}
+#s1:checked ~ .tabs [for=s1] b,#s2:checked ~ .tabs [for=s2] b,#s3:checked ~ .tabs [for=s3] b,#s4:checked ~ .tabs [for=s4] b,#s5:checked ~ .tabs [for=s5] b,#s6:checked ~ .tabs [for=s6] b,#s6b:checked ~ .tabs [for=s6] b{background:var(--lime);color:var(--green)}
+/* step 4: desktop scanner, phone mode */
+.dqr-art{display:grid;justify-items:center;gap:6px}
+.dqr-txt{display:flex;flex-direction:column;gap:10px}
+.dscan,.pqr{display:none}
+#dsc1:checked ~ .stage .dscan{display:flex}
+#dsc1:checked ~ .stage .dqr{display:none}
+#pm-qr:checked ~ .stage .pqr{display:flex}
+#pm-qr:checked ~ .stage .pscan{display:none}
+/* step 5: nearby list */
+#d0:checked ~ .stage .pn0,#d1:checked ~ .stage .pn1,#d2:checked ~ .stage .pn2{display:block}
+#d0:checked ~ .stage .it0,#d1:checked ~ .stage .it1,#d2:checked ~ .stage .it2{border-color:var(--lime)}
+#d0:checked ~ .stage .pwait{display:none}
+#d0:checked ~ .stage .preq{display:flex}
+#dm1:checked ~ .stage .pn0 .act{display:none}
+#dm1:checked ~ .stage .pn0 .w{display:block}
+#pm1:checked ~ .stage .preq .act{display:none}
+#pm1:checked ~ .stage .preq .w{display:block}
+#dm1:checked ~ #pm1:checked ~ .stage .pn0 .w,#dm1:checked ~ #pm1:checked ~ .stage .preq .w{display:none}
+#dm1:checked ~ #pm1:checked ~ .stage .pn0 .ok,#dm1:checked ~ #pm1:checked ~ .stage .preq .ok{display:block}
+#dm1:checked ~ #pm1:checked ~ .stage .it0 .st{background:rgba(198,241,157,.15);color:var(--lime)}
+#dm1:checked ~ #pm1:checked ~ .stage .it0 .st::after{content:"Terhubung"}
+.it0 .st::after{content:"Belum terhubung"}
+#dm1:checked ~ #pm1:checked ~ .stage .it0 .fi{background:rgba(198,241,157,.15);color:var(--lime)}
+@media(prefers-reduced-motion:reduce){.wait i{animation:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+  <symbol id="i-tablet" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 013 0V11M11 10V4.5a1.5 1.5 0 013 0V11M14 10.5V6a1.5 1.5 0 013 0v7a7 7 0 01-7 7h-.6a6 6 0 01-4.6-2.2L3.5 15a1.6 1.6 0 012.4-2L8 15"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0120 0"/><path d="M5 12.86a10 10 0 0114 0"/><path d="M8.5 16.43a5 5 0 017 0"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/></symbol>
+  <symbol id="i-cloudoff" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.5 6.3A6 6 0 0117.7 10H18a4 4 0 012.6 7M15 19H7a5 5 0 01-1.9-9.6"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h9M19 8h1M4 16h3M13 16h7"/><circle cx="16" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></symbol>
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h3v-3"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M3 8a2 2 0 012-2h2l2-2h6l2 2h2a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 010 8.4M7.8 16.2a6 6 0 010-8.4M19 5a10 10 0 010 14M5 19A10 10 0 015 5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4a3 3 0 016 0"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></symbol>
+  <symbol id="i-mouse" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="5"/><path d="M12 6v4"/></symbol>
+  <symbol id="i-media" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8l6 4-6 4z"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3"/></symbol>
+  <symbol id="qr" viewBox="0 0 200 200"><rect width="200" height="200" fill="#fff"/><path fill="#0F1F10" d="M72 0h8v8h-8zM80 0h8v8h-8zM88 0h8v8h-8zM96 0h8v8h-8zM104 0h8v8h-8zM112 0h8v8h-8zM128 0h8v8h-8zM64 8h8v8h-8zM104 8h8v8h-8zM64 24h8v8h-8zM80 24h8v8h-8zM88 24h8v8h-8zM96 24h8v8h-8zM104 24h8v8h-8zM64 32h8v8h-8zM72 32h8v8h-8zM80 32h8v8h-8zM104 32h8v8h-8zM112 32h8v8h-8zM120 32h8v8h-8zM128 32h8v8h-8zM72 40h8v8h-8zM104 40h8v8h-8zM128 40h8v8h-8zM64 48h8v8h-8zM72 48h8v8h-8zM80 48h8v8h-8zM96 48h8v8h-8zM112 48h8v8h-8zM120 48h8v8h-8zM64 56h8v8h-8zM88 56h8v8h-8zM120 56h8v8h-8zM128 56h8v8h-8zM16 64h8v8h-8zM32 64h8v8h-8zM56 64h8v8h-8zM64 64h8v8h-8zM120 64h8v8h-8zM136 64h8v8h-8zM144 64h8v8h-8zM152 64h8v8h-8zM176 64h8v8h-8zM0 72h8v8h-8zM8 72h8v8h-8zM16 72h8v8h-8zM40 72h8v8h-8zM56 72h8v8h-8zM64 72h8v8h-8zM80 72h8v8h-8zM128 72h8v8h-8zM136 72h8v8h-8zM152 72h8v8h-8zM184 72h8v8h-8zM24 80h8v8h-8zM32 80h8v8h-8zM48 80h8v8h-8zM72 80h8v8h-8zM88 80h8v8h-8zM104 80h8v8h-8zM112 80h8v8h-8zM152 80h8v8h-8zM168 80h8v8h-8zM176 80h8v8h-8zM40 88h8v8h-8zM56 88h8v8h-8zM88 88h8v8h-8zM96 88h8v8h-8zM120 88h8v8h-8zM160 88h8v8h-8zM168 88h8v8h-8zM184 88h8v8h-8zM0 96h8v8h-8zM8 96h8v8h-8zM16 96h8v8h-8zM24 96h8v8h-8zM48 96h8v8h-8zM64 96h8v8h-8zM72 96h8v8h-8zM88 96h8v8h-8zM120 96h8v8h-8zM136 96h8v8h-8zM152 96h8v8h-8zM160 96h8v8h-8zM176 96h8v8h-8zM192 96h8v8h-8zM16 104h8v8h-8zM24 104h8v8h-8zM72 104h8v8h-8zM88 104h8v8h-8zM104 104h8v8h-8zM144 104h8v8h-8zM168 104h8v8h-8zM176 104h8v8h-8zM192 104h8v8h-8zM8 112h8v8h-8zM32 112h8v8h-8zM48 112h8v8h-8zM64 112h8v8h-8zM72 112h8v8h-8zM88 112h8v8h-8zM96 112h8v8h-8zM104 112h8v8h-8zM112 112h8v8h-8zM120 112h8v8h-8zM136 112h8v8h-8zM144 112h8v8h-8zM152 112h8v8h-8zM160 112h8v8h-8zM168 112h8v8h-8zM0 120h8v8h-8zM16 120h8v8h-8zM32 120h8v8h-8zM40 120h8v8h-8zM56 120h8v8h-8zM96 120h8v8h-8zM128 120h8v8h-8zM144 120h8v8h-8zM192 120h8v8h-8zM0 128h8v8h-8zM32 128h8v8h-8zM56 128h8v8h-8zM72 128h8v8h-8zM88 128h8v8h-8zM112 128h8v8h-8zM120 128h8v8h-8zM152 128h8v8h-8zM168 128h8v8h-8zM176 128h8v8h-8zM184 128h8v8h-8zM64 136h8v8h-8zM88 136h8v8h-8zM104 136h8v8h-8zM112 136h8v8h-8zM176 136h8v8h-8zM192 136h8v8h-8zM64 144h8v8h-8zM96 144h8v8h-8zM104 144h8v8h-8zM144 144h8v8h-8zM152 144h8v8h-8zM160 144h8v8h-8zM176 144h8v8h-8zM184 144h8v8h-8zM64 152h8v8h-8zM80 152h8v8h-8zM104 152h8v8h-8zM112 152h8v8h-8zM120 152h8v8h-8zM128 152h8v8h-8zM152 152h8v8h-8zM72 160h8v8h-8zM80 160h8v8h-8zM96 160h8v8h-8zM112 160h8v8h-8zM120 160h8v8h-8zM128 160h8v8h-8zM144 160h8v8h-8zM168 160h8v8h-8zM176 160h8v8h-8zM192 160h8v8h-8zM64 168h8v8h-8zM80 168h8v8h-8zM96 168h8v8h-8zM112 168h8v8h-8zM160 168h8v8h-8zM184 168h8v8h-8zM192 168h8v8h-8zM72 176h8v8h-8zM80 176h8v8h-8zM96 176h8v8h-8zM120 176h8v8h-8zM128 176h8v8h-8zM152 176h8v8h-8zM160 176h8v8h-8zM64 184h8v8h-8zM112 184h8v8h-8zM128 184h8v8h-8zM144 184h8v8h-8zM160 184h8v8h-8zM184 184h8v8h-8zM72 192h8v8h-8zM80 192h8v8h-8zM96 192h8v8h-8zM128 192h8v8h-8zM136 192h8v8h-8zM160 192h8v8h-8zM192 192h8v8h-8z"/><path fill="#0F1F10" fill-rule="evenodd" d="M0 0h56v56h-56zM8 8v40h40v-40z"/><rect fill="#0F1F10" x="16" y="16" width="24" height="24"/><path fill="#0F1F10" fill-rule="evenodd" d="M144 0h56v56h-56zM152 8v40h40v-40z"/><rect fill="#0F1F10" x="160" y="16" width="24" height="24"/><path fill="#0F1F10" fill-rule="evenodd" d="M0 144h56v56h-56zM8 152v40h40v-40z"/><rect fill="#0F1F10" x="16" y="160" width="24" height="24"/></symbol>
+</svg>
+<div class="wrap">
+<div class="top">
+  <img src="../../assets/urdevice-logo-dark-bg.svg" alt="UrDevice" width="223" height="64">
+  <h1>Mockup onboarding</h1>
+  <p>Alur saat UrDevice pertama kali dibuka, di desktop (Laptop Ahmad) dan Android (Pixel). Panduan layout, bukan desain final. Klik nomor langkah atau tombol di dalam layar. Catatan ada di <span class="mono">onboarding.md</span>.</p>
+</div>
+
+<input class="r" type="radio" name="step" id="s1" checked>
+<input class="r" type="radio" name="step" id="s2">
+<input class="r" type="radio" name="step" id="s3">
+<input class="r" type="radio" name="step" id="s4">
+<input class="r" type="radio" name="step" id="s5">
+<input class="r" type="radio" name="step" id="s6">
+<input class="r" type="radio" name="step" id="s6b">
+<input class="r" type="radio" name="dsc" id="dsc0" checked>
+<input class="r" type="radio" name="dsc" id="dsc1">
+<input class="r" type="radio" name="pmode" id="pm-scan" checked>
+<input class="r" type="radio" name="pmode" id="pm-qr">
+<input class="r" type="radio" name="dev" id="dn" checked>
+<input class="r" type="radio" name="dev" id="d0">
+<input class="r" type="radio" name="dev" id="d1">
+<input class="r" type="radio" name="dev" id="d2">
+<input class="r" type="checkbox" id="dm1">
+<input class="r" type="checkbox" id="pm1">
+
+<div class="tabs" aria-label="Langkah onboarding">
+  <label class="tb" for="s1"><b>1</b>Selamat datang</label>
+  <label class="tb" for="s2"><b>2</b>Aman dan lokal</label>
+  <label class="tb" for="s3"><b>3</b>Izin</label>
+  <label class="tb" for="s4"><b>4</b>Pasangkan</label>
+  <label class="tb" for="s5"><b>5</b>Device di jaringan</label>
+  <label class="tb" for="s6"><b>6</b>Selesai</label>
+</div>
+
+<div class="stage">
+
+<!-- 1. Selamat datang -->
+<section class="step st1"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-hand"/></svg></span></div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+      <h2 class="t">Selamat datang di UrDevice</h2>
+      <p class="p">Hubungkan perangkat milik Anda sendiri dalam satu jaringan lokal. Tanpa akun, tanpa server cloud.</p>
+      <label class="fld">Nama perangkat ini<input type="text" value="Laptop Ahmad"></label>
+      <p class="small">Nama ini tampil di device lain. Bisa diubah nanti di Settings.</p>
+      <div class="acts"><label class="bt" for="s2">Lanjut</label></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+    <span class="badge-ic"><svg class="i"><use href="#i-hand"/></svg></span>
+    <h2 class="t">Selamat datang di UrDevice</h2>
+    <p class="p">Hubungkan perangkat milik Anda sendiri dalam satu jaringan lokal. Tanpa akun, tanpa server cloud.</p>
+    <label class="fld">Nama perangkat ini<input type="text" value="Pixel"></label>
+    <div class="acts"><label class="bt" for="s2">Lanjut</label></div>
+  </div></div>
+</div></section>
+
+<!-- 2. Aman dan lokal -->
+<section class="step st2"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-shield"/></svg></span></div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+      <h2 class="t">Aman dan tetap lokal</h2>
+      <div class="fact"><span class="fi"><svg class="i"><use href="#i-wifi"/></svg></span><span><b>Jaringan yang sama</b>Device saling menemukan di Wi-Fi yang sama. Kalau Wi-Fi putus, UrDevice pindah ke Bluetooth sendiri.</span></div>
+      <div class="fact"><span class="fi"><svg class="i"><use href="#i-cloudoff"/></svg></span><span><b>Tanpa server</b>Data langsung dari device ke device, terenkripsi. Tidak ada yang dikirim ke internet.</span></div>
+      <div class="fact"><span class="fi"><svg class="i"><use href="#i-key"/></svg></span><span><b>Kunci perangkat sudah dibuat</b>Kunci ini disimpan di keychain sistem dan tidak pernah keluar dari perangkat ini.</span></div>
+      <div class="box">Device ID perangkat ini<br><span class="did">K7QM-2X9D-H4TR-8WVA-5NBE-J3LC-Q6PF-Z2YU</span></div>
+      <div class="acts"><label class="bt g" for="s1">Kembali</label><label class="bt" for="s3">Lanjut</label></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+    <h2 class="t">Aman dan tetap lokal</h2>
+    <div class="fact"><span class="fi"><svg class="i"><use href="#i-wifi"/></svg></span><span><b>Jaringan yang sama</b>Kalau Wi-Fi putus, pindah ke Bluetooth sendiri.</span></div>
+    <div class="fact"><span class="fi"><svg class="i"><use href="#i-cloudoff"/></svg></span><span><b>Tanpa server</b>Langsung dari device ke device, terenkripsi.</span></div>
+    <div class="fact"><span class="fi"><svg class="i"><use href="#i-key"/></svg></span><span><b>Kunci perangkat sudah dibuat</b>Disimpan di Android Keystore.</span></div>
+    <div class="box">Device ID<br><span class="did">P3NA-7QDX-M2KC-9FRT-4WLB-H8EJ-T5VS-C6ZG</span></div>
+    <div class="acts"><label class="bt" for="s3">Lanjut</label><label class="bt g" for="s1">Kembali</label></div>
+  </div></div>
+</div></section>
+
+<!-- 3. Izin untuk device lain -->
+<section class="step st3"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-sliders"/></svg></span></div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+      <h2 class="t">Izin untuk device lain</h2>
+      <p class="p">Atur apa yang boleh dilakukan device lain di Laptop Ahmad. Berlaku untuk semua device yang nanti dipasangkan, dan bisa diubah kapan saja di <b>Perangkat ini</b>.</p>
+      <p class="legend"><span><b>Allow</b>: langsung jalan</span><span><b>Always Ask</b>: Anda konfirmasi dulu di sini</span><span><b>Deny</b>: fitur mati di device lain</span></p>
+      <div class="perms">
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-clip"/></svg></span><span class="pm">Clipboard<small>Salin di device lain, tempel di sini</small></span><span class="seg"><label><input type="radio" name="dp1" value="allow" checked><span>Allow</span></label><label><input type="radio" name="dp1" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp1" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-folder"/></svg></span><span class="pm">Terima file<small>Device lain mengirim file ke sini</small></span><span class="seg"><label><input type="radio" name="dp2" value="allow"><span>Allow</span></label><label><input type="radio" name="dp2" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp2" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-mouse"/></svg></span><span class="pm">Remote control<small>Mouse, keyboard, dan presenter</small></span><span class="seg"><label><input type="radio" name="dp3" value="allow"><span>Allow</span></label><label><input type="radio" name="dp3" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp3" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-media"/></svg></span><span class="pm">Media<small>Kontrol musik dan video</small></span><span class="seg"><label><input type="radio" name="dp4" value="allow" checked><span>Allow</span></label><label><input type="radio" name="dp4" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp4" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-screen"/></svg></span><span class="pm">Bagi layar<small>Layar ini dilihat dari device lain</small></span><span class="seg"><label><input type="radio" name="dp5" value="allow"><span>Allow</span></label><label><input type="radio" name="dp5" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="dp5" value="deny"><span>Deny</span></label></span></div>
+        <div class="pr"><span class="fi"><svg class="i"><use href="#i-code"/></svg></span><span class="pm">Localhost<small>Port yang dibagikan dibuka dari device lain</small></span><span class="seg"><label><input type="radio" name="dp6" value="allow"><span>Allow</span></label><label><input type="radio" name="dp6" value="ask"><span>Always Ask</span></label><label><input type="radio" name="dp6" value="deny" checked><span>Deny</span></label></span></div>
+      </div>
+      <p class="small">Galeri hanya ada di Android. Fitur Release 2 mendapat nilai awalnya saat dibuat. Terminal dan ubah file selalu mulai dari Deny.</p>
+      <div class="acts"><label class="bt g" for="s2">Kembali</label><label class="bt" for="s4">Simpan dan lanjut</label></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i></div>
+    <h2 class="t">Izin untuk device lain</h2>
+    <p class="small">Berlaku untuk semua device. Bisa diubah di kartu Perangkat ini.</p>
+    <div class="perms">
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-clip"/></svg></span><span class="pm">Clipboard</span><span class="seg"><label><input type="radio" name="pp1" value="allow" checked><span>Allow</span></label><label><input type="radio" name="pp1" value="ask"><span>Always Ask</span></label><label><input type="radio" name="pp1" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-folder"/></svg></span><span class="pm">Terima file</span><span class="seg"><label><input type="radio" name="pp2" value="allow"><span>Allow</span></label><label><input type="radio" name="pp2" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp2" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-image"/></svg></span><span class="pm">Galeri</span><span class="seg"><label><input type="radio" name="pp3" value="allow"><span>Allow</span></label><label><input type="radio" name="pp3" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp3" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-mouse"/></svg></span><span class="pm">Remote control</span><span class="seg"><label><input type="radio" name="pp4" value="allow"><span>Allow</span></label><label><input type="radio" name="pp4" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp4" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-media"/></svg></span><span class="pm">Media</span><span class="seg"><label><input type="radio" name="pp5" value="allow" checked><span>Allow</span></label><label><input type="radio" name="pp5" value="ask"><span>Always Ask</span></label><label><input type="radio" name="pp5" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-screen"/></svg></span><span class="pm">Bagi layar</span><span class="seg"><label><input type="radio" name="pp6" value="allow"><span>Allow</span></label><label><input type="radio" name="pp6" value="ask" checked><span>Always Ask</span></label><label><input type="radio" name="pp6" value="deny"><span>Deny</span></label></span></div>
+      <div class="pr"><span class="fi"><svg class="i"><use href="#i-code"/></svg></span><span class="pm">Localhost</span><span class="seg"><label><input type="radio" name="pp7" value="allow"><span>Allow</span></label><label><input type="radio" name="pp7" value="ask"><span>Always Ask</span></label><label><input type="radio" name="pp7" value="deny" checked><span>Deny</span></label></span></div>
+    </div>
+    <div class="acts"><label class="bt" for="s4">Simpan dan lanjut</label><label class="bt g" for="s2">Kembali</label></div>
+  </div></div>
+</div></section>
+
+<!-- 4. Pasangkan dengan QR -->
+<section class="step st4"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art">
+      <div class="dqr dqr-art"><div class="qr"><svg viewBox="0 0 200 200" role="img" aria-label="Contoh kode QR Laptop Ahmad"><use href="#qr"/></svg></div><span class="qrmeta">Berlaku <b class="mono">1:52</b></span></div>
+      <div class="dscan" style="flex-direction:column;align-items:center;gap:6px;color:var(--lime)"><svg class="i" style="width:44px;height:44px"><use href="#i-cam"/></svg><span class="qrmeta">Kamera menyala</span></div>
+    </div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+      <h2 class="t">Pasangkan device pertama</h2>
+      <div class="dqr dqr-txt">
+        <p class="p">Pindai QR ini dengan UrDevice di device lain. Pairing selesai tanpa kode, karena QR sudah memuat identitas perangkat ini.</p>
+        <p class="small">QR hanya bisa dipakai sekali, berlaku 2 menit, dan diperbarui sendiri selama halaman ini terbuka.</p>
+        <label class="bt g" for="dsc1" style="align-self:flex-start"><svg class="i"><use href="#i-cam"/></svg>Scan QR device lain</label>
+        <p class="small">Tombol ini memakai kamera bawaan atau webcam, dan disembunyikan kalau desktop tidak punya kamera.</p>
+      </div>
+      <div class="dscan" style="flex-direction:column;gap:10px">
+        <div class="cam"><span class="vf"></span><small>Arahkan ke QR di layar device lain</small></div>
+        <p class="small">Izin kamera dari sistem diminta hanya saat ini. Gambar kamera tidak disimpan atau dikirim.</p>
+        <div class="acts" style="justify-content:flex-start"><label class="bt" for="s6">Simulasi: QR Pixel terbaca</label><label class="bt g" for="dsc0">Batal</label></div>
+      </div>
+      <div class="acts"><label class="bt q" for="s6b">Lewati dulu</label><label class="bt g" for="s5"><svg class="i"><use href="#i-radar"/></svg>Pilih device di jaringan</label></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div>
+    <h2 class="t">Pasangkan device pertama</h2>
+    <div class="pscan" style="display:flex;flex-direction:column;gap:10px">
+      <div class="cam"><span class="vf"></span><small>Arahkan ke QR di layar Laptop Ahmad</small></div>
+      <p class="small">Izin kamera diminta hanya saat ini.</p>
+      <label class="bt" for="s6">Simulasi: QR Laptop Ahmad terbaca</label>
+      <label class="bt g" for="pm-qr"><svg class="i"><use href="#i-qr"/></svg>Tunjukkan QR perangkat ini</label>
+    </div>
+    <div class="pqr" style="flex-direction:column;gap:10px">
+      <div class="qr"><svg viewBox="0 0 200 200" role="img" aria-label="Contoh kode QR Pixel"><use href="#qr"/></svg></div>
+      <p class="qrmeta"><b>Pixel</b> · berlaku <b class="mono">1:52</b></p>
+      <label class="bt g" for="pm-scan"><svg class="i"><use href="#i-cam"/></svg>Scan QR</label>
+    </div>
+    <div class="acts"><label class="bt g" for="s5">Pilih device di jaringan</label><label class="bt q" for="s6b">Lewati dulu</label></div>
+  </div></div>
+</div></section>
+
+<!-- 5. Device di jaringan -->
+<section class="step st5"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-radar"/></svg></span></div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+      <h2 class="t">Device di jaringan</h2>
+      <p class="p">Pilih device. Kode 6 digit yang sama muncul di kedua layar. Pairing selesai setelah kedua device menekan <b>Kode cocok</b>.</p>
+      <div class="list">
+        <div class="it it0"><label class="hd" for="d0"><span class="fi"><svg class="i"><use href="#i-phone"/></svg></span><span>Pixel<small>Android · 192.168.1.12</small></span><span class="st"></span></label>
+          <div class="pn pn0">Pastikan kode ini sama dengan di Pixel
+            <div class="code"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>5</span></div>
+            <div class="act"><div class="acts"><label class="bt" for="dm1">Kode cocok</label><label class="bt g" for="dn">Batal</label></div></div>
+            <div class="w"><span class="wait"><i></i>Menunggu konfirmasi di Pixel…</span></div>
+            <div class="ok"><span class="okk"><svg class="i"><use href="#i-check"/></svg>Pixel terhubung</span><div class="acts"><label class="bt" for="s6">Lanjut</label></div></div>
+          </div></div>
+        <div class="it it1"><label class="hd" for="d1"><span class="fi"><svg class="i"><use href="#i-tablet"/></svg></span><span>Galaxy Tab S9<small>Android · 192.168.1.24</small></span><span class="st">Belum terhubung</span></label>
+          <div class="pn pn1">Pastikan kode ini sama dengan di Galaxy Tab S9
+            <div class="code"><span>7</span><span>0</span><span>3</span><span>1</span><span>6</span><span>8</span></div>
+            <div class="acts"><label class="bt g" for="dn">Batal</label></div>
+            <p class="small">Di mockup ini hanya Pixel yang punya layar contoh.</p></div></div>
+        <div class="it it2"><label class="hd" for="d2"><span class="fi"><svg class="i"><use href="#i-monitor"/></svg></span><span>PC Lab<small>Linux · 192.168.1.20</small></span><span class="st">Belum terhubung</span></label>
+          <div class="pn pn2">Pastikan kode ini sama dengan di PC Lab
+            <div class="code"><span>2</span><span>5</span><span>9</span><span>0</span><span>4</span><span>7</span></div>
+            <div class="acts"><label class="bt g" for="dn">Batal</label></div>
+            <p class="small">Di mockup ini hanya Pixel yang punya layar contoh.</p></div></div>
+      </div>
+      <p class="small">Gagal 5 kali dalam 5 menit mengunci pairing selama 5 menit.</p>
+      <div class="acts"><label class="bt g" for="s4">Kembali ke QR</label><label class="bt q" for="s6b">Lewati dulu</label></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></div>
+    <h2 class="t">Device di jaringan</h2>
+    <div class="pwait"><svg class="i"><use href="#i-radar"/></svg>Menunggu permintaan pairing…<br>Pilih Pixel di layar desktop.</div>
+    <div class="preq">
+      <b>Laptop Ahmad ingin dipasangkan</b>
+      <span class="small">Pastikan kode ini sama dengan di Laptop Ahmad</span>
+      <div class="code"><span>4</span><span>8</span><span>2</span><span>9</span><span>1</span><span>5</span></div>
+      <div class="act"><div class="acts2"><label class="bt" for="pm1">Kode cocok</label><label class="bt g" for="dn">Batal</label></div></div>
+      <div class="w"><span class="wait"><i></i>Menunggu konfirmasi di Laptop Ahmad…</span></div>
+      <div class="ok"><span class="okk"><svg class="i"><use href="#i-check"/></svg>Laptop Ahmad terhubung</span></div>
+    </div>
+    <p class="small">Izin Perangkat sekitar (Nearby devices) dari Android diminta hanya saat ini.</p>
+    <div class="acts"><label class="bt g" for="s4">Kembali ke QR</label></div>
+  </div></div>
+</div></section>
+
+<!-- 6. Selesai -->
+<section class="step st6"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art"><div class="pair-art"><span class="badge-ic"><svg class="i"><use href="#i-laptop"/></svg></span><span class="wire"></span><span class="badge-ic"><svg class="i"><use href="#i-phone"/></svg></span></div></div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+      <h2 class="t">Laptop Ahmad dan Pixel terhubung</h2>
+      <p class="p">Pixel sekarang ada di daftar device. Fiturnya mengikuti izin yang dipilih di Pixel, dan fitur di sini mengikuti izin yang Anda pilih tadi.</p>
+      <div class="box">Tambah device lain kapan saja lewat <b>Add Device</b> di sidebar.</div>
+      <div class="acts"><span class="bt">Buka UrDevice</span></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <div class="pair-art" style="justify-content:center"><span class="badge-ic"><svg class="i"><use href="#i-phone"/></svg></span><span class="wire"></span><span class="badge-ic"><svg class="i"><use href="#i-laptop"/></svg></span></div>
+    <h2 class="t">Pixel dan Laptop Ahmad terhubung</h2>
+    <p class="p">UrDevice menyala di latar belakang dengan notifikasi tetap, supaya koneksi tidak diputus Android.</p>
+    <div class="acts"><span class="bt">Buka UrDevice</span></div>
+  </div></div>
+</div></section>
+
+<section class="step st6b"><div class="row">
+  <div><p class="cap">Desktop</p><div class="win"><div class="bar"><i></i><i></i><i></i><img src="../../assets/urdevice-logo-dark-bg.svg" alt=""></div><div class="dbody">
+    <div class="art"><span class="badge-ic"><svg class="i"><use href="#i-check"/></svg></span></div>
+    <div class="cont">
+      <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+      <h2 class="t">Siap dipakai</h2>
+      <p class="p">Belum ada device yang dipasangkan. UrDevice tetap terbuka, dan device di jaringan yang sama akan muncul di halaman Add Device.</p>
+      <div class="acts"><label class="bt g" for="s4">Pasangkan sekarang</label><span class="bt">Buka UrDevice</span></div>
+    </div></div></div></div>
+  <div class="phone"><p class="cap" style="margin-left:6px">Android</p><div class="ph">
+    <div class="ph-top"><span>09.41</span><span>Wi-Fi</span></div>
+    <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <span class="badge-ic"><svg class="i"><use href="#i-check"/></svg></span>
+    <h2 class="t">Siap dipakai</h2>
+    <p class="p">Belum ada device. Tambah kapan saja lewat Add Device di beranda.</p>
+    <div class="acts"><span class="bt">Buka UrDevice</span><label class="bt g" for="s4">Pasangkan sekarang</label></div>
+  </div></div>
+</div></section>
+
+</div>
+</div>
+</body>
+</html>
