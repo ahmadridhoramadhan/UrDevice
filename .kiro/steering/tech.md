@@ -1,3 +1,8 @@
+---
+inclusion: fileMatch
+fileMatchPattern: ["**/*.rs", "**/Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "deny.toml", "**/*.slint", "android/**", ".github/workflows/**"]
+---
+
 # UrDevice: technology and conventions
 
 ## Stack
@@ -20,15 +25,21 @@
 
 Platform-specific code lives behind traits defined in `urdevice-core`. Do not put OS calls in the core.
 
+## Protocol notes
+
+- Permission settings are looked up by capability only, not by device (design §7.4). The host sends `PermissionState` after the handshake and within 1 s of a change; the peer uses it only to draw the UI.
+- New session messages from the UI review: `PermissionState`, `DeviceStatus` (battery), `Disconnect`, `MediaSubscribe`, `MediaState`, `NotifSubscribe` (design §6.3, §6.5, §9.4, §18.2).
+- Desktop QR scanning uses `nokhwa` for the camera and `rqrr` for decoding (design §7.5).
+
 ## Before every commit
 
 ```sh
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 ```
 
-CI also runs `cargo deny check` and `cargo audit`, and builds the Android debug APK. CI must be green on Linux, macOS, and Windows before a pull request is merged.
+CI also runs `cargo build --workspace --locked`, `cargo deny check`, and `cargo audit`, and builds the Android debug APK. CI must be green on Linux, macOS, and Windows before a pull request is merged.
 
 ## Rust style
 
