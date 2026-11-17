@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
-<title>UrDevice: mockup layout</title>
+<title>UrDevice: layout mockup</title>
 <!--
-  Mockup layout UrDevice (desktop, Android v1, Android v2).
-  Ini panduan, bukan desain final. Semua data contoh dan semua interaksi
-  hanya simulasi di browser. Acuan perilaku: .kiro/specs/urdevice/
-  (requirements.md dan design.md). Font dan library QR diambil dari CDN
-  hanya untuk mockup; aplikasi asli membundel semuanya (R16.1).
+  UrDevice layout mockup (desktop, Android v1, Android v2).
+  This is a guide, not a final design. All sample data and interactions
+  are simulated in the browser. Behavior is defined by .kiro/specs/urdevice/
+  (requirements.md and design.md). Fonts and the QR library come from CDNs
+  for the mockup only; the real app bundles everything (R16.1).
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -534,39 +534,39 @@ button.device{cursor:pointer}
 <body>
 <div class="page">
 
-  <section class="intro" aria-label="Tentang mockup ini">
-    <h1>UrDevice: mockup layout</h1>
-    <p>Mockup ini panduan, bukan desain final. Data dan interaksi hanya simulasi. Acuan perilaku ada di <span class="mono">.kiro/specs/urdevice/</span>.</p>
+  <section class="intro" aria-label="About this mockup">
+    <h1>UrDevice: layout mockup</h1>
+    <p>This mockup is a guide, not a final design. All data and interactions are simulated. The spec in <span class="mono">.kiro/specs/urdevice/</span> defines the behavior.</p>
     <ul>
-      <li>Ubah izin di <b>Perangkat ini</b> (desktop) atau kartu Pixel di HP. Ubin fitur di device lain langsung ikut berubah.</li>
-      <li>Buka fitur yang <b>Always Ask</b>, misalnya Mousepad di HP. Laptop menampilkan permintaan izin dengan batas 30 detik.</li>
-      <li>Coba <b>Putuskan koneksi</b> lalu <b>Hubungkan lagi</b>, dan halaman <b>Tambah Device</b> (Scan QR, atau pilih device untuk kode 6 digit).</li>
+      <li>Change a permission on <b>This device</b> (desktop) or on the Pixel card on the phone. The feature tiles on the other device follow right away.</li>
+      <li>Open a feature set to <b>Always Ask</b>, for example Mousepad on the phone. The laptop shows a permission request with a 30-second limit.</li>
+      <li>Try <b>Disconnect</b> and then <b>Reconnect</b>, and the <b>Add Device</b> page (Scan QR, or pick a device to get a 6-digit code).</li>
     </ul>
     <div class="intro-actions">
-      <button class="btn secondary sm" type="button" data-act="simble">Simulasi: Wi-Fi putus, pindah ke Bluetooth LE</button>
+      <button class="btn secondary sm" type="button" data-act="simble">Simulate: Wi-Fi drops, switch to Bluetooth LE</button>
     </div>
   </section>
 
   <!-- DESKTOP -->
-  <section aria-label="Layout aplikasi desktop UrDevice">
+  <section aria-label="UrDevice desktop app layout">
     <div class="panel">
       <div class="panel-head">
         <div class="ph-left"><span class="dotwin"><i style="background:#F87171"></i><i style="background:#FBBF24"></i><i style="background:#34D399"></i></span><strong>UrDevice: Desktop · Windows / macOS / Linux</strong></div>
-        <div class="ph-right"><span class="badge ok" data-pathbadge>Wi-Fi · terenkripsi</span><button class="btn secondary sm" type="button" data-act="onbopen" data-k="dsk">Lihat onboarding</button></div>
+        <div class="ph-right"><span class="badge ok" data-pathbadge>Wi-Fi · encrypted</span><button class="btn secondary sm" type="button" data-act="onbopen" data-k="dsk">Show onboarding</button></div>
       </div>
       <div class="desktop-grid">
-        <nav class="d-side" aria-label="Daftar device">
+        <nav class="d-side" aria-label="Device list">
           <div class="brand">
             <img class="brand-logo logo-light" src="../../assets/urdevice-logo-light-bg.svg" alt="UrDevice" width="223" height="64">
             <img class="brand-logo logo-dark" src="../../assets/urdevice-logo-dark-bg.svg" alt="" aria-hidden="true" width="223" height="64">
           </div>
           <button class="dev-item" type="button" data-act="dgo" data-to="self" data-side="self" aria-current="true">
             <span class="ic" data-icon="laptop"></span>
-            <span class="meta"><b>Laptop Ahmad</b><small>Perangkat ini · Windows 11</small><small>192.168.1.8 · Baterai 82%</small></span>
-            <span class="status-dot" role="img" aria-label="Perangkat ini"></span>
+            <span class="meta"><b>Laptop Ahmad</b><small>This device · Windows 11</small><small>192.168.1.8 · Battery 82%</small></span>
+            <span class="status-dot" role="img" aria-label="This device"></span>
           </button>
           <div class="side-sep" aria-hidden="true"></div>
-          <span class="side-label">Device</span>
+          <span class="side-label">Devices</span>
           <button class="dev-item" type="button" data-act="dgo" data-to="pixel" data-side="pixel" aria-current="false" data-sidepixel>
             <span class="ic" data-icon="phone"></span>
             <span class="meta"><b>Pixel</b><small data-sideline1></small><small data-sideline2></small></span>
@@ -574,7 +574,7 @@ button.device{cursor:pointer}
           </button>
           <button class="dev-item offline" type="button" data-act="dgo" data-to="mac" data-side="mac" aria-current="false">
             <span class="ic" data-icon="laptop"></span>
-            <span class="meta"><b>MacBook Kantor</b><small>macOS · Offline</small><small>Terlihat kemarin 17.20</small></span>
+            <span class="meta"><b>Office MacBook</b><small>macOS · Offline</small><small>Last seen yesterday 17:20</small></span>
             <span class="status-dot off" role="img" aria-label="Offline"></span>
           </button>
           <button class="add-device" type="button" data-act="dgo" data-to="add" data-side="add" aria-current="false"><span aria-hidden="true" style="font-size:17px;line-height:1">+</span> Add Device</button>
@@ -586,12 +586,12 @@ button.device{cursor:pointer}
           <div class="screen active" data-panel="self"><div id="dskSelf"></div></div>
 
           <div class="screen" data-panel="pixel">
-            <div class="top-actions" id="dskActions" aria-label="Aksi koneksi Pixel"></div>
+            <div class="top-actions" id="dskActions" aria-label="Pixel connection actions"></div>
             <div id="dskHero"></div>
             <div id="dskBanner"></div>
             <div id="dskMp"></div>
-            <div class="feat-head"><h3>Fitur di Pixel</h3>
-              <p class="legend"><span><i class="lg on"></i>Allow</span><span><i class="lg ask"></i>Always Ask: Pixel konfirmasi dulu</span><span><i class="lg off"></i>Deny: dimatikan oleh Pixel</span></p>
+            <div class="feat-head"><h3>Features on Pixel</h3>
+              <p class="legend"><span><i class="lg on"></i>Allow</span><span><i class="lg ask"></i>Always Ask: Pixel confirms first</span><span><i class="lg off"></i>Deny: turned off by Pixel</span></p>
             </div>
             <div class="feat-grid" id="dskTiles"></div>
             <div id="dskNotif"></div>
@@ -600,9 +600,9 @@ button.device{cursor:pointer}
           <div class="screen" data-panel="feature"><div id="dskFeat"></div></div>
 
           <div class="screen" data-panel="mac">
-            <div class="top-actions"><button class="icon-action" type="button" data-act="forget" data-name="MacBook Kantor" aria-label="Lupakan device"><span data-icon="trash"></span><span class="ia-label" aria-hidden="true">Lupakan device</span></button></div>
-            <div class="peer-hero dim"><div class="hero-top"><span class="big-ic" data-icon="laptop"></span><div><h2>MacBook Kantor</h2><div class="chips"><span class="chip">macOS 15</span><span class="chip">Offline</span><span class="chip mono">192.168.1.40</span></div></div><div class="hero-side"><small>Terlihat kemarin 17.20<br>di Wi-Fi Kantor</small></div></div></div>
-            <div class="conn-banner off"><span data-icon="power"></span><div><b>MacBook Kantor sedang offline</b><p>UrDevice tersambung otomatis saat MacBook Kantor ada di jaringan yang sama. Tidak ada relay internet.</p></div></div>
+            <div class="top-actions"><button class="icon-action" type="button" data-act="forget" data-name="Office MacBook" aria-label="Forget device"><span data-icon="trash"></span><span class="ia-label" aria-hidden="true">Forget device</span></button></div>
+            <div class="peer-hero dim"><div class="hero-top"><span class="big-ic" data-icon="laptop"></span><div><h2>Office MacBook</h2><div class="chips"><span class="chip">macOS 15</span><span class="chip">Offline</span><span class="chip mono">192.168.1.40</span></div></div><div class="hero-side"><small>Last seen yesterday 17:20<br>on Office Wi-Fi</small></div></div></div>
+            <div class="conn-banner off"><span data-icon="power"></span><div><b>Office MacBook is offline</b><p>UrDevice connects on its own when Office MacBook is on the same network. There is no internet relay.</p></div></div>
           </div>
 
           <div class="screen" data-panel="add"><div id="dskAdd"></div></div>
@@ -616,12 +616,12 @@ button.device{cursor:pointer}
   </section>
 
   <!-- ANDROID v1 -->
-  <section aria-label="Layout aplikasi Android UrDevice versi 1">
+  <section aria-label="UrDevice Android app layout, version 1">
     <div class="panel">
-      <div class="panel-head"><strong>UrDevice: Android v1 · halaman dengan tombol kembali</strong><div class="ph-right"><button class="btn secondary sm" type="button" data-act="onbopen" data-k="v1">Lihat onboarding</button></div></div>
+      <div class="panel-head"><strong>UrDevice: Android v1 · pages with a back button</strong><div class="ph-right"><button class="btn secondary sm" type="button" data-act="onbopen" data-k="v1">Show onboarding</button></div></div>
       <div class="android-wrap">
         <div class="phone"><div class="phone-in">
-          <div class="phone-status"><span>09.41</span><span data-phonepath>Wi-Fi ▂▄▆</span></div>
+          <div class="phone-status"><span>09:41</span><span data-phonepath>Wi-Fi ▂▄▆</span></div>
           <div class="hu-wrap" data-prompt="pixel"></div>
           <div class="phone-appbar">
             <img class="phone-logo logo-light" src="../../assets/urdevice-logo-light-bg.svg" alt="UrDevice" width="223" height="64">
@@ -631,38 +631,38 @@ button.device{cursor:pointer}
           <div data-ind="pixel"></div>
           <div class="phone-body" id="v1Body">
             <div data-mview="home" class="mview">
-              <button class="m-self" type="button" data-act="sheetopen" data-sheet="v1Sheet" aria-haspopup="dialog" aria-label="Perangkat ini, Pixel. Buka izin untuk device lain">
+              <button class="m-self" type="button" data-act="sheetopen" data-sheet="v1Sheet" aria-haspopup="dialog" aria-label="This device, Pixel. Open permissions for other devices">
                 <span class="ic" data-icon="phone"></span>
-                <span class="meta"><b>Pixel</b><small>Perangkat ini · Android 14 · 192.168.1.12</small><small>Ketuk untuk izin device lain</small></span>
+                <span class="meta"><b>Pixel</b><small>This device · Android 14 · 192.168.1.12</small><small>Tap to set permissions for other devices</small></span>
                 <span class="pill">64%</span>
               </button>
-              <span class="m-label">Device</span>
+              <span class="m-label">Devices</span>
               <div data-homelist="v1"></div>
               <button class="add-device" type="button" data-act="mgo" data-to="add"><span aria-hidden="true" style="font-size:17px;line-height:1">+</span> Add Device</button>
             </div>
             <div data-mview="peer" class="mview" hidden>
-              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Kembali"><span data-icon="back"></span></button><span id="v1Actions" class="btn-row"></span></div>
+              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Back"><span data-icon="back"></span></button><span id="v1Actions" class="btn-row"></span></div>
               <div id="v1Hero"></div>
               <div id="v1Banner"></div>
               <div id="v1Mp"></div>
-              <div class="feat-head"><h3>Fitur di Laptop Ahmad</h3></div>
+              <div class="feat-head"><h3>Features on Laptop Ahmad</h3></div>
               <div class="feat-grid" id="v1Tiles"></div>
               <div id="v1Notif"></div>
             </div>
             <div data-mview="feature" class="mview" hidden><div id="v1Feat"></div></div>
             <div data-mview="add" class="mview" hidden>
-              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Kembali"><span data-icon="back"></span></button><h3 class="m-title">Tambah Device</h3></div>
+              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Back"><span data-icon="back"></span></button><h3 class="m-title">Add Device</h3></div>
               <div id="v1Add"></div>
             </div>
             <div data-mview="settings" class="mview" hidden>
-              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Kembali"><span data-icon="back"></span></button><h3 class="m-title">Settings</h3></div>
+              <div class="m-backrow"><button class="m-back" type="button" data-act="mgo" data-to="home" aria-label="Back"><span data-icon="back"></span></button><h3 class="m-title">Settings</h3></div>
               <div data-settings="pixel" data-k="v1"></div>
             </div>
           </div>
-          <div class="m-sheet" id="v1Sheet" hidden role="dialog" aria-label="Izin untuk device lain di Pixel">
-            <button class="m-sheet-bg" type="button" data-act="sheetclose" data-sheet="v1Sheet" aria-label="Tutup"></button>
+          <div class="m-sheet" id="v1Sheet" hidden role="dialog" aria-label="Permissions for other devices on Pixel">
+            <button class="m-sheet-bg" type="button" data-act="sheetclose" data-sheet="v1Sheet" aria-label="Close"></button>
             <div class="m-sheet-panel">
-              <div class="m-sheet-head"><h4>Perangkat ini: Pixel</h4><button class="m-sheet-close" type="button" data-act="sheetclose" data-sheet="v1Sheet" aria-label="Tutup"><span data-icon="close"></span></button></div>
+              <div class="m-sheet-head"><h4>This device: Pixel</h4><button class="m-sheet-close" type="button" data-act="sheetclose" data-sheet="v1Sheet" aria-label="Close"><span data-icon="close"></span></button></div>
               <div data-selfsheet="pixel"></div>
             </div>
           </div>
@@ -673,12 +673,12 @@ button.device{cursor:pointer}
   </section>
 
   <!-- ANDROID v2 -->
-  <section aria-label="Layout aplikasi Android UrDevice versi 2">
+  <section aria-label="UrDevice Android app layout, version 2">
     <div class="panel">
-      <div class="panel-head"><strong>UrDevice: Android v2 · tab bar bawah (pembanding)</strong><div class="ph-right"><button class="btn secondary sm" type="button" data-act="onbopen" data-k="v2">Lihat onboarding</button></div></div>
+      <div class="panel-head"><strong>UrDevice: Android v2 · bottom tab bar (for comparison)</strong><div class="ph-right"><button class="btn secondary sm" type="button" data-act="onbopen" data-k="v2">Show onboarding</button></div></div>
       <div class="android-wrap">
         <div class="phone"><div class="phone-in v2-in">
-          <div class="phone-status"><span>09.41</span><span data-phonepath>Wi-Fi ▂▄▆</span></div>
+          <div class="phone-status"><span>09:41</span><span data-phonepath>Wi-Fi ▂▄▆</span></div>
           <div class="hu-wrap" data-prompt="pixel"></div>
           <div class="v2-appbar">
             <img class="phone-logo logo-dark" src="../../assets/urdevice-logo-dark-bg.svg" alt="UrDevice" width="223" height="64">
@@ -687,41 +687,41 @@ button.device{cursor:pointer}
           <div data-ind="pixel"></div>
           <div class="phone-body" id="v2Body">
             <div data-v2view="devices" class="v2view">
-              <button class="v2-self" type="button" data-act="sheetopen" data-sheet="v2Sheet" aria-haspopup="dialog" aria-label="Perangkat ini, Pixel. Buka izin untuk device lain">
+              <button class="v2-self" type="button" data-act="sheetopen" data-sheet="v2Sheet" aria-haspopup="dialog" aria-label="This device, Pixel. Open permissions for other devices">
                 <span class="ic" data-icon="phone"></span>
-                <span class="meta"><b>Pixel</b><small>Perangkat ini · Android 14 · 192.168.1.12</small><small>Ketuk untuk izin device lain</small></span>
+                <span class="meta"><b>Pixel</b><small>This device · Android 14 · 192.168.1.12</small><small>Tap to set permissions for other devices</small></span>
                 <span class="pill">64%</span>
               </button>
-              <span class="m-label">Device</span>
+              <span class="m-label">Devices</span>
               <div data-homelist="v2"></div>
             </div>
             <div data-v2view="kontrol" class="v2view" hidden>
               <div class="v2-khead"><div class="kt" id="v2Hero"></div><span id="v2Actions" class="btn-row"></span></div>
               <div id="v2Banner"></div>
               <div id="v2Mp"></div>
-              <span class="m-label">Fitur di Laptop Ahmad</span>
+              <span class="m-label">Features on Laptop Ahmad</span>
               <div class="feat-grid" id="v2Tiles"></div>
               <div id="v2Notif"></div>
             </div>
             <div data-v2view="feature" class="v2view" hidden><div id="v2Feat"></div></div>
-            <div data-v2view="tambah" class="v2view" hidden><h3 class="m-title" style="margin-bottom:4px">Tambah Device</h3><div id="v2Add"></div></div>
+            <div data-v2view="tambah" class="v2view" hidden><h3 class="m-title" style="margin-bottom:4px">Add Device</h3><div id="v2Add"></div></div>
             <div data-v2view="settings" class="v2view" hidden>
-              <div class="m-backrow"><button class="v2-iconbtn" type="button" data-act="v2go" data-to="devices" aria-label="Kembali"><span data-icon="back"></span></button><h3 class="m-title">Settings</h3></div>
+              <div class="m-backrow"><button class="v2-iconbtn" type="button" data-act="v2go" data-to="devices" aria-label="Back"><span data-icon="back"></span></button><h3 class="m-title">Settings</h3></div>
               <div data-settings="pixel" data-k="v2"></div>
             </div>
           </div>
-          <div class="m-sheet" id="v2Sheet" hidden role="dialog" aria-label="Izin untuk device lain di Pixel">
-            <button class="m-sheet-bg" type="button" data-act="sheetclose" data-sheet="v2Sheet" aria-label="Tutup"></button>
+          <div class="m-sheet" id="v2Sheet" hidden role="dialog" aria-label="Permissions for other devices on Pixel">
+            <button class="m-sheet-bg" type="button" data-act="sheetclose" data-sheet="v2Sheet" aria-label="Close"></button>
             <div class="m-sheet-panel">
-              <div class="m-sheet-head"><h4>Perangkat ini: Pixel</h4><button class="v2-iconbtn" type="button" data-act="sheetclose" data-sheet="v2Sheet" aria-label="Tutup"><span data-icon="close"></span></button></div>
+              <div class="m-sheet-head"><h4>This device: Pixel</h4><button class="v2-iconbtn" type="button" data-act="sheetclose" data-sheet="v2Sheet" aria-label="Close"><span data-icon="close"></span></button></div>
               <div data-selfsheet="pixel"></div>
             </div>
           </div>
           <div class="onb" id="v2Onb" hidden></div>
-          <nav class="v2-tabs" aria-label="Navigasi Android versi 2">
-            <button type="button" data-act="v2go" data-to="devices" data-v2tab="devices" aria-current="true"><span data-icon="devices"></span><span>Perangkat</span></button>
-            <button type="button" data-act="v2go" data-to="kontrol" data-v2tab="kontrol" aria-current="false"><span data-icon="sliders"></span><span>Kontrol</span></button>
-            <button type="button" data-act="v2go" data-to="tambah" data-v2tab="tambah" aria-current="false"><span data-icon="pluscircle"></span><span>Tambah</span></button>
+          <nav class="v2-tabs" aria-label="Android version 2 navigation">
+            <button type="button" data-act="v2go" data-to="devices" data-v2tab="devices" aria-current="true"><span data-icon="devices"></span><span>Devices</span></button>
+            <button type="button" data-act="v2go" data-to="kontrol" data-v2tab="kontrol" aria-current="false"><span data-icon="sliders"></span><span>Control</span></button>
+            <button type="button" data-act="v2go" data-to="tambah" data-v2tab="tambah" aria-current="false"><span data-icon="pluscircle"></span><span>Add</span></button>
           </nav>
         </div></div>
       </div>
@@ -784,9 +784,9 @@ const IC={
   pluscircle:'<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>'
 };
 function svg(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(IC[n]||'')+'</svg>'}
-function now(){const d=new Date();return String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0')}
+function now(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 function fmt(s){s=Math.max(0,Math.floor(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-function listJoin(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+', dan '+a[a.length-1]}
+function listJoin(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+', and '+a[a.length-1]}
 let toastTimer=null;
 function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.hidden=true},3800)}
 
@@ -796,14 +796,14 @@ const DEV={
   pixel:{name:'Pixel',os:'Android 14',ip:'192.168.1.12',batt:64,charging:true,kind:'android',icon:'phone'}
 };
 const CAPS=[
-  {id:'clipboard',label:'Clipboard',desc:'Salin di device lain, tempel di sini',icon:'clip',def:'allow'},
-  {id:'files',label:'Terima file',desc:'Device lain mengirim file ke perangkat ini',icon:'folder',def:'ask'},
-  {id:'gallery',label:'Galeri',desc:'Device lain melihat dan mengunduh foto dan video',icon:'image',def:'ask',android:true},
-  {id:'input',label:'Remote control',desc:'Mouse, keyboard, dan presenter dari device lain',icon:'mouse',def:'ask'},
-  {id:'media',label:'Media',desc:'Kontrol musik dan video dari device lain',icon:'media',def:'allow'},
-  {id:'screen',label:'Bagi layar',desc:'Layar perangkat ini dilihat dari device lain',icon:'screen',def:'ask'},
-  {id:'tunnel',label:'Localhost',desc:'Port yang dibagikan dibuka dari device lain',icon:'code',def:'deny'},
-  {id:'notify',label:'Notifikasi',desc:'Notifikasi perangkat ini tampil di device lain',icon:'bell',def:'allow',r2:true}
+  {id:'clipboard',label:'Clipboard',desc:'Copy on another device, paste here',icon:'clip',def:'allow'},
+  {id:'files',label:'Receive files',desc:'Other devices send files to this device',icon:'folder',def:'ask'},
+  {id:'gallery',label:'Gallery',desc:'Other devices browse and download photos and videos',icon:'image',def:'ask',android:true},
+  {id:'input',label:'Remote control',desc:'Mouse, keyboard, and presenter from other devices',icon:'mouse',def:'ask'},
+  {id:'media',label:'Media',desc:'Control music and video from other devices',icon:'media',def:'allow'},
+  {id:'screen',label:'Screen sharing',desc:'Other devices view this screen',icon:'screen',def:'ask'},
+  {id:'tunnel',label:'Localhost',desc:'Other devices open the ports you share',icon:'code',def:'deny'},
+  {id:'notify',label:'Notifications',desc:'Notifications from this device show on other devices',icon:'bell',def:'allow',r2:true}
 ];
 const CAP={};CAPS.forEach(c=>{CAP[c.id]=c});
 const ML={allow:'Allow',ask:'Always Ask',deny:'Deny'};
@@ -811,19 +811,19 @@ function capsFor(host){return CAPS.filter(c=>!c.android||DEV[host].kind==='andro
 function defPerms(o){const p={};CAPS.forEach(c=>{p[c.id]=c.def});return Object.assign(p,o||{})}
 const FEAT={
   clipboard:{cap:'clipboard',label:'Clipboard',icon:'clip',gear:true,req:'action'},
-  files:{cap:'files',label:'Kirim file',icon:'folder',gear:true,req:'action',noBle:true},
-  gallery:{cap:'gallery',label:'Galeri',icon:'image',req:'open',noBle:true},
+  files:{cap:'files',label:'Send files',icon:'folder',gear:true,req:'action',noBle:true},
+  gallery:{cap:'gallery',label:'Gallery',icon:'image',req:'open',noBle:true},
   mousepad:{cap:'input',label:'Mousepad',icon:'mouse',req:'open',act:true},
   keyboard:{cap:'input',label:'Keyboard',icon:'kbd',req:'open',act:true},
   presenter:{cap:'input',label:'Presenter',icon:'present',req:'open',act:true},
-  screen:{cap:'screen',label:'Bagi layar',icon:'screen',req:'open',act:true,noBle:true},
+  screen:{cap:'screen',label:'Screen sharing',icon:'screen',req:'open',act:true,noBle:true},
   tunnel:{cap:'tunnel',label:'Localhost',icon:'code',gear:true,req:'open',noBle:true},
   media:{cap:'media',label:'Media',icon:'media',req:'open'}
 };
 const FEATS={desktop:['clipboard','files','mousepad','keyboard','presenter','screen','tunnel'],android:['clipboard','files','gallery','screen','keyboard','tunnel']};
-const REQV={clipboard:'mengirim clipboard ke perangkat ini',files:'mengirim 2 file (3,4 MB) ke perangkat ini',gallery:'membuka galeri perangkat ini',mousepad:'mengendalikan perangkat ini dengan Mousepad',keyboard:'mengetik ke perangkat ini',presenter:'mengendalikan presentasi di perangkat ini',screen:'melihat layar perangkat ini',tunnel:'membuka localhost perangkat ini',media:'mengontrol media di perangkat ini'};
-const ACTV={mousepad:'mengendalikan perangkat ini (Mousepad)',keyboard:'mengetik ke perangkat ini',presenter:'mengendalikan presentasi di perangkat ini',screen:'melihat layar perangkat ini'};
-/* Tiga tampilan: desktop (Laptop melihat Pixel), HP v1 dan v2 (Pixel melihat Laptop). */
+const REQV={clipboard:'send its clipboard to this device',files:'send 2 files (3.4 MB) to this device',gallery:'open the gallery on this device',mousepad:'control this device with Mousepad',keyboard:'type on this device',presenter:'control the presentation on this device',screen:'view the screen of this device',tunnel:'open localhost on this device',media:'control media on this device'};
+const ACTV={mousepad:'controlling this device (Mousepad)',keyboard:'typing on this device',presenter:'controlling the presentation on this device',screen:'viewing the screen of this device'};
+/* Three views: desktop (Laptop sees Pixel), phone v1 and v2 (Pixel sees Laptop). */
 const VW={
   dsk:{self:'laptop',peer:'pixel',open:()=>dShow('feature'),back:()=>dShow('pixel')},
   v1:{self:'pixel',peer:'laptop',open:()=>mShow('feature'),back:()=>mShow('peer')},
@@ -831,16 +831,16 @@ const VW={
 };
 const VKS=['dsk','v1','v2'];
 
-/* ===== state (sesi saja) ===== */
+/* ===== state (session only) ===== */
 const S={
   perms:{laptop:defPerms({tunnel:'allow'}),pixel:defPerms()},
-  ports:{laptop:[{port:3000,label:'Vite dev server',lan:'off'},{port:8080,label:'API lokal',lan:'off'}],pixel:[]},
+  ports:{laptop:[{port:3000,label:'Vite dev server',lan:'off'},{port:8080,label:'Local API',lan:'off'}],pixel:[]},
   conn:{on:true,by:null},
   path:'wifi',
   pend:{}, act:{},
   log:{
-    laptop:[{t:'09.12',dev:'Pixel',cap:'Clipboard',d:'Diizinkan otomatis (Allow)',ok:true},{t:'08.55',dev:'Pixel',cap:'Bagi layar',d:'Ditolak',ok:false}],
-    pixel:[{t:'09.05',dev:'Laptop Ahmad',cap:'Terima file',d:'Diizinkan',ok:true}]
+    laptop:[{t:'09:12',dev:'Pixel',cap:'Clipboard',d:'Allowed automatically (Allow)',ok:true},{t:'08:55',dev:'Pixel',cap:'Screen sharing',d:'Denied',ok:false}],
+    pixel:[{t:'09:05',dev:'Laptop Ahmad',cap:'Receive files',d:'Allowed',ok:true}]
   }
 };
 const FV={dsk:null,v1:null,v2:null};
@@ -871,7 +871,7 @@ function permListHTML(host,onbKey){
   return capsFor(host).filter(c=>!(onbKey&&c.r2)).map(c=>{
     const m=onbKey?OB[onbKey].perms[c.id]:S.perms[host][c.id];
     const btns=['allow','ask','deny'].map(x=>'<button type="button" data-act="'+(onbKey?'onbperm':'perm')+'" data-k="'+(onbKey||'')+'" data-host="'+host+'" data-cap="'+c.id+'" data-mode="'+x+'" data-perm="'+x+'" class="'+(m===x?'on':'')+'" aria-pressed="'+(m===x)+'">'+ML[x]+'</button>').join('');
-    return '<div class="perm-row"><span class="ic">'+svg(c.icon)+'</span><div class="pmeta"><b>'+c.label+(c.r2?' <span class="r2">Release 2</span>':'')+'</b><p>'+c.desc+'</p></div><div class="seg perm-seg" role="group" aria-label="Izin '+c.label+'">'+btns+'</div></div>';
+    return '<div class="perm-row"><span class="ic">'+svg(c.icon)+'</span><div class="pmeta"><b>'+c.label+(c.r2?' <span class="r2">Release 2</span>':'')+'</b><p>'+c.desc+'</p></div><div class="seg perm-seg" role="group" aria-label="'+c.label+' permission">'+btns+'</div></div>';
   }).join('');
 }
 function lanPorts(host){return S.ports[host].filter(p=>p.lan!=='off')}
@@ -879,34 +879,34 @@ function portsHTML(host){
   const m=S.perms[host].tunnel, ps=S.ports[host];
   const rows=ps.map((p,i)=>{
     const sel=p.pending||p.lan;
-    const lanTxt=p.lan==='1h'?' · <span class="lan-on">LAN terbuka sampai '+p.until+'</span>':p.lan==='always'?' · <span class="lan-on">LAN selalu terbuka</span>':'';
+    const lanTxt=p.lan==='1h'?' · <span class="lan-on">Open on LAN until '+p.until+'</span>':p.lan==='always'?' · <span class="lan-on">Always open on LAN</span>':'';
     let warn='';
     if(p.pending){
       const always=p.pending==='always';
-      warn='<div class="lan-warn" role="alert">'+svg('alert')+'<div><b>localhost:'+p.port+' akan terbuka untuk semua perangkat di jaringan ini</b>, termasuk yang belum dipasangkan, dan tanpa enkripsi UrDevice.'
-        +(always?'<label class="ack"><input type="checkbox" data-act="lanack" data-host="'+host+'" data-i="'+i+'"'+(p.ack?' checked':'')+'> Saya paham. Biarkan terbuka sampai saya mematikannya, juga setelah restart.</label>':'<p>Mati otomatis setelah 1 jam.</p>')
-        +'<div class="lw-actions"><button class="btn brand sm" type="button" data-act="lanok" data-host="'+host+'" data-i="'+i+'"'+(always&&!p.ack?' disabled':'')+'>'+(always?'Buka selalu':'Buka 1 jam')+'</button><button class="btn secondary sm" type="button" data-act="lancancel" data-host="'+host+'" data-i="'+i+'">Batal</button></div></div></div>';
+      warn='<div class="lan-warn" role="alert">'+svg('alert')+'<div><b>localhost:'+p.port+' will be open to every device on this network</b>, including unpaired ones, without UrDevice encryption.'
+        +(always?'<label class="ack"><input type="checkbox" data-act="lanack" data-host="'+host+'" data-i="'+i+'"'+(p.ack?' checked':'')+'> I understand. Keep it open until I turn it off, also after a restart.</label>':'<p>Turns off by itself after 1 hour.</p>')
+        +'<div class="lw-actions"><button class="btn brand sm" type="button" data-act="lanok" data-host="'+host+'" data-i="'+i+'"'+(always&&!p.ack?' disabled':'')+'>'+(always?'Keep open':'Open for 1 hour')+'</button><button class="btn secondary sm" type="button" data-act="lancancel" data-host="'+host+'" data-i="'+i+'">Cancel</button></div></div></div>';
     }
-    return '<div class="port-row"><div class="pmeta"><b class="mono">localhost:'+p.port+'</b><small>'+(p.label?esc(p.label):'Tanpa label')+lanTxt+'</small></div>'
-      +'<label class="lan-sel">Expose on LAN <select data-act="lan" data-host="'+host+'" data-i="'+i+'"><option value="off"'+(sel==='off'?' selected':'')+'>Mati</option><option value="1h"'+(sel==='1h'?' selected':'')+'>1 jam</option><option value="always"'+(sel==='always'?' selected':'')+'>Selalu aktif</option></select></label>'
-      +'<button class="icon-x" type="button" data-act="portdel" data-host="'+host+'" data-i="'+i+'" aria-label="Berhenti membagikan port '+p.port+'">×</button>'+warn+'</div>';
+    return '<div class="port-row"><div class="pmeta"><b class="mono">localhost:'+p.port+'</b><small>'+(p.label?esc(p.label):'No label')+lanTxt+'</small></div>'
+      +'<label class="lan-sel">Expose on LAN <select data-act="lan" data-host="'+host+'" data-i="'+i+'"><option value="off"'+(sel==='off'?' selected':'')+'>Off</option><option value="1h"'+(sel==='1h'?' selected':'')+'>1 hour</option><option value="always"'+(sel==='always'?' selected':'')+'>Always on</option></select></label>'
+      +'<button class="icon-x" type="button" data-act="portdel" data-host="'+host+'" data-i="'+i+'" aria-label="Stop sharing port '+p.port+'">×</button>'+warn+'</div>';
   }).join('');
-  return '<div class="ports"><div class="feat-head"><h3>Localhost yang dibagikan</h3>'+(m==='deny'?'<span class="tag deny">Localhost: Deny</span>':'')+'</div>'
-    +'<p class="sub">Port ini bisa dibuka semua device yang terhubung, sesuai izin Localhost di atas.'+(m==='deny'?' Saat ini izinnya Deny, jadi belum ada device yang bisa membukanya.':'')+'</p>'
-    +(rows||'<p class="empty">Belum ada port yang dibagikan.</p>')
-    +'<div class="port-add"><input type="number" min="1" max="65535" placeholder="Port" data-portnum="'+host+'" aria-label="Nomor port"><input type="text" placeholder="Label (opsional)" data-portlabel="'+host+'" aria-label="Label port"><button class="btn secondary sm" type="button" data-act="portadd" data-host="'+host+'">Bagikan port</button></div></div>';
+  return '<div class="ports"><div class="feat-head"><h3>Shared localhost ports</h3>'+(m==='deny'?'<span class="tag deny">Localhost: Deny</span>':'')+'</div>'
+    +'<p class="sub">Every connected device can open these ports, subject to the Localhost permission above.'+(m==='deny'?' It is set to Deny now, so no device can open them yet.':'')+'</p>'
+    +(rows||'<p class="empty">No ports shared yet.</p>')
+    +'<div class="port-add"><input type="number" min="1" max="65535" placeholder="Port" data-portnum="'+host+'" aria-label="Port number"><input type="text" placeholder="Label (optional)" data-portlabel="'+host+'" aria-label="Port label"><button class="btn secondary sm" type="button" data-act="portadd" data-host="'+host+'">Share port</button></div></div>';
 }
 function permIntro(host){
-  return '<p class="sub">Berlaku untuk semua device yang terhubung ke '+DEV[host].name+'. <b>Allow</b>: langsung jalan. <b>Always Ask</b>: Anda konfirmasi dulu di sini. <b>Deny</b>: fitur itu mati di device lain.</p>';
+  return '<p class="sub">Applies to every device connected to '+DEV[host].name+'. <b>Allow</b>: starts right away. <b>Always Ask</b>: you confirm here first. <b>Deny</b>: the feature is off on other devices.</p>';
 }
 function renderSelf(){
   const d=DEV.laptop, lp=lanPorts('laptop');
-  $('#dskSelf').innerHTML='<div class="self-hero"><span class="big-ic">'+svg('laptop')+'</span><div><h2>'+d.name+'</h2><div class="chips"><span class="chip">'+d.os+'</span><span class="chip">Perangkat ini</span><span class="chip mono">'+d.ip+'</span>'+(lp.length?'<span class="chip warn">LAN terbuka: '+lp.map(p=>p.port).join(', ')+'</span>':'')+'</div></div><div class="hero-side"><div class="batt-big">'+d.batt+'%</div><small>sisa baterai</small></div></div>'
-    +'<div class="feat-head"><h3>Izin untuk device lain</h3></div>'+permIntro('laptop')
+  $('#dskSelf').innerHTML='<div class="self-hero"><span class="big-ic">'+svg('laptop')+'</span><div><h2>'+d.name+'</h2><div class="chips"><span class="chip">'+d.os+'</span><span class="chip">This device</span><span class="chip mono">'+d.ip+'</span>'+(lp.length?'<span class="chip warn">Open on LAN: '+lp.map(p=>p.port).join(', ')+'</span>':'')+'</div></div><div class="hero-side"><div class="batt-big">'+d.batt+'%</div><small>battery left</small></div></div>'
+    +'<div class="feat-head"><h3>Permissions for other devices</h3></div>'+permIntro('laptop')
     +'<div class="perm-list">'+permListHTML('laptop')+'</div>'+portsHTML('laptop');
   $$('[data-selfsheet]').forEach(el=>{
     const host=el.dataset.selfsheet;
-    el.innerHTML='<h3 class="m-title" style="font-size:15px;margin-top:4px">Izin untuk device lain</h3>'+permIntro(host)+'<div class="perm-list">'+permListHTML(host)+'</div>'+portsHTML(host);
+    el.innerHTML='<h3 class="m-title" style="font-size:15px;margin-top:4px">Permissions for other devices</h3>'+permIntro(host)+'<div class="perm-list">'+permListHTML(host)+'</div>'+portsHTML(host);
   });
 }
 function setPerm(host,cap,mode){
@@ -923,44 +923,44 @@ function setPerm(host,cap,mode){
     if(mode==='deny'&&fv&&fv.mode==='use'&&FEAT[fv.feat].cap===cap){clearFvTimers(fv);fv.status='revoked'}
   });
   renderAll();
-  toast('Izin '+CAP[cap].label+' di '+DEV[host].name+' sekarang '+ML[mode]+'. Device yang terhubung langsung mendapat perubahan ini.');
+  toast(CAP[cap].label+' on '+DEV[host].name+' is now '+ML[mode]+'. Connected devices get the change right away.');
 }
 
 /* ===== peer view: actions, header, banner, tiles ===== */
 function pathInfo(){return S.path==='wifi'?{ic:'wifi',t:'Wi-Fi • 12ms'}:{ic:'bt',t:'Bluetooth LE • 48ms'}}
 function connText(viewerSelf){
   if(S.conn.on) return pathInfo().t;
-  return S.conn.by===viewerSelf?'Terputus oleh Anda':'Terputus oleh '+DEV[S.conn.by].name;
+  return S.conn.by===viewerSelf?'Disconnected by you':'Disconnected by '+DEV[S.conn.by].name;
 }
 function actionsHTML(vk){
   const v2=vk==='v2';
   const b=(cls,act,icon,label)=>v2
     ?'<button class="v2-iconbtn '+cls+'" type="button" data-act="'+act+'" data-vk="'+vk+'" aria-label="'+label+'" title="'+label+'">'+svg(icon)+'</button>'
     :'<button class="icon-action '+cls+'" type="button" data-act="'+act+'" data-vk="'+vk+'" aria-label="'+label+'">'+svg(icon)+'<span class="ia-label" aria-hidden="true">'+label+'</span></button>';
-  return (S.conn.on?b('danger','disc','power','Putuskan koneksi'):b('primary','reconn','link','Hubungkan lagi'))+b('','forget','trash','Lupakan device');
+  return (S.conn.on?b('danger','disc','power','Disconnect'):b('primary','reconn','link','Reconnect'))+b('','forget','trash','Forget device');
 }
 function heroHTML(vk){
   const v=VW[vk], d=DEV[v.peer], on=S.conn.on, pi=pathInfo();
-  if(vk==='v2') return '<h3>'+d.name+'</h3><span class="v2-kchip'+(on?'':' off')+'"><i aria-hidden="true"></i>'+d.os+' · '+connText(v.self)+'</span><span class="v2-kmeta mono">'+d.ip+' · Baterai '+d.batt+'%'+(d.charging?' (diisi)':'')+'</span>';
+  if(vk==='v2') return '<h3>'+d.name+'</h3><span class="v2-kchip'+(on?'':' off')+'"><i aria-hidden="true"></i>'+d.os+' · '+connText(v.self)+'</span><span class="v2-kmeta mono">'+d.ip+' · Battery '+d.batt+'%'+(d.charging?' (charging)':'')+'</span>';
   const conn=on?svg(pi.ic)+pi.t:connText(v.self);
-  return '<div class="peer-hero'+(on?'':' dim')+'"><div class="hero-top"><span class="big-ic">'+svg(d.icon)+'</span><div><h2>'+d.name+'</h2><div class="chips"><span class="chip">'+d.os+'</span><span class="chip">'+conn+'</span><span class="chip mono">'+d.ip+'</span></div></div><div class="hero-side"><div class="batt-big">'+d.batt+'%</div><div class="batt-gauge" aria-hidden="true"><i style="width:'+d.batt+'%"></i></div><small>'+(d.charging?'sedang diisi':'sisa baterai')+'</small></div></div></div>';
+  return '<div class="peer-hero'+(on?'':' dim')+'"><div class="hero-top"><span class="big-ic">'+svg(d.icon)+'</span><div><h2>'+d.name+'</h2><div class="chips"><span class="chip">'+d.os+'</span><span class="chip">'+conn+'</span><span class="chip mono">'+d.ip+'</span></div></div><div class="hero-side"><div class="batt-big">'+d.batt+'%</div><div class="batt-gauge" aria-hidden="true"><i style="width:'+d.batt+'%"></i></div><small>'+(d.charging?'charging':'battery left')+'</small></div></div></div>';
 }
 function bannerHTML(vk){
   const v=VW[vk], hn=DEV[v.peer].name;
-  if(!S.conn.on) return '<div class="conn-banner off" role="status">'+svg('power')+'<div><b>'+connText(v.self)+'</b><p>Pairing tetap tersimpan. '+hn+' tidak tersambung otomatis sampai salah satu device menekan Hubungkan lagi.</p></div></div>';
+  if(!S.conn.on) return '<div class="conn-banner off" role="status">'+svg('power')+'<div><b>'+connText(v.self)+'</b><p>The pairing is kept. '+hn+' does not reconnect on its own until one of the devices taps Reconnect.</p></div></div>';
   if(S.path==='ble'){
     const na=[];FEATS[DEV[v.peer].kind].forEach(id=>{if(FEAT[id].noBle&&na.indexOf(FEAT[id].label)<0) na.push(FEAT[id].label)});
-    return '<div class="conn-banner ble" role="status">'+svg('bt')+'<div><b>Terhubung lewat Bluetooth LE</b><p>'+listJoin(na)+' tidak tersedia sampai Wi-Fi kembali. Remote control, media, dan clipboard teks tetap jalan.</p></div></div>';
+    return '<div class="conn-banner ble" role="status">'+svg('bt')+'<div><b>Connected over Bluetooth LE</b><p>'+listJoin(na)+' are unavailable until Wi-Fi returns. Remote control, media, and clipboard text still work.</p></div></div>';
   }
   return '';
 }
 function tileState(host,id){
   const f=FEAT[id];
-  if(!S.conn.on) return {st:'off',note:'Tidak terhubung'};
-  if(S.path==='ble'&&f.noBle) return {st:'off',note:'Tidak tersedia lewat Bluetooth'};
+  if(!S.conn.on) return {st:'off',note:'Not connected'};
+  if(S.path==='ble'&&f.noBle) return {st:'off',note:'Not available over Bluetooth'};
   const m=S.perms[host][f.cap];
-  if(m==='deny') return {st:'off',note:'Dimatikan oleh '+DEV[host].name};
-  if(m==='ask') return {st:'ask',note:'Perlu izin'};
+  if(m==='deny') return {st:'off',note:'Turned off by '+DEV[host].name};
+  if(m==='ask') return {st:'ask',note:'Needs approval'};
   return {st:'on',note:''};
 }
 function tilesHTML(vk){
@@ -968,7 +968,7 @@ function tilesHTML(vk){
   return FEATS[DEV[host].kind].map(id=>{
     const f=FEAT[id], t=tileState(host,id), off=t.st==='off', gear=f.gear&&!off;
     return '<div class="feat-cell '+t.st+(gear?' has-gear':'')+'"><button class="feat" type="button" data-act="tile" data-vk="'+vk+'" data-feat="'+id+'"'+(off?' disabled':'')+' aria-label="'+f.label+(t.note?', '+t.note:'')+'"><span class="ic">'+svg(f.icon)+'</span><span class="ft"><b>'+f.label+'</b>'+(t.note?'<small>'+t.note+'</small>':'')+'</span></button>'
-      +(gear?'<button class="feat-set" type="button" data-act="gear" data-vk="'+vk+'" data-feat="'+id+'" aria-label="Pengaturan '+f.label+'">'+svg('gear')+'</button>':'')+'</div>';
+      +(gear?'<button class="feat-set" type="button" data-act="gear" data-vk="'+vk+'" data-feat="'+id+'" aria-label="'+f.label+' settings">'+svg('gear')+'</button>':'')+'</div>';
   }).join('');
 }
 function renderPeer(vk){
@@ -981,17 +981,17 @@ function renderLists(){
   const side=$('[data-sidepixel]');
   side.classList.toggle('disc',!S.conn.on);
   $('[data-sideline1]',side).textContent='Android · '+connText('laptop');
-  $('[data-sideline2]',side).textContent=S.conn.on?'Baterai 64% · sedang diisi':'Pairing tetap tersimpan';
+  $('[data-sideline2]',side).textContent=S.conn.on?'Battery 64% · charging':'Pairing kept';
   $('[data-sidedot]',side).className='status-dot'+(S.conn.on?'':' off');
   $$('[data-homelist]').forEach(el=>{
     const vk=el.dataset.homelist, on=S.conn.on, go=vk==='v1'?'data-act="mgo" data-to="peer"':'data-act="v2go" data-to="kontrol"';
     el.innerHTML='<button class="device'+(on?'':' disc')+'" type="button" '+go+'><span class="ic">'+svg('laptop')+'</span><span class="meta"><b>Laptop Ahmad</b><small>Windows 11 · '+connText('pixel')+'</small></span>'+(on?'<span class="pill ghost">82%</span>':'')+'<span class="status-dot'+(on?'':' off')+'"></span></button>'
-      +'<div class="device offline"><span class="ic">'+svg('laptop')+'</span><span class="meta"><b>MacBook Kantor</b><small>macOS · Offline · terlihat kemarin 17.20</small></span><span class="status-dot off"></span></div>';
+      +'<div class="device offline"><span class="ic">'+svg('laptop')+'</span><span class="meta"><b>Office MacBook</b><small>macOS · Offline · last seen yesterday 17:20</small></span><span class="status-dot off"></span></div>';
   });
   const ble=S.path==='ble';
-  $$('[data-pathbadge]').forEach(b=>{b.textContent=ble?'Bluetooth LE · terenkripsi':'Wi-Fi · terenkripsi';b.className='badge '+(ble?'warn':'ok')});
+  $$('[data-pathbadge]').forEach(b=>{b.textContent=ble?'Bluetooth LE · encrypted':'Wi-Fi · encrypted';b.className='badge '+(ble?'warn':'ok')});
   $$('[data-phonepath]').forEach(b=>{b.textContent=ble?'Bluetooth ᛒ':'Wi-Fi ▂▄▆'});
-  $$('[data-act="simble"]').forEach(b=>{b.textContent=ble?'Simulasi: Wi-Fi kembali':'Simulasi: Wi-Fi putus, pindah ke Bluetooth LE'});
+  $$('[data-act="simble"]').forEach(b=>{b.textContent=ble?'Simulate: Wi-Fi comes back':'Simulate: Wi-Fi drops, switch to Bluetooth LE'});
 }
 
 /* ===== requests, prompts, activities ===== */
@@ -1000,7 +1000,7 @@ function ask(vk,feat){
   if(!S.conn.on) return;
   if(m==='allow') return resolve(vk,feat,'allow',true);
   if(m==='deny') return resolve(vk,feat,'deny',true);
-  if(S.pend[host]){toast(DEV[host].name+' masih menunggu jawaban untuk permintaan lain.');return}
+  if(S.pend[host]){toast(DEV[host].name+' is still waiting for an answer to another request.');return}
   const p={vk:vk,feat:feat,left:30};
   p.timer=setInterval(()=>tick(host),1000);
   S.pend[host]=p;
@@ -1030,7 +1030,7 @@ function cancelPend(host){
 function resolve(vk,feat,res,auto){
   const v=VW[vk], host=v.peer, f=FEAT[feat];
   const capL=CAP[f.cap].label+(f.cap==='input'?' ('+f.label+')':'');
-  const d=res==='allow'?(auto?'Diizinkan otomatis (Allow)':'Diizinkan'):res==='timeout'?'Ditolak (tidak dijawab 30 dtk)':(auto?'Ditolak otomatis (Deny)':'Ditolak');
+  const d=res==='allow'?(auto?'Allowed automatically (Allow)':'Allowed'):res==='timeout'?'Denied (no answer in 30 s)':(auto?'Denied automatically (Deny)':'Denied');
   S.log[host].unshift({t:now(),dev:DEV[v.self].name,cap:capL,d:d,ok:res==='allow'});
   renderLogs();
   if(feat==='media'){P[vk].granted=res==='allow';P[vk].res=res;mpGate(vk);return}
@@ -1047,22 +1047,22 @@ function renderPrompts(){
     const host=w.dataset.prompt, p=S.pend[host];
     if(!p){w.innerHTML='';return}
     const req=DEV[VW[p.vk].self].name, capL=CAP[FEAT[p.feat].cap].label;
-    const btns='<div class="pc-actions"><button class="btn brand'+(DEV[host].kind==='android'?' sm':'')+'" type="button" data-act="pallow" data-host="'+host+'">Izinkan</button><button class="btn secondary'+(DEV[host].kind==='android'?' sm':'')+'" type="button" data-act="pdeny" data-host="'+host+'">Tolak</button></div>';
+    const btns='<div class="pc-actions"><button class="btn brand'+(DEV[host].kind==='android'?' sm':'')+'" type="button" data-act="pallow" data-host="'+host+'">Allow</button><button class="btn secondary'+(DEV[host].kind==='android'?' sm':'')+'" type="button" data-act="pdeny" data-host="'+host+'">Deny</button></div>';
     w.innerHTML=DEV[host].kind==='android'
-      ?'<div class="hu" role="alertdialog" aria-label="Permintaan izin"><div class="hu-top">'+svg('shield')+'<span>UrDevice · sekarang</span><span class="pc-left"><b data-pleft="'+host+'">'+p.left+'</b> dtk</span></div><b>'+req+'</b><p>ingin '+REQV[p.feat]+'.</p>'+btns+'</div>'
-      :'<div class="prompt-card" role="alertdialog" aria-label="Permintaan izin"><div class="pc-head">'+svg('shield')+'<b>Permintaan izin · '+capL+'</b><span class="pc-left"><b data-pleft="'+host+'">'+p.left+'</b> dtk</span></div><p><b>'+req+'</b> ingin '+REQV[p.feat]+'.</p><small>Izin '+capL+' di perangkat ini: Always Ask. Kalau tidak dijawab dalam 30 detik, permintaan ditolak.</small>'+btns+'</div>';
+      ?'<div class="hu" role="alertdialog" aria-label="Permission request"><div class="hu-top">'+svg('shield')+'<span>UrDevice · now</span><span class="pc-left"><b data-pleft="'+host+'">'+p.left+'</b> s</span></div><b>'+req+'</b><p>wants to '+REQV[p.feat]+'.</p>'+btns+'</div>'
+      :'<div class="prompt-card" role="alertdialog" aria-label="Permission request"><div class="pc-head">'+svg('shield')+'<b>Permission request · '+capL+'</b><span class="pc-left"><b data-pleft="'+host+'">'+p.left+'</b> s</span></div><p><b>'+req+'</b> wants to '+REQV[p.feat]+'.</p><small>'+capL+' on this device: Always Ask. If you do not answer within 30 seconds, the request is denied.</small>'+btns+'</div>';
   });
 }
 function renderIndicators(){
   $$('[data-ind]').forEach(el=>{
     const host=el.dataset.ind, a=S.act[host];
-    el.innerHTML=a?'<div class="act-ind" role="status"><span class="rec" aria-hidden="true"></span><span><b>'+DEV[VW[a.vk].self].name+'</b> sedang '+ACTV[a.feat]+'</span><button class="btn stop sm" type="button" data-act="actstop" data-host="'+host+'">Stop</button></div>':'';
+    el.innerHTML=a?'<div class="act-ind" role="status"><span class="rec" aria-hidden="true"></span><span><b>'+DEV[VW[a.vk].self].name+'</b> is '+ACTV[a.feat]+'</span><button class="btn stop sm" type="button" data-act="actstop" data-host="'+host+'">Stop</button></div>':'';
   });
 }
 function stopAct(host){
   const a=S.act[host]; if(!a) return;
   delete S.act[host];
-  S.log[host].unshift({t:now(),dev:DEV[VW[a.vk].self].name,cap:CAP[FEAT[a.feat].cap].label+' ('+FEAT[a.feat].label+')',d:'Dihentikan dengan Stop',ok:false});
+  S.log[host].unshift({t:now(),dev:DEV[VW[a.vk].self].name,cap:CAP[FEAT[a.feat].cap].label+' ('+FEAT[a.feat].label+')',d:'Stopped with Stop',ok:false});
   const fv=FV[a.vk];
   if(fv&&fv.feat===a.feat){clearFvTimers(fv);fv.status='stopped';renderFV(a.vk)}
   renderIndicators(); renderLogs();
@@ -1091,7 +1091,7 @@ function startFeature(vk){
   const fv=FV[vk];
   if(fv.feat==='files'){
     fv.note='';
-    fv.prog=[{n:'laporan-q4.pdf',sz:'2,1 MB',pct:0},{n:'foto-acara.jpg',sz:'1,3 MB',pct:0}];
+    fv.prog=[{n:'q4-report.pdf',sz:'2.1 MB',pct:0},{n:'event-photo.jpg',sz:'1.3 MB',pct:0}];
     clearInterval(fv.xfer);
     fv.xfer=setInterval(()=>{
       let done=true;
@@ -1106,17 +1106,17 @@ function startFeature(vk){
     fv.pt=setInterval(()=>{$$('[data-ptimer="'+vk+'"]').forEach(e=>{e.textContent=fmt((Date.now()-fv.t0)/1000)})},1000);
   }
 }
-function modeNote(m){return m==='allow'?'Allow: langsung jalan':m==='ask'?'Always Ask: perlu izin setiap sesi':'Deny: dimatikan'}
+function modeNote(m){return m==='allow'?'Allow: starts right away':m==='ask'?'Always Ask: needs approval each session':'Deny: turned off'}
 function statusHTML(vk,fv,hn){
-  const capL=CAP[FEAT[fv.feat].cap].label, retry='<button class="btn secondary sm" type="button" data-act="fvaction" data-vk="'+vk+'">Coba lagi</button>';
+  const capL=CAP[FEAT[fv.feat].cap].label, retry='<button class="btn secondary sm" type="button" data-act="fvaction" data-vk="'+vk+'">Try again</button>';
   switch(fv.status){
-    case 'waiting': return '<div class="fv-status wait"><span class="pair-dot" aria-hidden="true"></span><span>Menunggu izin dari '+hn+'… <b data-left="'+vk+'">'+(S.pend[VW[vk].peer]?S.pend[VW[vk].peer].left:30)+'</b> dtk</span><button class="btn secondary sm" type="button" data-act="fvcancel" data-vk="'+vk+'">Batal</button></div>';
-    case 'deny': return '<div class="fv-status err">'+hn+' menolak permintaan ini.'+retry+'</div>';
-    case 'timeout': return '<div class="fv-status err">Tidak ada jawaban dari '+hn+' dalam 30 detik, jadi permintaan ditolak.'+retry+'</div>';
-    case 'stopped': return '<div class="fv-status err">'+hn+' menekan Stop. Sesi berakhir.'+retry+'</div>';
-    case 'revoked': return '<div class="fv-status err">'+hn+' mengubah izin '+capL+' ke Deny. Sesi berakhir.</div>';
-    case 'ble': return '<div class="fv-status err">Koneksi pindah ke Bluetooth LE, jadi fitur ini berhenti.</div>';
-    case 'active': return S.perms[VW[vk].peer][FEAT[fv.feat].cap]==='ask'?'<div class="fv-status okk">'+svg('check').replace('<svg','<svg width="16" height="16"')+'Diizinkan oleh '+hn+' untuk sesi ini.</div>':'';
+    case 'waiting': return '<div class="fv-status wait"><span class="pair-dot" aria-hidden="true"></span><span>Waiting for approval from '+hn+'… <b data-left="'+vk+'">'+(S.pend[VW[vk].peer]?S.pend[VW[vk].peer].left:30)+'</b> s</span><button class="btn secondary sm" type="button" data-act="fvcancel" data-vk="'+vk+'">Cancel</button></div>';
+    case 'deny': return '<div class="fv-status err">'+hn+' denied this request.'+retry+'</div>';
+    case 'timeout': return '<div class="fv-status err">No answer from '+hn+' within 30 seconds, so the request was denied.'+retry+'</div>';
+    case 'stopped': return '<div class="fv-status err">'+hn+' pressed Stop. The session ended.'+retry+'</div>';
+    case 'revoked': return '<div class="fv-status err">'+hn+' changed '+capL+' to Deny. The session ended.</div>';
+    case 'ble': return '<div class="fv-status err">The connection moved to Bluetooth LE, so this feature stopped.</div>';
+    case 'active': return S.perms[VW[vk].peer][FEAT[fv.feat].cap]==='ask'?'<div class="fv-status okk">'+svg('check').replace('<svg','<svg width="16" height="16"')+'Allowed by '+hn+' for this session.</div>':'';
   }
   return '';
 }
@@ -1124,37 +1124,37 @@ function bodyHTML(vk,fv,host){
   const hn=DEV[host].name, self=VW[vk].self, waiting=fv.status==='waiting', dis=waiting?' disabled':'';
   switch(fv.feat){
     case 'clipboard':
-      return '<div class="fv-card"><b>Clipboard terakhir dari '+hn+'</b><p class="mono">https://urdevice.dev/docs/pairing</p><small>Diterima 09.40 · teks</small></div>'
-        +'<div class="fv-card"><b>Kirim clipboard perangkat ini</b><p class="mono">npm run dev -- --host</p><button class="btn brand sm" type="button" data-act="fvaction" data-vk="'+vk+'"'+dis+'>Kirim sekarang</button>'+(fv.status==='active'&&fv.sent?'<p class="ok">Terkirim ke '+hn+' pukul '+fv.sent+'.</p>':'')+'</div>'
-        +'<p class="hint">'+(DEV[self].kind==='android'?'Android tidak mengizinkan aplikasi membaca clipboard di latar belakang. Kirim lewat tombol ini, tile Quick Settings, atau menu Bagikan.':'Selama sinkron menyala (ikon gear), clipboard terkirim otomatis.')+'</p>';
+      return '<div class="fv-card"><b>Last clipboard from '+hn+'</b><p class="mono">https://urdevice.dev/docs/pairing</p><small>Received 09:40 · text</small></div>'
+        +'<div class="fv-card"><b>Send the clipboard of this device</b><p class="mono">npm run dev -- --host</p><button class="btn brand sm" type="button" data-act="fvaction" data-vk="'+vk+'"'+dis+'>Send now</button>'+(fv.status==='active'&&fv.sent?'<p class="ok">Sent to '+hn+' at '+fv.sent+'.</p>':'')+'</div>'
+        +'<p class="hint">'+(DEV[self].kind==='android'?'Android does not let apps read the clipboard in the background. Send it with this button, the Quick Settings tile, or the Share menu.':'While sync is on (gear icon), the clipboard is sent automatically.')+'</p>';
     case 'files': {
-      const rows=(fv.prog||[]).map(x=>'<div class="xfer"><div class="xfer-top"><span>'+x.n+'</span><span>'+x.sz+'</span></div><div class="xfer-bar"><i style="width:'+x.pct+'%"></i></div><small>'+(x.pct<100?x.pct+'% · 12,4 MB/dtk · sisa '+Math.max(1,Math.round((100-x.pct)/30))+' dtk':'Selesai · SHA-256 cocok')+'</small></div>').join('');
-      return '<div class="drop">'+svg('upload')+'<b>Seret file ke sini</b><span>atau</span><button class="btn brand sm" type="button" data-act="fvaction" data-vk="'+vk+'"'+dis+'>Pilih file</button><small>Contoh: laporan-q4.pdf dan foto-acara.jpg (3,4 MB)</small></div>'
-        +rows+(fv.xfer?'<button class="btn secondary sm" type="button" data-act="fvxfer" data-vk="'+vk+'">Batalkan transfer</button>':'')+(fv.note?'<p class="hint">'+fv.note+'</p>':'');
+      const rows=(fv.prog||[]).map(x=>'<div class="xfer"><div class="xfer-top"><span>'+x.n+'</span><span>'+x.sz+'</span></div><div class="xfer-bar"><i style="width:'+x.pct+'%"></i></div><small>'+(x.pct<100?x.pct+'% · 12.4 MB/s · '+Math.max(1,Math.round((100-x.pct)/30))+' s left':'Done · SHA-256 verified')+'</small></div>').join('');
+      return '<div class="drop">'+svg('upload')+'<b>Drag files here</b><span>or</span><button class="btn brand sm" type="button" data-act="fvaction" data-vk="'+vk+'"'+dis+'>Choose files</button><small>Example: q4-report.pdf and event-photo.jpg (3.4 MB)</small></div>'
+        +rows+(fv.xfer?'<button class="btn secondary sm" type="button" data-act="fvxfer" data-vk="'+vk+'">Cancel transfer</button>':'')+(fv.note?'<p class="hint">'+fv.note+'</p>':'');
     }
     case 'gallery': {
       const n=Object.keys(fv.sel).filter(k=>fv.sel[k]).length;
-      const th=[18,40,95,150,200,260,300,330,60].map((h,i)=>'<button class="thumb'+(fv.sel[i]?' sel':'')+'" type="button" data-act="gal" data-vk="'+vk+'" data-i="'+i+'" aria-pressed="'+!!fv.sel[i]+'" aria-label="Foto '+(i+1)+'" style="background:hsl('+h+' 45% 55%)"></button>').join('');
-      return '<div class="thumbs">'+th+'</div><button class="btn brand sm" type="button" data-act="toast" data-msg="Simulasi: '+n+' item diunduh lewat transfer file.">Unduh '+n+' item</button>';
+      const th=[18,40,95,150,200,260,300,330,60].map((h,i)=>'<button class="thumb'+(fv.sel[i]?' sel':'')+'" type="button" data-act="gal" data-vk="'+vk+'" data-i="'+i+'" aria-pressed="'+!!fv.sel[i]+'" aria-label="Photo '+(i+1)+'" style="background:hsl('+h+' 45% 55%)"></button>').join('');
+      return '<div class="thumbs">'+th+'</div><button class="btn brand sm" type="button" data-act="toast" data-msg="Simulated: '+n+' items downloaded through file transfer.">Download '+n+' items</button>';
     }
     case 'mousepad':
-      return '<div class="touchpad">Geser satu jari untuk menggerakkan kursor.<br>Ketuk = klik kiri · dua jari = klik kanan dan scroll</div><div class="mouse-btns"><button type="button">Klik kiri</button><button type="button">Klik kanan</button></div><label class="slider">Sensitivitas <input type="range" min="1" max="10" value="6"></label>';
+      return '<div class="touchpad">Swipe one finger to move the pointer.<br>Tap = left click · two fingers = right click and scroll</div><div class="mouse-btns"><button type="button">Left click</button><button type="button">Right click</button></div><label class="slider">Sensitivity <input type="range" min="1" max="10" value="6"></label>';
     case 'keyboard':
-      return '<textarea class="kb-input" placeholder="Ketik di sini, teks muncul di '+hn+'"></textarea><div class="keys">'+['Esc','Tab','Ctrl','Alt','Shift','←','↑','↓','→','Enter'].map(k=>'<button type="button">'+k+'</button>').join('')+'</div>'
-        +(DEV[host].kind==='android'?'<p class="hint">Butuh keyboard UrDevice aktif di '+hn+'.</p>':'');
+      return '<textarea class="kb-input" placeholder="Type here. The text appears on '+hn+'"></textarea><div class="keys">'+['Esc','Tab','Ctrl','Alt','Shift','←','↑','↓','→','Enter'].map(k=>'<button type="button">'+k+'</button>').join('')+'</div>'
+        +(DEV[host].kind==='android'?'<p class="hint">Needs the UrDevice keyboard enabled on '+hn+'.</p>':'');
     case 'presenter':
-      return '<div class="pres"><button type="button">‹ Sebelumnya</button><button class="next" type="button">Berikutnya ›</button></div><div class="keys"><button type="button">Layar hitam (B)</button><button type="button">Mulai (F5)</button><button type="button">Akhiri (Esc)</button><button type="button">Tahan untuk laser</button></div><div class="ptimer">Waktu presentasi <b data-ptimer="'+vk+'">0:00</b></div><p class="hint">Tombol volume HP juga pindah slide selama layar ini terbuka.</p>';
+      return '<div class="pres"><button type="button">‹ Previous</button><button class="next" type="button">Next ›</button></div><div class="keys"><button type="button">Blank screen (B)</button><button type="button">Start (F5)</button><button type="button">End (Esc)</button><button type="button">Hold for laser</button></div><div class="ptimer">Presentation time <b data-ptimer="'+vk+'">0:00</b></div><p class="hint">The phone volume keys also change slides while this screen is open.</p>';
     case 'screen': {
       const im=S.perms[host].input;
-      return '<div class="viewer '+DEV[host].kind+'"><div class="vscreen">Layar '+hn+' (langsung)<small>1080p · 30 fps · 62 ms</small></div></div>'
-        +(DEV[host].kind==='desktop'?'<label class="fld">Layar yang dilihat<select><option>Layar 1 (utama)</option><option>Layar 2</option></select></label>':'')
-        +'<p class="hint">Kendalikan dari layar ini: izin Remote control di '+hn+' adalah <b>'+ML[im]+'</b>.'+(im==='ask'?' Klik pertama di layar akan meminta izin.':'')+'</p>';
+      return '<div class="viewer '+DEV[host].kind+'"><div class="vscreen">'+hn+' screen (live)<small>1080p · 30 fps · 62 ms</small></div></div>'
+        +(DEV[host].kind==='desktop'?'<label class="fld">Display to view<select><option>Display 1 (main)</option><option>Display 2</option></select></label>':'')
+        +'<p class="hint">Control from this view: Remote control on '+hn+' is set to <b>'+ML[im]+'</b>.'+(im==='ask'?' The first click on the screen asks for approval.':'')+'</p>';
     }
     case 'tunnel': {
       const ps=S.ports[host];
-      if(!ps.length) return '<p class="empty">'+hn+' belum membagikan port.</p>';
-      return ps.map(p=>'<div class="port-row"><div class="pmeta"><b class="mono">localhost:'+p.port+'</b><small>'+(p.label?esc(p.label):'Tanpa label')+' · dari '+hn+':'+p.port+' · 2 koneksi · 1,2 MB</small></div><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: http://localhost:'+p.port+' dibuka di browser.">Buka di browser</button></div>').join('')
-        +'<p class="hint">Port lokal sama dengan port di '+hn+'. Kalau port itu sudah dipakai, UrDevice memakai port kosong berikutnya.</p>';
+      if(!ps.length) return '<p class="empty">'+hn+' has not shared any ports.</p>';
+      return ps.map(p=>'<div class="port-row"><div class="pmeta"><b class="mono">localhost:'+p.port+'</b><small>'+(p.label?esc(p.label):'No label')+' · from '+hn+':'+p.port+' · 2 connections · 1.2 MB</small></div><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulated: http://localhost:'+p.port+' opened in the browser.">Open in browser</button></div>').join('')
+        +'<p class="hint">The local port is the same as on '+hn+'. If that port is taken, UrDevice uses the next free port.</p>';
     }
   }
   return '';
@@ -1163,11 +1163,11 @@ function settingsBody(vk,fv,host){
   const hn=DEV[host].name, desk=DEV[VW[vk].self].kind==='desktop';
   switch(fv.feat){
     case 'clipboard':
-      return '<div class="set-row"><span class="lbl"><b>Sinkron clipboard dengan '+hn+'</b><small>Mati: clipboard tidak dikirim ke dan diterima dari '+hn+'. Jeda untuk semua device ada di Settings.</small></span><label class="switch"><input type="checkbox" data-act="clipsync" data-vk="'+vk+'"'+(CS[vk]?' checked':'')+' aria-label="Sinkron clipboard dengan '+hn+'"><span class="track" aria-hidden="true"></span></label></div>';
+      return '<div class="set-row"><span class="lbl"><b>Sync clipboard with '+hn+'</b><small>Off: the clipboard is not sent to or received from '+hn+'. The pause for all devices is in Settings.</small></span><label class="switch"><input type="checkbox" data-act="clipsync" data-vk="'+vk+'"'+(CS[vk]?' checked':'')+' aria-label="Sync clipboard with '+hn+'"><span class="track" aria-hidden="true"></span></label></div>';
     case 'files':
-      return '<div class="set-row"><span class="lbl"><b>File dari '+hn+' disimpan di</b><small class="mono">'+(desk?'Downloads\\UrDevice':'Download/UrDevice')+'</small></span><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: pemilih folder terbuka.">Ubah</button></div><p class="hint">Folder ini berlaku untuk semua device dan juga ada di Settings.</p>';
+      return '<div class="set-row"><span class="lbl"><b>Files from '+hn+' are saved in</b><small class="mono">'+(desk?'Downloads\\UrDevice':'Download/UrDevice')+'</small></span><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulated: the folder picker opens.">Change</button></div><p class="hint">This folder applies to all devices and is also in Settings.</p>';
     case 'tunnel':
-      return S.ports[host].map(p=>'<div class="set-row"><span class="lbl"><b>Port lokal untuk '+hn+':'+p.port+'</b><small>Alamat yang dibuka browser di perangkat ini.</small></span><input class="set-in mono" type="number" value="'+p.port+'" style="width:100px" aria-label="Port lokal"></div>').join('')||'<p class="empty">'+hn+' belum membagikan port.</p>';
+      return S.ports[host].map(p=>'<div class="set-row"><span class="lbl"><b>Local port for '+hn+':'+p.port+'</b><small>The address the browser opens on this device.</small></span><input class="set-in mono" type="number" value="'+p.port+'" style="width:100px" aria-label="Local port"></div>').join('')||'<p class="empty">'+hn+' has not shared any ports.</p>';
   }
   return '';
 }
@@ -1175,7 +1175,7 @@ function renderFV(vk){
   const el=$('#'+vk+'Feat'), fv=FV[vk];
   if(!fv){el.innerHTML='';return}
   const host=VW[vk].peer, hn=DEV[host].name, f=FEAT[fv.feat], m=S.perms[host][f.cap];
-  let h='<div class="fv-head"><button class="m-back" type="button" data-act="fvback" data-vk="'+vk+'" aria-label="Kembali">'+svg('back')+'</button><div><h3>'+(fv.mode==='settings'?'Pengaturan '+f.label:f.label)+'</h3><small>'+hn+' · '+(fv.mode==='settings'?'pengaturan di perangkat ini':modeNote(m))+'</small></div></div>';
+  let h='<div class="fv-head"><button class="m-back" type="button" data-act="fvback" data-vk="'+vk+'" aria-label="Back">'+svg('back')+'</button><div><h3>'+(fv.mode==='settings'?f.label+' settings':f.label)+'</h3><small>'+hn+' · '+(fv.mode==='settings'?'settings on this device':modeNote(m))+'</small></div></div>';
   if(fv.mode==='settings'){el.innerHTML=h+settingsBody(vk,fv,host);return}
   h+=statusHTML(vk,fv,hn);
   if(fv.status==='active'||(f.req==='action'&&['idle','waiting','active','deny','timeout'].indexOf(fv.status)>=0)) h+=bodyHTML(vk,fv,host);
@@ -1189,12 +1189,12 @@ function disconnect(vk){
   S.act={};
   VKS.forEach(k=>{if(FV[k]) closeFeature(k); if(P[k].playing) mpPlay(k,false)});
   renderAll();
-  toast('Koneksi Laptop Ahmad dan Pixel diputus. Keduanya tidak tersambung otomatis sampai Hubungkan lagi ditekan.');
+  toast('Laptop Ahmad and Pixel are disconnected. Neither reconnects on its own until someone taps Reconnect.');
 }
 function reconnect(){
   S.conn={on:true,by:null};
   renderAll();
-  toast('Tersambung lagi lewat '+(S.path==='wifi'?'Wi-Fi':'Bluetooth LE')+'. Reconnect otomatis aktif lagi.');
+  toast('Connected again over '+(S.path==='wifi'?'Wi-Fi':'Bluetooth LE')+'. Automatic reconnect is back on.');
 }
 function togglePath(){
   S.path=S.path==='wifi'?'ble':'wifi';
@@ -1208,22 +1208,22 @@ function togglePath(){
 
 /* ===== media player ===== */
 const TR={
-  spotify:{app:'Spotify',cover:'note',seek:true,nav:true,pos:84,tracks:[{t:'Midnight Drive',a:'Neon Coast',d:225},{t:'Kota Pagi',a:'Arunika',d:204},{t:'Garis Pantai',a:'Senja Kala',d:241}]},
-  youtube:{app:'YouTube',cover:'yt',seek:true,nav:true,pos:437,tracks:[{t:'Tutorial Chord Dasar untuk Pemula',a:'MusikKita',d:754},{t:'Belajar Fingerstyle 10 Menit',a:'MusikKita',d:612}]},
-  chrome:{app:'Chrome',cover:'globe',seek:false,nav:false,pos:0,tracks:[{t:'Radio lofi: siaran langsung',a:'lofi.example.com',d:0}]}
+  spotify:{app:'Spotify',cover:'note',seek:true,nav:true,pos:84,tracks:[{t:'Midnight Drive',a:'Neon Coast',d:225},{t:'Morning City',a:'Arunika',d:204},{t:'Coastline',a:'Dusk Hour',d:241}]},
+  youtube:{app:'YouTube',cover:'yt',seek:true,nav:true,pos:437,tracks:[{t:'Basic Guitar Chords for Beginners',a:'MusicLab',d:754},{t:'Learn Fingerstyle in 10 Minutes',a:'MusicLab',d:612}]},
+  chrome:{app:'Chrome',cover:'globe',seek:false,nav:false,pos:0,tracks:[{t:'Lofi radio: live stream',a:'lofi.example.com',d:0}]}
 };
 const P={};
 function mpBuild(vk){
   const hn=DEV[VW[vk].peer].name, el=$('#'+vk+'Mp');
   P[vk]={on:true,src:'spotify',idx:0,pos:TR.spotify.pos,playing:false,vol:70,muted:false,granted:false,res:null,timer:null};
-  el.innerHTML='<div class="feat-head" style="margin-top:2px"><h3>Media player</h3><label class="switch"><span data-mpstate>Aktif</span><input type="checkbox" data-act="mptoggle" data-vk="'+vk+'" checked aria-label="Terima info media dari '+hn+'"><span class="track" aria-hidden="true"></span></label></div>'
-    +'<div class="mp-console" aria-label="Media player di '+hn+'"><p class="mp-msg" data-mpmsg hidden></p><div data-mpbody>'
-    +'<div class="mp-sources" role="tablist" aria-label="Sumber media di '+hn+'">'+Object.keys(TR).map(k=>'<button class="mp-src" type="button" role="tab" data-act="mpsrc" data-vk="'+vk+'" data-src="'+k+'"><span class="src-dot" aria-hidden="true"></span>'+TR[k].app+'<span class="src-state">Jeda</span></button>').join('')+'</div>'
+  el.innerHTML='<div class="feat-head" style="margin-top:2px"><h3>Media player</h3><label class="switch"><span data-mpstate>On</span><input type="checkbox" data-act="mptoggle" data-vk="'+vk+'" checked aria-label="Receive media info from '+hn+'"><span class="track" aria-hidden="true"></span></label></div>'
+    +'<div class="mp-console" aria-label="Media player on '+hn+'"><p class="mp-msg" data-mpmsg hidden></p><div data-mpbody>'
+    +'<div class="mp-sources" role="tablist" aria-label="Media sources on '+hn+'">'+Object.keys(TR).map(k=>'<button class="mp-src" type="button" role="tab" data-act="mpsrc" data-vk="'+vk+'" data-src="'+k+'"><span class="src-dot" aria-hidden="true"></span>'+TR[k].app+'<span class="src-state">Paused</span></button>').join('')+'</div>'
     +'<div class="mp-stage"><span class="mp-cover" data-mpcover aria-hidden="true"></span><div class="mp-main"><span class="mp-srcname" data-mpsrcname></span><b data-mptitle></b><span class="mp-artist" data-mpartist></span>'
-    +'<div data-mpprog><div class="mp-progress" role="slider" aria-label="Posisi putar" aria-valuemin="0" data-act="mpseek" data-vk="'+vk+'"><i data-mpbar></i></div><div class="mp-times"><span data-mpcur></span><span data-mpdur></span></div></div>'
-    +'<p class="mp-live" data-mplive hidden>Siaran langsung · posisi tidak bisa digeser</p>'
-    +'<div class="mp-controls"><button class="mp-btn" type="button" data-act="mpprev" data-vk="'+vk+'" aria-label="Sebelumnya">'+svg('prev')+'</button><button class="mp-btn play" type="button" data-act="mpplay" data-vk="'+vk+'" aria-label="Putar"></button><button class="mp-btn" type="button" data-act="mpnext" data-vk="'+vk+'" aria-label="Berikutnya">'+svg('next')+'</button>'
-    +'<span class="mp-volume"><button class="mp-btn" type="button" data-act="mpmute" data-vk="'+vk+'" aria-pressed="false" aria-label="Bisukan"></button><input type="range" min="0" max="100" value="70" data-act="mpvol" data-vk="'+vk+'" aria-label="Volume '+hn+'"></span></div>'
+    +'<div data-mpprog><div class="mp-progress" role="slider" aria-label="Playback position" aria-valuemin="0" data-act="mpseek" data-vk="'+vk+'"><i data-mpbar></i></div><div class="mp-times"><span data-mpcur></span><span data-mpdur></span></div></div>'
+    +'<p class="mp-live" data-mplive hidden>Live stream · seeking is not available</p>'
+    +'<div class="mp-controls"><button class="mp-btn" type="button" data-act="mpprev" data-vk="'+vk+'" aria-label="Previous">'+svg('prev')+'</button><button class="mp-btn play" type="button" data-act="mpplay" data-vk="'+vk+'" aria-label="Play"></button><button class="mp-btn" type="button" data-act="mpnext" data-vk="'+vk+'" aria-label="Next">'+svg('next')+'</button>'
+    +'<span class="mp-volume"><button class="mp-btn" type="button" data-act="mpmute" data-vk="'+vk+'" aria-pressed="false" aria-label="Mute"></button><input type="range" min="0" max="100" value="70" data-act="mpvol" data-vk="'+vk+'" aria-label="'+hn+' volume"></span></div>'
     +'</div></div></div></div>';
   mpRender(vk);
 }
@@ -1242,9 +1242,9 @@ function mpRender(vk){
     pr.setAttribute('aria-valuemax',t.d); pr.setAttribute('aria-valuenow',Math.floor(p.pos)); pr.setAttribute('aria-disabled',s.seek?'false':'true');
   }
   q('[data-act="mpprev"]').hidden=!s.nav; q('[data-act="mpnext"]').hidden=!s.nav;
-  const pl=q('[data-act="mpplay"]'); pl.innerHTML=svg(p.playing?'pause':'play'); pl.setAttribute('aria-label',p.playing?'Jeda':'Putar');
-  $$('.mp-src',el).forEach(b=>{const on=b.dataset.src===p.src;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.querySelector('.src-state').textContent=on&&p.playing?'Diputar':'Jeda'});
-  const mu=q('[data-act="mpmute"]'); mu.innerHTML=svg(p.muted?'mute':'vol'); mu.setAttribute('aria-pressed',p.muted?'true':'false'); mu.setAttribute('aria-label',p.muted?'Bunyikan':'Bisukan'); mu.classList.toggle('on',p.muted);
+  const pl=q('[data-act="mpplay"]'); pl.innerHTML=svg(p.playing?'pause':'play'); pl.setAttribute('aria-label',p.playing?'Pause':'Play');
+  $$('.mp-src',el).forEach(b=>{const on=b.dataset.src===p.src;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');b.querySelector('.src-state').textContent=on&&p.playing?'Playing':'Paused'});
+  const mu=q('[data-act="mpmute"]'); mu.innerHTML=svg(p.muted?'mute':'vol'); mu.setAttribute('aria-pressed',p.muted?'true':'false'); mu.setAttribute('aria-label',p.muted?'Unmute':'Mute'); mu.classList.toggle('on',p.muted);
   q('[data-act="mpvol"]').value=p.vol;
 }
 function mpPlay(vk,on){
@@ -1260,73 +1260,73 @@ function mpGate(vk){
   const p=P[vk], host=VW[vk].peer, hn=DEV[host].name, m=S.perms[host].media, el=$('#'+vk+'Mp');
   const msg=el.querySelector('[data-mpmsg]'), body=el.querySelector('[data-mpbody]'), tg=el.querySelector('[data-act="mptoggle"]');
   let text='', btn='';
-  if(!S.conn.on) text='Tidak terhubung ke '+hn+'.';
-  else if(m==='deny') text='Media dimatikan oleh '+hn+'.';
-  else if(!p.on) text='Media player dimatikan. '+hn+' berhenti mengirim info media ke perangkat ini. Nyalakan lagi kapan saja.';
+  if(!S.conn.on) text='Not connected to '+hn+'.';
+  else if(m==='deny') text='Media is turned off by '+hn+'.';
+  else if(!p.on) text='Media player is off. '+hn+' stopped sending media info to this device. Turn it back on any time.';
   else if(m==='ask'&&!p.granted){
     const pend=S.pend[host]&&S.pend[host].vk===vk&&S.pend[host].feat==='media';
-    text=pend?'Menunggu izin dari '+hn+'…':p.res==='deny'?hn+' menolak kontrol media.':p.res==='timeout'?'Tidak ada jawaban dari '+hn+' dalam 30 detik.':hn+' meminta konfirmasi sebelum media bisa dikontrol (Always Ask).';
-    if(!pend) btn='<button class="btn brand sm" type="button" data-act="mpask" data-vk="'+vk+'">Minta izin</button>';
+    text=pend?'Waiting for approval from '+hn+'…':p.res==='deny'?hn+' denied media control.':p.res==='timeout'?'No answer from '+hn+' within 30 seconds.':hn+' asks for approval before its media can be controlled (Always Ask).';
+    if(!pend) btn='<button class="btn brand sm" type="button" data-act="mpask" data-vk="'+vk+'">Ask for approval</button>';
   }
   msg.innerHTML=text?'<span>'+text+'</span>'+btn:'';
   msg.hidden=!text; body.hidden=!!text;
   tg.checked=p.on; tg.disabled=!S.conn.on||m==='deny';
-  el.querySelector('[data-mpstate]').textContent=p.on?'Aktif':'Mati';
+  el.querySelector('[data-mpstate]').textContent=p.on?'On':'Off';
   if(text&&p.playing) mpPlay(vk,false);
 }
 
 /* ===== notifications (Release 2) ===== */
 const NAPPS={
-  pixel:[{id:'wa',name:'WhatsApp',icon:'msg'},{id:'cal',name:'Kalender',icon:'cal'},{id:'ig',name:'Instagram',icon:'insta'}],
-  laptop:[{id:'outlook',name:'Outlook',icon:'mail'},{id:'teams',name:'Teams',icon:'msg'},{id:'cal',name:'Kalender',icon:'cal'}]
+  pixel:[{id:'wa',name:'WhatsApp',icon:'msg'},{id:'cal',name:'Calendar',icon:'cal'},{id:'ig',name:'Instagram',icon:'insta'}],
+  laptop:[{id:'outlook',name:'Outlook',icon:'mail'},{id:'teams',name:'Teams',icon:'msg'},{id:'cal',name:'Calendar',icon:'cal'}]
 };
 const NITEMS={
-  pixel:[{id:'n1',app:'wa',title:'Rina',text:'Jadi rapat jam 1 kan?',time:'09.41',reply:true},{id:'n2',app:'cal',title:'Kalender',text:'Rapat tim pukul 13.00',time:'09.15'},{id:'n3',app:'ig',title:'Instagram',text:'3 notifikasi baru',time:'08.57'}],
-  laptop:[{id:'m1',app:'outlook',title:'Outlook · Budi',text:'Draf laporan Q4 sudah saya kirim',time:'09.38'},{id:'m2',app:'teams',title:'Teams',text:'Standup dimulai 5 menit lagi',time:'09.25'},{id:'m3',app:'cal',title:'Kalender',text:'Demo klien pukul 15.00',time:'08.50'}]
+  pixel:[{id:'n1',app:'wa',title:'Rina',text:'Still on for the 1 pm meeting?',time:'09:41',reply:true},{id:'n2',app:'cal',title:'Calendar',text:'Team meeting at 13:00',time:'09:15'},{id:'n3',app:'ig',title:'Instagram',text:'3 new notifications',time:'08:57'}],
+  laptop:[{id:'m1',app:'outlook',title:'Outlook · Budi',text:'I sent the Q4 report draft',time:'09:38'},{id:'m2',app:'teams',title:'Teams',text:'Standup starts in 5 minutes',time:'09:25'},{id:'m3',app:'cal',title:'Calendar',text:'Client demo at 15:00',time:'08:50'}]
 };
 const N={dsk:{on:false,apps:{},reply:null,sent:{}},v1:{on:false,apps:{},reply:null,sent:{}},v2:{on:false,apps:{},reply:null,sent:{}}};
 function renderNotif(vk){
   const host=VW[vk].peer, hn=DEV[host].name, n=N[vk], m=S.perms[host].notify, andro=DEV[host].kind==='android', dis=!S.conn.on||m==='deny';
   let body='';
-  if(!S.conn.on) body='<p class="notif-off">Tidak terhubung ke '+hn+'.</p>';
-  else if(m==='deny') body='<p class="notif-off">'+hn+' tidak mengizinkan notifikasinya dibagikan.</p>';
-  else if(!n.on) body='<p class="notif-off">Notifikasi dari '+hn+' belum diterima. Nyalakan, lalu pilih aplikasi yang diteruskan.</p>';
+  if(!S.conn.on) body='<p class="notif-off">Not connected to '+hn+'.</p>';
+  else if(m==='deny') body='<p class="notif-off">'+hn+' does not allow sharing its notifications.</p>';
+  else if(!n.on) body='<p class="notif-off">Notifications from '+hn+' are not received yet. Turn this on, then pick the apps to forward.</p>';
   else {
     const apps=NAPPS[host], appBy={}; apps.forEach(a=>{appBy[a.id]=a});
-    const chips='<div class="napps"><span class="m-label">Aplikasi yang diteruskan dari '+hn+'</span>'+apps.map(a=>'<button class="napp'+(n.apps[a.id]?' on':'')+'" type="button" data-act="napp" data-vk="'+vk+'" data-app="'+a.id+'" aria-pressed="'+!!n.apps[a.id]+'">'+svg(a.icon)+a.name+'</button>').join('')+'</div>';
+    const chips='<div class="napps"><span class="m-label">Apps forwarded from '+hn+'</span>'+apps.map(a=>'<button class="napp'+(n.apps[a.id]?' on':'')+'" type="button" data-act="napp" data-vk="'+vk+'" data-app="'+a.id+'" aria-pressed="'+!!n.apps[a.id]+'">'+svg(a.icon)+a.name+'</button>').join('')+'</div>';
     const items=NITEMS[host].filter(i=>n.apps[i.app]);
     const list=items.length?'<div class="notif-list">'+items.map(i=>{
       let rep='';
       if(andro&&i.reply){
-        if(n.sent[i.id]) rep='<p class="ok">Balasan terkirim lewat '+hn+'.</p>';
-        else if(n.reply===i.id) rep='<div class="reply-row"><input type="text" placeholder="Balas…" aria-label="Balasan untuk '+i.title+'"><button class="btn brand sm" type="button" data-act="nsend" data-vk="'+vk+'" data-id="'+i.id+'">Kirim</button></div>';
-        else rep='<button class="linkbtn" type="button" data-act="nreply" data-vk="'+vk+'" data-id="'+i.id+'">Balas</button>';
+        if(n.sent[i.id]) rep='<p class="ok">Reply sent through '+hn+'.</p>';
+        else if(n.reply===i.id) rep='<div class="reply-row"><input type="text" placeholder="Reply…" aria-label="Reply to '+i.title+'"><button class="btn brand sm" type="button" data-act="nsend" data-vk="'+vk+'" data-id="'+i.id+'">Send</button></div>';
+        else rep='<button class="linkbtn" type="button" data-act="nreply" data-vk="'+vk+'" data-id="'+i.id+'">Reply</button>';
       }
       return '<div class="notif-item"><span class="nic">'+svg(appBy[i.app].icon)+'</span><div class="nmeta"><b>'+i.title+'</b><p>'+i.text+'</p>'+rep+'</div><time>'+i.time+'</time></div>';
-    }).join('')+'</div>':'<p class="notif-off">Belum ada aplikasi yang dipilih. Aplikasi baru tidak diteruskan sampai Anda memilihnya.</p>';
-    body=chips+list+(andro?'':'<p class="hint">Notifikasi dari desktop hanya ditampilkan, tidak bisa dibalas. Desktop macOS tidak bisa meneruskan notifikasi.</p>');
+    }).join('')+'</div>':'<p class="notif-off">No apps picked yet. New apps are not forwarded until you pick them.</p>';
+    body=chips+list+(andro?'':'<p class="hint">Notifications from a desktop are display-only and cannot be answered. macOS desktops cannot forward notifications.</p>');
   }
-  $('#'+vk+'Notif').innerHTML='<div class="notif"><div class="notif-head"><h3>Notifikasi</h3><span class="r2">Release 2</span><label class="switch"><span>'+(n.on&&!dis?'Aktif':'Mati')+'</span><input type="checkbox" data-act="ntoggle" data-vk="'+vk+'"'+(n.on?' checked':'')+(dis?' disabled':'')+' aria-label="Terima notifikasi dari '+hn+'"><span class="track" aria-hidden="true"></span></label></div>'+body+'</div>';
+  $('#'+vk+'Notif').innerHTML='<div class="notif"><div class="notif-head"><h3>Notifications</h3><span class="r2">Release 2</span><label class="switch"><span>'+(n.on&&!dis?'On':'Off')+'</span><input type="checkbox" data-act="ntoggle" data-vk="'+vk+'"'+(n.on?' checked':'')+(dis?' disabled':'')+' aria-label="Receive notifications from '+hn+'"><span class="track" aria-hidden="true"></span></label></div>'+body+'</div>';
 }
 
 /* ===== add device / pairing ===== */
 const DETS=[
   {id:'pclab',name:'PC Lab',os:'Linux',ip:'192.168.1.20',icon:'monitor'},
-  {id:'imac',name:'iMac Ruang Multimedia',os:'macOS',ip:'192.168.1.31',icon:'monitor'},
+  {id:'imac',name:'Media Room iMac',os:'macOS',ip:'192.168.1.31',icon:'monitor'},
   {id:'galaxytab',name:'Galaxy Tab S9',os:'Android',ip:'192.168.1.24',icon:'tablet'}
 ];
 const AD={dsk:{host:'laptop',open:null,st:{},code:{},left:120,scan:null,target:'galaxytab'},v1:{host:'pixel',open:null,st:{},code:{},left:120,scan:null,target:'imac'},v2:{host:'pixel',open:null,st:{},code:{},left:120,scan:null,target:'imac'}};
 function addHTML(px){
   const d=DEV[AD[px].host];
-  return (px==='dsk'?'<h2>Tambah Device</h2>':'')
-    +'<p class="sub">Pindai QR di layar device lain, tunjukkan QR perangkat ini, atau pilih device di jaringan untuk mencocokkan kode. Pairing hanya bisa selama halaman ini terbuka.</p>'
-    +'<button class="btn brand wide" type="button" data-act="addscan" data-px="'+px+'">'+svg('cam')+'Scan QR untuk pairing</button>'
-    +(px==='dsk'?'<p class="hint">Desktop memakai kamera bawaan atau webcam. Tombol ini disembunyikan kalau tidak ada kamera.</p>':'')
-    +'<div class="scan-box" data-scan hidden><div class="scan-view" aria-hidden="true"><span class="scan-frame"></span><span class="scan-line"></span></div><p>Arahkan kamera ke QR di layar device lain…</p><button class="btn secondary sm" type="button" data-act="addscancancel" data-px="'+px+'">Batal</button></div>'
+  return (px==='dsk'?'<h2>Add Device</h2>':'')
+    +'<p class="sub">Scan the QR code on another device, show the QR code of this device, or pick a device on the network to match a code. Pairing works only while this page is open.</p>'
+    +'<button class="btn brand wide" type="button" data-act="addscan" data-px="'+px+'">'+svg('cam')+'Scan QR to pair</button>'
+    +(px==='dsk'?'<p class="hint">The desktop uses its built-in camera or a webcam. This button is hidden when there is no camera.</p>':'')
+    +'<div class="scan-box" data-scan hidden><div class="scan-view" aria-hidden="true"><span class="scan-frame"></span><span class="scan-line"></span></div><p>Point the camera at the QR code on the other device…</p><button class="btn secondary sm" type="button" data-act="addscancancel" data-px="'+px+'">Cancel</button></div>'
     +'<p class="pair-msg" data-scanmsg role="status" hidden></p>'
-    +'<div class="host-qr"><span class="pair-label">QR perangkat ini</span><div class="pair-qr" data-qr role="img" aria-label="Kode QR '+d.name+'. Pindai dengan UrDevice di device lain."></div><div class="host-meta"><b>'+d.name+'</b> · <span class="mono">'+d.ip+'</span></div><div class="qr-exp">Berlaku <b data-qrleft>2:00</b> · <button class="linkbtn" type="button" data-act="qrrefresh" data-px="'+px+'">Buat ulang</button></div></div>'
-    +'<span class="m-label" style="padding-left:2px">Device di jaringan ini</span><div class="detect-list" data-detlist></div>'
-    +'<p class="hint">Kalau pairing gagal 5 kali dalam 5 menit, pairing dikunci selama 5 menit.</p>';
+    +'<div class="host-qr"><span class="pair-label">QR code of this device</span><div class="pair-qr" data-qr role="img" aria-label="QR code for '+d.name+'. Scan it with UrDevice on another device."></div><div class="host-meta"><b>'+d.name+'</b> · <span class="mono">'+d.ip+'</span></div><div class="qr-exp">Valid for <b data-qrleft>2:00</b> · <button class="linkbtn" type="button" data-act="qrrefresh" data-px="'+px+'">Make a new one</button></div></div>'
+    +'<span class="m-label" style="padding-left:2px">Devices on this network</span><div class="detect-list" data-detlist></div>'
+    +'<p class="hint">If pairing fails 5 times in 5 minutes, pairing is locked for 5 minutes.</p>';
 }
 function renderDet(px){
   const a=AD[px];
@@ -1335,12 +1335,12 @@ function renderDet(px){
     let drop='';
     if(open){
       const code=(a.code[d.id]||'').split('').map(c=>'<span>'+c+'</span>').join('');
-      if(paired) drop='<div class="pair-status done" role="status"><span class="pair-dot" aria-hidden="true"></span>Pairing selesai. '+d.name+' terhubung.</div>';
-      else if(st==='waitpeer') drop='<span class="pair-label">Kode verifikasi</span><div class="pair-code" role="img" aria-label="Kode '+a.code[d.id].split('').join(' ')+'">'+code+'</div><div class="pair-status" role="status"><span class="pair-dot" aria-hidden="true"></span>Menunggu konfirmasi di '+d.name+'…</div><div class="drop-actions"><button class="btn secondary sm" type="button" data-act="dcancel" data-px="'+px+'" data-id="'+d.id+'">Batal</button></div>';
-      else drop='<span class="pair-label">Kode verifikasi</span><div class="pair-code" role="img" aria-label="Kode '+a.code[d.id].split('').join(' ')+'">'+code+'</div><p class="drop-note">Pastikan kode yang sama tampil di '+d.name+', lalu tekan Kode cocok di kedua device.</p><div class="drop-actions"><button class="btn brand" type="button" data-act="dmatch" data-px="'+px+'" data-id="'+d.id+'">Kode cocok</button><button class="btn secondary" type="button" data-act="dcancel" data-px="'+px+'" data-id="'+d.id+'">Batal</button></div>';
+      if(paired) drop='<div class="pair-status done" role="status"><span class="pair-dot" aria-hidden="true"></span>Paired. '+d.name+' is connected.</div>';
+      else if(st==='waitpeer') drop='<span class="pair-label">Verification code</span><div class="pair-code" role="img" aria-label="Code '+a.code[d.id].split('').join(' ')+'">'+code+'</div><div class="pair-status" role="status"><span class="pair-dot" aria-hidden="true"></span>Waiting for '+d.name+' to confirm…</div><div class="drop-actions"><button class="btn secondary sm" type="button" data-act="dcancel" data-px="'+px+'" data-id="'+d.id+'">Cancel</button></div>';
+      else drop='<span class="pair-label">Verification code</span><div class="pair-code" role="img" aria-label="Code '+a.code[d.id].split('').join(' ')+'">'+code+'</div><p class="drop-note">Check that the same code shows on '+d.name+', then tap Codes match on both devices.</p><div class="drop-actions"><button class="btn brand" type="button" data-act="dmatch" data-px="'+px+'" data-id="'+d.id+'">Codes match</button><button class="btn secondary" type="button" data-act="dcancel" data-px="'+px+'" data-id="'+d.id+'">Cancel</button></div>';
       drop='<div class="detect-drop">'+drop+'</div>';
     }
-    return '<div class="detect-item'+(open?' open':'')+(paired?' connected':'')+'"><button class="detect-head" type="button" data-act="detect" data-px="'+px+'" data-id="'+d.id+'" aria-expanded="'+open+'"><span class="ic">'+svg(d.icon)+'</span><span class="meta"><b>'+d.name+'</b><small>'+d.os+' · '+d.ip+'</small></span><span class="detect-badge">'+(paired?'Terhubung':'Belum terhubung')+'</span><span class="chev" aria-hidden="true">'+svg('chev')+'</span></button>'+drop+'</div>';
+    return '<div class="detect-item'+(open?' open':'')+(paired?' connected':'')+'"><button class="detect-head" type="button" data-act="detect" data-px="'+px+'" data-id="'+d.id+'" aria-expanded="'+open+'"><span class="ic">'+svg(d.icon)+'</span><span class="meta"><b>'+d.name+'</b><small>'+d.os+' · '+d.ip+'</small></span><span class="detect-badge">'+(paired?'Connected':'Not connected')+'</span><span class="chev" aria-hidden="true">'+svg('chev')+'</span></button>'+drop+'</div>';
   }).join('');
 }
 function hex(n){let s='';for(let i=0;i<n;i++) s+=Math.floor(Math.random()*16).toString(16);return s}
@@ -1377,14 +1377,14 @@ function renderOnb(k){
   const dots=[0,1,2,3].map(i=>'<i class="'+(i===o.step?'on':'')+'"></i>').join('');
   let c='';
   if(o.step===1){
-    c='<span class="onb-ic">'+svg('shield')+'</span><h2>Aman dan tetap lokal</h2><p>Device saling menemukan di Wi-Fi yang sama, dan pindah ke Bluetooth sendiri kalau Wi-Fi putus. Data langsung dari device ke device, terenkripsi, tanpa server.</p><p>Kunci perangkat sudah dibuat dan disimpan di '+(d.kind==='android'?'Android Keystore':'keychain sistem')+'. Device ID:</p><p class="mono" style="font-size:12.5px;word-break:break-all"><b>'+DID[host]+'</b></p><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbback" data-k="'+k+'">Kembali</button><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Lanjut</button></div>';
-    $('#'+k+'Onb').innerHTML='<div class="onb-card" role="dialog" aria-modal="true" aria-label="Onboarding UrDevice"><div class="onb-top"><span class="onb-dots" aria-hidden="true">'+dots+'</span><button class="m-sheet-close" type="button" data-act="onbclose" data-k="'+k+'" aria-label="Tutup onboarding">'+svg('close')+'</button></div>'+c+'<p class="onb-note">Alur lengkap, termasuk langkah pairing: docs/mockup/onboarding.html.</p></div>';
+    c='<span class="onb-ic">'+svg('shield')+'</span><h2>Safe and local</h2><p>Devices find each other on the same Wi-Fi and switch to Bluetooth on their own if Wi-Fi drops. Data goes straight from device to device, encrypted, with no server.</p><p>The device key is already made and stored in '+(d.kind==='android'?'the Android Keystore':'the system keychain')+'. Device ID:</p><p class="mono" style="font-size:12.5px;word-break:break-all"><b>'+DID[host]+'</b></p><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbback" data-k="'+k+'">Back</button><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Continue</button></div>';
+    $('#'+k+'Onb').innerHTML='<div class="onb-card" role="dialog" aria-modal="true" aria-label="UrDevice onboarding"><div class="onb-top"><span class="onb-dots" aria-hidden="true">'+dots+'</span><button class="m-sheet-close" type="button" data-act="onbclose" data-k="'+k+'" aria-label="Close onboarding">'+svg('close')+'</button></div>'+c+'<p class="onb-note">Full flow, including the pairing steps: docs/mockup/onboarding.html.</p></div>';
     return;
   }
-  if(o.step===0) c='<span class="onb-ic">'+svg(d.icon)+'</span><h2>Selamat datang di UrDevice</h2><p>UrDevice menghubungkan perangkat Anda sendiri di jaringan lokal. Semua lalu lintas terenkripsi, tanpa server cloud.</p><label class="fld">Nama perangkat ini<input type="text" data-onbname="'+k+'" value="'+esc(o.name)+'"></label><div class="onb-actions"><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Lanjut</button></div>';
-  else if(o.step===2) c='<h2>Izin untuk device lain</h2><p>Atur apa yang boleh dilakukan device lain di '+esc(o.name)+'. Pengaturan ini berlaku untuk semua device yang nanti dipasangkan, dan bisa diubah kapan saja di <b>Perangkat ini</b>.</p><ul class="legend-list"><li><b>Allow</b>: langsung jalan.</li><li><b>Always Ask</b>: Anda konfirmasi dulu di perangkat ini.</li><li><b>Deny</b>: fitur itu mati di device lain.</li></ul><div class="perm-list">'+permListHTML(host,k)+'</div><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbback" data-k="'+k+'">Kembali</button><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Lanjut</button></div>';
-  else c='<span class="onb-ic">'+svg('check')+'</span><h2>Siap dipakai</h2><p>Sekarang pasangkan device lain: pindai QR-nya, tunjukkan QR perangkat ini, atau pilih device di jaringan lalu cocokkan kodenya.</p><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbdone" data-k="'+k+'">Nanti saja</button><button class="btn brand" type="button" data-act="onbdone" data-k="'+k+'" data-next="add">Tambah device</button></div>';
-  $('#'+k+'Onb').innerHTML='<div class="onb-card" role="dialog" aria-modal="true" aria-label="Onboarding UrDevice"><div class="onb-top"><span class="onb-dots" aria-hidden="true">'+dots+'</span><button class="m-sheet-close" type="button" data-act="onbclose" data-k="'+k+'" aria-label="Tutup onboarding">'+svg('close')+'</button></div>'+c+'<p class="onb-note">Demo: tombol di langkah terakhir menerapkan pilihan izin ini ke mockup.</p></div>';
+  if(o.step===0) c='<span class="onb-ic">'+svg(d.icon)+'</span><h2>Welcome to UrDevice</h2><p>UrDevice connects your own devices on the local network. All traffic is encrypted, with no cloud server.</p><label class="fld">Name this device<input type="text" data-onbname="'+k+'" value="'+esc(o.name)+'"></label><div class="onb-actions"><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Continue</button></div>';
+  else if(o.step===2) c='<h2>Permissions for other devices</h2><p>Choose what other devices may do on '+esc(o.name)+'. These settings apply to every device you pair later, and you can change them any time on <b>This device</b>.</p><ul class="legend-list"><li><b>Allow</b>: starts right away.</li><li><b>Always Ask</b>: you confirm on this device first.</li><li><b>Deny</b>: the feature is off on other devices.</li></ul><div class="perm-list">'+permListHTML(host,k)+'</div><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbback" data-k="'+k+'">Back</button><button class="btn brand" type="button" data-act="onbnext" data-k="'+k+'">Continue</button></div>';
+  else c='<span class="onb-ic">'+svg('check')+'</span><h2>Ready to go</h2><p>Now pair another device: scan its QR code, show the QR code of this device, or pick a device on the network and match the code.</p><div class="onb-actions"><button class="btn secondary" type="button" data-act="onbdone" data-k="'+k+'">Not now</button><button class="btn brand" type="button" data-act="onbdone" data-k="'+k+'" data-next="add">Add device</button></div>';
+  $('#'+k+'Onb').innerHTML='<div class="onb-card" role="dialog" aria-modal="true" aria-label="UrDevice onboarding"><div class="onb-top"><span class="onb-dots" aria-hidden="true">'+dots+'</span><button class="m-sheet-close" type="button" data-act="onbclose" data-k="'+k+'" aria-label="Close onboarding">'+svg('close')+'</button></div>'+c+'<p class="onb-note">Demo: the buttons on the last step apply these permission choices to the mockup.</p></div>';
 }
 
 /* ===== settings ===== */
@@ -1392,17 +1392,17 @@ const DID={laptop:'K7QM-2X9D-H4TR-8WVA-5NBE-J3LC-Q6PF-Z2YU',pixel:'P3NA-7QDX-M2K
 function sw(label,small,on){return '<div class="set-row"><span class="lbl"><b>'+label+'</b>'+(small?'<small>'+small+'</small>':'')+'</span><label class="switch"><input type="checkbox"'+(on?' checked':'')+' aria-label="'+label+'"><span class="track" aria-hidden="true"></span></label></div>'}
 function settingsHTML(host,k){
   const d=DEV[host], desk=d.kind==='desktop';
-  return '<div class="set-row"><span class="lbl"><b>Nama perangkat ini</b></span><input class="set-in" type="text" value="'+d.name+'" aria-label="Nama perangkat ini"></div>'
-    +'<div class="set-row"><span class="lbl"><b>Device ID</b><small>Sidik jari identitas perangkat ini</small><span class="mono did">'+DID[host]+'</span></span></div>'
-    +sw('Hidden mode','Tidak mengumumkan diri di jaringan. Device yang sudah dipasangkan tetap bisa tersambung.',false)
-    +(desk?sw('Mulai saat login','',true):'')
-    +'<div class="set-row"><span class="lbl"><b>Folder unduhan</b><small class="mono">'+(desk?'Downloads\\UrDevice':'Download/UrDevice')+'</small></span><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: pemilih folder terbuka.">Ubah</button></div>'
-    +sw('Jeda clipboard di semua device','Clipboard berhenti dikirim dan diterima sampai dinyalakan lagi.',false)
-    +'<div class="set-row"><span class="lbl"><b>Bahasa</b></span><span class="val">Indonesia</span></div>'
-    +'<div class="set-row"><span class="lbl"><b>Izin untuk device lain</b><small>Ubah di '+(desk?'halaman Perangkat ini':'kartu Perangkat ini di beranda')+', atau ulangi onboarding.</small></span><button class="btn secondary sm" type="button" data-act="onbopen" data-k="'+k+'">Buka onboarding</button></div>'
-    +'<div class="set-block"><b>Activity log</b><small>Permintaan yang diizinkan dan ditolak selama 30 hari terakhir, tanpa isi clipboard atau file.</small><ul class="log" data-log="'+host+'"></ul></div>'
-    +'<div class="set-row"><span class="lbl"><b>Data</b><small>Semua data lokal UrDevice di perangkat ini.</small></span><span class="btn-row"><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: data diekspor ke urdevice-export.zip.">Export data</button><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulasi: konfirmasi hapus semua data muncul.">Hapus semua data</button></span></div>'
-    +'<div class="set-row" style="border-bottom:0"><span class="lbl"><b>Reset identity</b><small>Membuat kunci identitas baru dan menghapus semua pairing. Semua device harus dipasangkan ulang.</small></span><button class="btn danger sm" type="button" data-act="toast" data-msg="Simulasi: peringatan muncul sebelum kunci identitas baru dibuat.">Reset</button></div>';
+  return '<div class="set-row"><span class="lbl"><b>Device name</b></span><input class="set-in" type="text" value="'+d.name+'" aria-label="Device name"></div>'
+    +'<div class="set-row"><span class="lbl"><b>Device ID</b><small>Identity fingerprint of this device</small><span class="mono did">'+DID[host]+'</span></span></div>'
+    +sw('Hidden mode','Does not announce itself on the network. Paired devices can still connect.',false)
+    +(desk?sw('Start at login','',true):'')
+    +'<div class="set-row"><span class="lbl"><b>Download folder</b><small class="mono">'+(desk?'Downloads\\UrDevice':'Download/UrDevice')+'</small></span><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulated: the folder picker opens.">Change</button></div>'
+    +sw('Pause clipboard on all devices','The clipboard is not sent or received until you turn this back on.',false)
+    +'<div class="set-row"><span class="lbl"><b>Language</b></span><span class="val">English</span></div>'
+    +'<div class="set-row"><span class="lbl"><b>Permissions for other devices</b><small>Change them on '+(desk?'the This device page':'the This device card on the home screen')+', or run onboarding again.</small></span><button class="btn secondary sm" type="button" data-act="onbopen" data-k="'+k+'">Open onboarding</button></div>'
+    +'<div class="set-block"><b>Activity log</b><small>Allowed and denied requests from the last 30 days, without clipboard or file contents.</small><ul class="log" data-log="'+host+'"></ul></div>'
+    +'<div class="set-row"><span class="lbl"><b>Data</b><small>All local UrDevice data on this device.</small></span><span class="btn-row"><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulated: data exported to urdevice-export.zip.">Export data</button><button class="btn secondary sm" type="button" data-act="toast" data-msg="Simulated: a confirmation to delete all data appears.">Delete all data</button></span></div>'
+    +'<div class="set-row" style="border-bottom:0"><span class="lbl"><b>Reset identity</b><small>Creates a new identity key and deletes all pairings. Every device must pair again.</small></span><button class="btn danger sm" type="button" data-act="toast" data-msg="Simulated: a warning appears before the new identity key is created.">Reset</button></div>';
 }
 function renderLogs(){
   $$('[data-log]').forEach(ul=>{ul.innerHTML=S.log[ul.dataset.log].slice(0,6).map(l=>'<li><time>'+l.t+'</time><span><b>'+l.dev+'</b> · '+l.cap+'</span><em class="'+(l.ok?'ok':'no')+'">'+l.d+'</em></li>').join('')});
@@ -1425,12 +1425,12 @@ const ACT={
   fvback:t=>closeFeature(t.dataset.vk),
   fvaction:t=>{const vk=t.dataset.vk;if(FV[vk]) ask(vk,FV[vk].feat)},
   fvcancel:t=>cancelPend(VW[t.dataset.vk].peer),
-  fvxfer:t=>{const fv=FV[t.dataset.vk];clearFvTimers(fv);fv.prog=null;fv.note='Transfer dibatalkan. File yang belum selesai dihapus.';renderFV(t.dataset.vk)},
+  fvxfer:t=>{const fv=FV[t.dataset.vk];clearFvTimers(fv);fv.prog=null;fv.note='Transfer cancelled. Unfinished files are deleted.';renderFV(t.dataset.vk)},
   gal:t=>{const fv=FV[t.dataset.vk];fv.sel[t.dataset.i]=!fv.sel[t.dataset.i];renderFV(t.dataset.vk)},
   pallow:t=>answer(t.dataset.host,true), pdeny:t=>answer(t.dataset.host,false),
   actstop:t=>stopAct(t.dataset.host),
   disc:t=>disconnect(t.dataset.vk), reconn:()=>reconnect(),
-  forget:t=>{const name=t.dataset.name||DEV[VW[t.dataset.vk].peer].name;if(window.confirm('Lupakan '+name+'? Pairing dihapus, dan device ini harus dipasangkan ulang.')) toast('Simulasi: di aplikasi asli '+name+' hilang dari daftar. Di mockup ini device tetap ditampilkan.')},
+  forget:t=>{const name=t.dataset.name||DEV[VW[t.dataset.vk].peer].name;if(window.confirm('Forget '+name+'? The pairing is deleted, and this device must pair again.')) toast('Simulated: in the real app '+name+' leaves the list. In this mockup the device stays visible.')},
   mpplay:t=>mpPlay(t.dataset.vk,!P[t.dataset.vk].playing),
   mpnext:t=>{const p=P[t.dataset.vk],s=TR[p.src];p.idx=(p.idx+1)%s.tracks.length;p.pos=0;mpRender(t.dataset.vk)},
   mpprev:t=>{const p=P[t.dataset.vk],s=TR[p.src];p.idx=(p.idx-1+s.tracks.length)%s.tracks.length;p.pos=0;mpRender(t.dataset.vk)},
@@ -1447,7 +1447,7 @@ const ACT={
     a.scan=setTimeout(()=>{
       box.hidden=true;a.st[a.target]='paired';a.open=a.target;renderDet(px);
       const d=DETS.find(x=>x.id===a.target);
-      msg.textContent='QR '+d.name+' terbaca. Pairing selesai tanpa kode, karena QR sudah memuat identitas '+d.name+'. Kamera langsung dimatikan.';
+      msg.textContent='Read the QR code of '+d.name+'. Paired without a code, because the QR code already carries the identity of '+d.name+'. The camera is turned off right away.';
       msg.hidden=false;
     },2400);
   },
@@ -1461,7 +1461,7 @@ const ACT={
   },
   dmatch:t=>{
     const px=t.dataset.px,id=t.dataset.id,a=AD[px];a.st[id]='waitpeer';renderDet(px);
-    setTimeout(()=>{if(a.st[id]==='waitpeer'){a.st[id]='paired';renderDet(px);toast(DETS.find(x=>x.id===id).name+' juga menekan Kode cocok. Pairing selesai (simulasi).')}},1800);
+    setTimeout(()=>{if(a.st[id]==='waitpeer'){a.st[id]='paired';renderDet(px);toast(DETS.find(x=>x.id===id).name+' also tapped Codes match. Paired (simulated).')}},1800);
   },
   dcancel:t=>{const a=AD[t.dataset.px];a.st[t.dataset.id]=undefined;a.open=null;renderDet(t.dataset.px)},
   qrrefresh:t=>genQr(t.dataset.px),
@@ -1474,21 +1474,21 @@ const ACT={
     capsFor(host).filter(c=>!c.r2).forEach(c=>{S.perms[host][c.id]=OB[k].perms[c.id]});
     $('#'+k+'Onb').hidden=true;renderAll();
     if(t.dataset.next==='add'){if(k==='dsk')dShow('add');else if(k==='v1')mShow('add');else v2Show('tambah')}
-    toast('Pilihan izin dari onboarding diterapkan ke '+DEV[host].name+'.');
+    toast('The permission choices from onboarding now apply to '+DEV[host].name+'.');
   },
   sheetopen:t=>{$('#'+t.dataset.sheet).hidden=false},
   sheetclose:t=>{$('#'+t.dataset.sheet).hidden=true},
   lanok:t=>{
     const p=S.ports[t.dataset.host][t.dataset.i];
     p.lan=p.pending;
-    if(p.lan==='1h'){const d=new Date(Date.now()+3600e3);p.until=String(d.getHours()).padStart(2,'0')+'.'+String(d.getMinutes()).padStart(2,'0')}
+    if(p.lan==='1h'){const d=new Date(Date.now()+3600e3);p.until=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
     p.pending=null;p.ack=false;renderSelf();
   },
   lancancel:t=>{const p=S.ports[t.dataset.host][t.dataset.i];p.pending=null;p.ack=false;renderSelf()},
   portadd:t=>{
     const host=t.dataset.host,num=parseInt($('[data-portnum="'+host+'"]',t.closest('.ports')).value,10),label=$('[data-portlabel="'+host+'"]',t.closest('.ports')).value.trim();
-    if(!(num>=1&&num<=65535)){toast('Isi nomor port antara 1 dan 65535.');return}
-    if(S.ports[host].some(p=>p.port===num)){toast('Port '+num+' sudah dibagikan.');return}
+    if(!(num>=1&&num<=65535)){toast('Enter a port number from 1 to 65535.');return}
+    if(S.ports[host].some(p=>p.port===num)){toast('Port '+num+' is already shared.');return}
     S.ports[host].push({port:num,label:label,lan:'off'});renderAll();
   },
   portdel:t=>{S.ports[t.dataset.host].splice(+t.dataset.i,1);renderAll()},
@@ -1498,7 +1498,7 @@ const ACT={
 const CHG={
   mptoggle:t=>{P[t.dataset.vk].on=t.checked;mpGate(t.dataset.vk)},
   ntoggle:t=>{N[t.dataset.vk].on=t.checked;renderNotif(t.dataset.vk)},
-  clipsync:t=>{CS[t.dataset.vk]=t.checked;toast('Sinkron clipboard dengan '+DEV[VW[t.dataset.vk].peer].name+' '+(t.checked?'menyala':'mati')+'.')},
+  clipsync:t=>{CS[t.dataset.vk]=t.checked;toast('Clipboard sync with '+DEV[VW[t.dataset.vk].peer].name+' is '+(t.checked?'on':'off')+'.')},
   lan:t=>{
     const p=S.ports[t.dataset.host][t.dataset.i];
     if(t.value==='off'){p.lan='off';p.pending=null;p.ack=false}else{p.pending=t.value;p.ack=false}
