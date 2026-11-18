@@ -22,5 +22,7 @@ The mockups are a guide, not a final design. Open the HTML files in a browser fr
 - [Development](development.md): prerequisites and build commands for each platform.
 - [Threat model](security/threat-model.md): assets, trust boundaries, and mitigations for pairing, transport, and permissions.
 - [Spike T0.3](spikes/t0.3-quic-android.md): QUIC and discovery between Android and a desktop on real Wi-Fi, with round-trip times.
+- [Spike T0.4](spikes/t0.4-accessibility-play.md): Google Play rules for remote control through AccessibilityService, and the disclosure plan.
+- [Spike T0.6](spikes/t0.6-wayland-portals.md): RemoteDesktop and ScreenCast portals on GNOME and KDE, and where `uinput` is needed.
 
 Implementation should follow the tasks in order. When a decision changes, update the design first.
