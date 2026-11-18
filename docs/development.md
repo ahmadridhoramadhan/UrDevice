@@ -42,7 +42,7 @@ cargo audit
 cargo run -p urdevice-desktop
 ```
 
-The app opens a Slint window and a tray icon. Both show the core version.
+The app opens the Slint window and a tray icon.
 
 ### Linux
 
@@ -110,6 +110,25 @@ Generated files stay under `build/`, so a clean checkout builds without any comm
 ```sh
 ./gradlew assembleDebug -Purdevice.abis=arm64-v8a
 ```
+
+## Running two desktop instances on one machine
+
+Each instance needs its own data directory and QUIC port. The UDP discovery port is shared (`SO_REUSEPORT`).
+
+```sh
+URDEVICE_DATA_DIR=/tmp/urdevice-a URDEVICE_PORT=47901 cargo run -p urdevice-desktop
+URDEVICE_DATA_DIR=/tmp/urdevice-b URDEVICE_PORT=47902 cargo run -p urdevice-desktop
+```
+
+| Variable | Effect |
+|---|---|
+| `URDEVICE_DATA_DIR` | Data directory instead of the per-user default |
+| `URDEVICE_PORT` | QUIC port instead of 47811 |
+| `URDEVICE_NO_KEYRING=1` | Skip the OS keystore and use the encrypted-file fallback |
+| `URDEVICE_NO_CAMERA=1` | Hide "Scan QR" as if there were no camera |
+| `URDEVICE_LOG` | Log filter, for example `info,urdevice_core=debug` (logs are redacted) |
+
+On Android, core logs go to logcat with the tag `UrDevice`: `adb logcat -s UrDevice`.
 
 ## Ports
 

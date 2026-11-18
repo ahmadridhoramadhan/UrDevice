@@ -1,5 +1,184 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">UrDevice</string>
-    <string name="core_version">Core version %1$s</string>
+    <string name="core_version">UrDevice %1$s</string>
+
+    <!-- Common -->
+    <string name="continue_">Continue</string>
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="allow">Allow</string>
+    <string name="always_ask">Always Ask</string>
+    <string name="deny">Deny</string>
+    <string name="stop">Stop</string>
+    <string name="settings">Settings</string>
+    <string name="this_device">This device</string>
+    <string name="devices">Devices</string>
+    <string name="add_device">Add Device</string>
+    <string name="battery_pct">%1$d%%</string>
+    <string name="battery_charging">%1$d%% charging</string>
+
+    <!-- Capabilities -->
+    <string name="cap_clipboard">Clipboard</string>
+    <string name="cap_clipboard_desc">Copy on another device, paste here</string>
+    <string name="cap_files">Receive files</string>
+    <string name="cap_files_desc">Other devices send files to this device</string>
+    <string name="cap_gallery">Gallery</string>
+    <string name="cap_gallery_desc">Other devices browse photos and videos here</string>
+    <string name="cap_input">Remote control</string>
+    <string name="cap_input_desc">Mouse, keyboard, and presenter from other devices</string>
+    <string name="cap_media">Media</string>
+    <string name="cap_media_desc">Control music and video from other devices</string>
+    <string name="cap_screen">Screen sharing</string>
+    <string name="cap_screen_desc">Other devices view this screen</string>
+    <string name="cap_tunnel">Localhost</string>
+    <string name="cap_tunnel_desc">Other devices open the ports you share</string>
+    <string name="cap_term">Remote terminal</string>
+    <string name="cap_term_desc">Other devices open a shell here. Only this device can change it.</string>
+    <string name="cap_fswrite">File changes</string>
+    <string name="cap_fswrite_desc">Upload, rename, and delete. Only this device can change it.</string>
+
+    <!-- Feature tiles -->
+    <string name="tile_send_files">Send files</string>
+    <string name="tile_mousepad">Mousepad</string>
+    <string name="tile_presenter">Presenter</string>
+    <string name="tile_keyboard">Keyboard</string>
+    <string name="tile_ready">Ready</string>
+    <string name="tile_needs_approval">Needs approval</string>
+    <string name="tile_turned_off_by">Turned off by %1$s</string>
+    <string name="features_on">Features on %1$s</string>
+
+    <!-- Onboarding -->
+    <string name="ob_welcome">Welcome to UrDevice</string>
+    <string name="ob_welcome_body">Connect your own devices on one local network. No account and no cloud server.</string>
+    <string name="ob_name">Name this device</string>
+    <string name="ob_name_hint">Other devices see this name. You can change it later in Settings.</string>
+    <string name="ob_safe">Safe and local</string>
+    <string name="ob_safe_body">Your devices talk directly on the same network. There is no server, and every connection is encrypted with this device\'s own key.</string>
+    <string name="ob_safe_key">The key for this device is ready and protected by Android Keystore. Its Device ID:</string>
+    <string name="ob_safe_check">Check this ID on the other device when you pair.</string>
+    <string name="ob_perms">Permissions for other devices</string>
+    <string name="ob_perms_body">Choose what your other devices may do here. This applies to every paired device. You can change it later on This device.</string>
+    <string name="ob_save">Save and continue</string>
+    <string name="ob_pair">Pair your first device</string>
+    <string name="ob_skip">Skip for now</string>
+    <string name="ob_ready">Ready</string>
+    <string name="ob_ready_body">You can pair a device any time with Add Device.</string>
+    <string name="ob_paired">Paired with %1$s</string>
+    <string name="ob_paired_body">Both devices are connected. They reconnect on their own when they are on the same network.</string>
+    <string name="ob_open">Open UrDevice</string>
+
+    <!-- OS permission explanations (R15.2) -->
+    <string name="why_notifications_title">Allow notifications</string>
+    <string name="why_notifications_body">UrDevice shows a notification while it runs, and asks you there when another device wants to use a feature set to Always Ask.</string>
+    <string name="why_camera_title">Allow the camera</string>
+    <string name="why_camera_body">The camera is used only to scan the pairing QR code on your other device. Frames stay on the phone and are never saved or sent.</string>
+    <string name="why_network_title">Allow nearby devices</string>
+    <string name="why_network_body">UrDevice needs access to your local network to find and connect to your own devices. Nothing goes to the internet.</string>
+    <string name="grant">Allow</string>
+    <string name="not_now">Not now</string>
+    <string name="open_settings">Open settings</string>
+
+    <!-- Home -->
+    <string name="home_this_device_line">This device · Android %1$s · %2$s</string>
+    <string name="home_tap_perms">Tap to set permissions for other devices</string>
+    <string name="status_connected_line">%1$s · Wi-Fi · %2$d ms</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_last_seen">Offline · last seen %1$s</string>
+    <string name="status_disconnected_by">Disconnected by %1$s</string>
+    <string name="no_devices">No paired devices yet.</string>
+
+    <!-- This device sheet -->
+    <string name="perms_apply_all">Applies to every device paired with %1$s. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.</string>
+    <string name="confirm_term_title">Allow remote terminal?</string>
+    <string name="confirm_term_body">Every paired device gets full control of this device\'s shell, with no prompt. Only allow this if you trust all of them.</string>
+    <string name="confirm_fs_title">Allow file changes?</string>
+    <string name="confirm_fs_body">Every paired device can upload, rename, and delete files here, with no prompt. Only allow this if you trust all of them.</string>
+
+    <!-- Device view -->
+    <string name="disconnect">Disconnect</string>
+    <string name="reconnect">Reconnect</string>
+    <string name="forget">Forget device</string>
+    <string name="forget_title">Forget this device?</string>
+    <string name="forget_body">The pairing is deleted on both devices. To connect again, pair again.</string>
+    <string name="peer_offline_title">%1$s is offline</string>
+    <string name="peer_offline_body">UrDevice connects on its own when %1$s is on the same network.</string>
+    <string name="peer_disconnected_body">Press Reconnect on either device to connect again. The pairing is kept.</string>
+    <string name="device_id">Device ID: %1$s</string>
+    <string name="you_are_using">You are using %1$s on %2$s</string>
+    <string name="end">End</string>
+    <string name="legend_ask">Always Ask: %1$s confirms first</string>
+    <string name="legend_deny">Deny: turned off by %1$s</string>
+
+    <!-- Pair -->
+    <string name="pair_scan">Scan QR</string>
+    <string name="pair_scan_body">Point the camera at the QR code on the other device.</string>
+    <string name="pair_show_qr">Show this device\'s QR</string>
+    <string name="pair_qr_body">Scan this code with the other device. It works once and changes every 2 minutes.</string>
+    <string name="pair_valid_for">Valid for %1$d s</string>
+    <string name="pair_locked">Too many failed attempts. Pairing is locked for %1$d s.</string>
+    <string name="pair_hidden">Hidden mode is on. Turn it off in Settings to pair.</string>
+    <string name="pair_nearby">Devices on the network</string>
+    <string name="pair_nearby_body">Pick a device. Both screens then show the same 6-digit code.</string>
+    <string name="pair_none">No devices found yet. Open UrDevice on the other device, on the same Wi-Fi.</string>
+    <string name="pair_button">Pair</string>
+    <string name="pair_wants">%1$s wants to pair. Check the code on both screens.</string>
+    <string name="pair_check">Check that %1$s shows this code.</string>
+    <string name="codes_match">Codes match</string>
+    <string name="pair_waiting">Waiting for the other device…</string>
+    <string name="no_camera">No camera found. Show this device\'s QR code instead.</string>
+
+    <!-- Results -->
+    <string name="paired_with">Paired with %1$s</string>
+    <string name="pair_fail_cancelled">Pairing was cancelled.</string>
+    <string name="pair_fail_timeout">Pairing timed out.</string>
+    <string name="pair_fail_expired">That QR code expired or was already used. Scan the new one.</string>
+    <string name="pair_fail_locked">Pairing is locked on the other device after too many failures.</string>
+    <string name="pair_fail_closed">Open Add Device on the other device first.</string>
+    <string name="pair_fail_hidden">The other device is in hidden mode.</string>
+    <string name="pair_fail_unreachable">Could not reach the other device, or its key did not match the QR code.</string>
+    <string name="pair_fail_invalid">That is not a UrDevice pairing code.</string>
+    <string name="pair_fail_other">Pairing failed.</string>
+    <string name="result_allowed">%1$s allowed %2$s. The feature itself arrives in a later update.</string>
+    <string name="result_timeout">%1$s did not answer in time.</string>
+    <string name="result_declined">%1$s declined %2$s.</string>
+    <string name="result_offline">%1$s is not connected.</string>
+    <string name="result_unsupported">%1$s does not offer %2$s.</string>
+    <string name="result_denied">%1$s has %2$s turned off.</string>
+    <string name="notice_unpaired">%1$s removed this pairing.</string>
+    <string name="notice_disconnected">%1$s disconnected.</string>
+    <string name="notice_update">Update UrDevice on %1$s.</string>
+    <string name="notice_locked">Too many failed pairing attempts. Pairing is locked for 5 minutes.</string>
+    <string name="notice_stopped">%1$s stopped the session.</string>
+
+    <!-- Prompts and notifications (R5.3, R5.4) -->
+    <string name="prompt_title">%1$s wants to use %2$s</string>
+    <string name="prompt_body">This setting is Always Ask. If you don\'t answer, the request is denied in %1$d s.</string>
+    <string name="channel_service">Running</string>
+    <string name="channel_prompts">Permission requests</string>
+    <string name="notif_running">Connected to %1$d device(s)</string>
+    <string name="notif_waiting">Waiting for your devices</string>
+    <string name="notif_active">%1$s is using %2$s on this phone</string>
+    <string name="active_banner">%1$s is using %2$s on this device.</string>
+
+    <!-- Settings -->
+    <string name="set_name">Device name</string>
+    <string name="set_hidden">Hidden mode</string>
+    <string name="set_hidden_body">Stop announcing this device. Paired devices can still connect; new devices can\'t pair.</string>
+    <string name="set_language">Language</string>
+    <string name="set_language_body">English. More languages come later.</string>
+    <string name="set_log">Activity log</string>
+    <string name="set_log_body">Requests from other devices in the last 30 days. Content is never recorded.</string>
+    <string name="set_export">Export data</string>
+    <string name="set_reset">Reset identity</string>
+    <string name="set_reset_body">A new key is made and every paired device is removed. Each one must pair again.</string>
+    <string name="set_delete">Delete all data</string>
+    <string name="set_delete_body">Pairings, permissions, the activity log, and this device\'s key are deleted.</string>
+    <string name="log_empty">Nothing yet.</string>
+    <string name="decision_allowed">Allowed</string>
+    <string name="decision_denied">Denied</string>
+    <string name="decision_timeout">No answer</string>
+    <string name="decision_declined">Declined</string>
+    <string name="decision_stopped">Stopped</string>
 </resources>

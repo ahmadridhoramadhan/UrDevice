@@ -6,36 +6,36 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 - [x] T0.1 Create the Cargo workspace with the crates from design §2, add `rustfmt`/`clippy` config, and add a CI workflow (build + clippy + `cargo deny` + `cargo audit` on Linux, macOS, and Windows). _Req: R16_
 - [x] T0.2 Create the Android Gradle project (Kotlin, Compose, minSdk 29) and build `urdevice-ffi` for `arm64-v8a`, `armeabi-v7a`, and `x86_64` with `cargo-ndk`. Generate UniFFI Kotlin bindings and call one `core_version()` function from the app. _Req: R15_
-- [ ] T0.3 Spike: try QUIC between Android and a desktop on real Wi-Fi, including multicast discovery through `MulticastLock` and NsdManager. Measure round-trip time. _Req: R2, R4_
+- [x] T0.3 Spike: try QUIC between Android and a desktop on real Wi-Fi, including multicast discovery through `MulticastLock` and NsdManager. Measure round-trip time. Results: [`docs/spikes/t0.3-quic-android.md`](../../../docs/spikes/t0.3-quic-android.md). _Req: R2, R4_
 - [ ] T0.4 Spike: check the Google Play policy for AccessibilityService remote-control use and write a short disclosure plan. Record the decision in `docs/`. _Req: R9.3, R15_
 - [ ] T0.5 Spike: Bluetooth PAN between Android and Windows/Linux, and a `btleplug` GATT connection between macOS and Android. Confirm that the fallback in design §8 works. _Req: R6_
 - [ ] T0.6 Spike: Wayland RemoteDesktop and ScreenCast portals on GNOME and KDE. Write down which compositors work. _Req: R9.2, R12.2_
 
 ## Phase 1: Core security foundation
 
-- [ ] T1.1 `urdevice-proto`: protobuf schemas for Announce, Hello/Welcome, PairInvite/PairProof/PairAccept, and the control envelope. Add length-prefixed framing with a 1 MiB limit. _Req: R4.6_
-- [ ] T1.2 Identity: create the Ed25519 key and the `rcgen` certificate, compute the Device ID and readable fingerprint, store the key through `keyring` (with an encrypted-file fallback), and support reset. _Req: R1_
-- [ ] T1.3 Trust store: SQLite schema from design §4.2 with row HMACs. Add CRUD for paired devices, permissions, the activity log (30-day pruning), and shared ports. _Req: R3.6, R3.9, R5.1, R5.6_
-- [ ] T1.4 Transport: quinn endpoint, ALPN `urdevice/1`, custom client and server certificate verifiers with pinning, a pairing-context hook, a rule for duplicate connections, and keep-alive. _Req: R4.1, R4.2_
-- [ ] T1.5 Session: Hello/Welcome handshake, capability negotiation, version rejection, the stream multiplexer, the datagram channel, reconnect with backoff, `PermissionState` and `DeviceStatus` messages, user Disconnect/Reconnect with `auto_connect`, and RTT reporting. _Req: R4.3–R4.9, R5.7_
-- [ ] T1.6 Discovery: mDNS advertise and browse, UDP broadcast announcements, a rate-limited parser, the PeerTable, auto-connect to paired peers, and hidden mode. _Req: R2_
-- [ ] T1.7 QR pairing: create the invite and token, encode the URI, verify the HMAC over the TLS exporter, make tokens single-use with expiry, create a new token when one expires while the Pair screen is open, and add the lockout counter. _Req: R3.1–R3.4, R3.7, R3.8, R3.11_
-- [ ] T1.8 Code-confirmation pairing: derive the 6-digit code from the exporter and require confirmation on both sides. _Req: R3.5_
-- [ ] T1.9 Write `docs/security/threat-model.md` from design §15. _Req: R4, R5_
-- [ ] T1.10 Permission engine and ActivityMonitor: one Allow/Always Ask/Deny setting per capability for all paired devices, onboarding defaults (design §7.4), the Always Ask prompt with the 30 s timeout, `Denied` replies, the `PermissionState` push within 1 s of a change, the warning and extra confirmation before Allow for terminal and file changes, and revoke and stop. _Req: R5_
-- [ ] T1.11 Logging with `tracing` and a redaction layer. _Req: R16.2_
-- [ ]* T1.12 Integration tests: both pairing flows, wrong-fingerprint rejection, token replay, lockout, reconnect, and unpair-then-reject.
+- [x] T1.1 `urdevice-proto`: protobuf schemas for Announce, Hello/Welcome, PairInvite/PairProof/PairAccept, and the control envelope. Add length-prefixed framing with a 1 MiB limit. _Req: R4.6_
+- [x] T1.2 Identity: create the Ed25519 key and the `rcgen` certificate, compute the Device ID and readable fingerprint, store the key through `keyring` (with an encrypted-file fallback), and support reset. _Req: R1_
+- [x] T1.3 Trust store: SQLite schema from design §4.2 with row HMACs. Add CRUD for paired devices, permissions, the activity log (30-day pruning), and shared ports. _Req: R3.6, R3.9, R5.1, R5.6_
+- [x] T1.4 Transport: quinn endpoint, ALPN `urdevice/1`, custom client and server certificate verifiers with pinning, a pairing-context hook, a rule for duplicate connections, and keep-alive. _Req: R4.1, R4.2_
+- [x] T1.5 Session: Hello/Welcome handshake, capability negotiation, version rejection, the stream multiplexer, the datagram channel, reconnect with backoff, `PermissionState` and `DeviceStatus` messages, user Disconnect/Reconnect with `auto_connect`, and RTT reporting. _Req: R4.3–R4.9, R5.7_
+- [x] T1.6 Discovery: mDNS advertise and browse, UDP broadcast announcements, a rate-limited parser, the PeerTable, auto-connect to paired peers, and hidden mode. _Req: R2_
+- [x] T1.7 QR pairing: create the invite and token, encode the URI, verify the HMAC over the TLS exporter, make tokens single-use with expiry, create a new token when one expires while the Pair screen is open, and add the lockout counter. _Req: R3.1–R3.4, R3.7, R3.8, R3.11_
+- [x] T1.8 Code-confirmation pairing: derive the 6-digit code from the exporter and require confirmation on both sides. _Req: R3.5_
+- [x] T1.9 Write `docs/security/threat-model.md` from design §15. _Req: R4, R5_
+- [x] T1.10 Permission engine and ActivityMonitor: one Allow/Always Ask/Deny setting per capability for all paired devices, onboarding defaults (design §7.4), the Always Ask prompt with the 30 s timeout, `Denied` replies, the `PermissionState` push within 1 s of a change, the warning and extra confirmation before Allow for terminal and file changes, and revoke and stop. _Req: R5_
+- [x] T1.11 Logging with `tracing` and a redaction layer. _Req: R16.2_
+- [x]* T1.12 Integration tests: both pairing flows, wrong-fingerprint rejection, token replay, lockout, reconnect, and unpair-then-reject.
 - [ ]* T1.13 Fuzz targets: control-message framing, Announce parser, and QR payload parser.
 
 ## Phase 2: App shells
 
-- [ ] T2.1 Desktop: Slint app with a tray icon and start at login, following the layout in `docs/mockup/urdevice-layout.html` (design §12). Add onboarding (`docs/mockup/onboarding.html`), the sidebar device list (connected, disconnected, offline with last seen), the "This device" view with permission settings, the paired-device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`), the Pair screen (QR display with countdown, available devices with code confirmation), and the Settings screen (name, Device ID, hidden mode, start at login, download folder, clipboard pause, language, activity log, reset identity, data export and delete). _Req: R1.4, R1.5, R2, R3, R4.7–R4.9, R5, R14.1, R14.2, R16.3_
-- [ ] T2.2 Desktop: Always Ask prompt window (Allow / Deny, 30 s timeout), the warning and extra confirmation when the user sets terminal or file changes to Allow, a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.2–R5.6_
-- [ ] T2.3 Android: foreground service that hosts the core, NsdManager discovery adapter, and Compose Devices/Pair screens (CameraX + ML Kit QR scanner, the app's own QR display with countdown, code confirmation), and the device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`). _Req: R2, R3, R4.7–R4.9, R15.1_
-- [ ] T2.4 Android: onboarding with the permission defaults (including Gallery), following `docs/mockup/onboarding.html`, the "This device" permission sheet, OS permission explanation screens, a notification with Stop, the Always Ask notification with Allow and Deny, and the Settings screen. _Req: R5, R15.2, R16.3_
-- [ ] T2.5 Localization setup on both platforms (Slint `@tr`, Android `strings.xml`). _Req: R16.4_
-- [ ] T2.6 Desktop QR scanner: camera frames with `nokhwa`, decoding with `rqrr`, the OS camera permission on each OS, hiding "Scan QR" when there is no camera, and stopping the camera when the Pair screen closes. _Req: R3.10_
-- [ ] T2.7 Battery status adapters (`starship-battery` on desktop, `BatteryManager` on Android) and the connection-path chip with latency. _Req: R4.8, R4.9_
+- [x] T2.1 Desktop: Slint app with a tray icon and start at login, following the layout in `docs/mockup/urdevice-layout.html` (design §12). Add onboarding (`docs/mockup/onboarding.html`), the sidebar device list (connected, disconnected, offline with last seen), the "This device" view with permission settings, the paired-device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`), the Pair screen (QR display with countdown, available devices with code confirmation), and the Settings screen (name, Device ID, hidden mode, start at login, download folder, clipboard pause, language, activity log, reset identity, data export and delete). _Req: R1.4, R1.5, R2, R3, R4.7–R4.9, R5, R14.1, R14.2, R16.3_
+- [x] T2.2 Desktop: Always Ask prompt window (Allow / Deny, 30 s timeout), the warning and extra confirmation when the user sets terminal or file changes to Allow, a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.2–R5.6_
+- [x] T2.3 Android: foreground service that hosts the core, NsdManager discovery adapter, and Compose Devices/Pair screens (CameraX + ML Kit QR scanner, the app's own QR display with countdown, code confirmation), and the device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`). _Req: R2, R3, R4.7–R4.9, R15.1_
+- [x] T2.4 Android: onboarding with the permission defaults (including Gallery), following `docs/mockup/onboarding.html`, the "This device" permission sheet, OS permission explanation screens, a notification with Stop, the Always Ask notification with Allow and Deny, and the Settings screen. _Req: R5, R15.2, R16.3_
+- [x] T2.5 Localization setup on both platforms (Slint `@tr`, Android `strings.xml`). _Req: R16.4_
+- [x] T2.6 Desktop QR scanner: camera frames with `nokhwa`, decoding with `rqrr`, the OS camera permission on each OS, hiding "Scan QR" when there is no camera, and stopping the camera when the Pair screen closes. _Req: R3.10_
+- [x] T2.7 Battery status adapters (`starship-battery` on desktop, `BatteryManager` on Android) and the connection-path chip with latency. _Req: R4.8, R4.9_
 
 ## Phase 3: Clipboard and files
 

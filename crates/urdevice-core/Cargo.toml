@@ -8,9 +8,32 @@ rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+default = ["mdns"]
+# Built-in mDNS through `mdns-sd`. Android turns it off and uses NsdManager.
+mdns = ["dep:mdns-sd"]
+
 [dependencies]
+data-encoding.workspace = true
 futures-core.workspace = true
+if-addrs.workspace = true
+mdns-sd = { workspace = true, optional = true }
+qrcode.workspace = true
+quinn.workspace = true
+rcgen.workspace = true
+ring.workspace = true
+rusqlite.workspace = true
+rustls.workspace = true
+rustls-webpki.workspace = true
+socket2.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+urdevice-proto.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+prost.workspace = true

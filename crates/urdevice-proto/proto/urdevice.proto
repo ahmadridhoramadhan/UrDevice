@@ -1,0 +1,86 @@
+// UrDevice protocol, version 1.
+//
+// Reference copy of the schema. The Rust types in `src/lib.rs` are written by
+// hand with `prost` derives and are the source of truth; keep both in sync.
+// Never reuse or renumber a field.
+
+syntax = "proto3";
+package urdevice.v1;
+
+// UDP broadcast payload, sent after the 4-byte magic "URDV". Max 512 bytes.
+message Announce {
+  uint32 v = 1;
+  bytes short_id = 2;  // first 8 bytes of the Device ID
+  string name = 3;
+  uint32 port = 4;     // QUIC port
+  string platform = 5;
+}
+
+// QR payload: urdevice://pair?d=<base64url(PairInvite)>
+message PairInvite {
+  uint32 v = 1;
+  bytes device_id = 2;  // 32 bytes
+  string name = 3;
+  string platform = 4;
+  repeated string addrs = 5;
+  uint32 port = 6;
+  bytes token = 7;      // 16 bytes, single use
+  uint64 expires_at = 8;
+}
+
+message Hello {
+  uint32 proto_min = 1;
+  uint32 proto_max = 2;
+  string app_version = 3;
+  repeated string capabilities = 4;
+  string name = 5;
+  string platform = 6;
+}
+
+message Welcome {
+  uint32 proto = 1;
+  repeated string capabilities = 2;
+  bytes session_id = 3;
+  string name = 4;
+  string platform = 5;
+}
+
+message PairProof { bytes hmac = 1; string name = 2; string platform = 3; }
+message PairAccept { string name = 1; string platform = 2; }
+message PairStart { string name = 1; string platform = 2; }
+message PairReady { string name = 1; string platform = 2; }
+message PairConfirm {}
+message PairReject { string reason = 1; }
+
+enum WireMode { DENY = 0; ASK = 1; ALLOW = 2; }
+message PermissionEntry { string capability = 1; WireMode mode = 2; }
+message PermissionState { repeated PermissionEntry entries = 1; }
+
+message DeviceStatus { optional uint32 battery_pct = 1; optional bool charging = 2; }
+message Disconnect {}
+message Unpair {}
+
+message ActivityRequest { uint64 request_id = 1; string capability = 2; }
+message ActivityReply { uint64 request_id = 1; bool granted = 2; string reason = 3; }
+message ActivityStop { uint64 request_id = 1; }
+
+// Control stream frame: [u32 big-endian length][Control], length <= 1 MiB.
+message Control {
+  oneof msg {
+    Hello hello = 1;
+    Welcome welcome = 2;
+    PairProof pair_proof = 3;
+    PairAccept pair_accept = 4;
+    PairStart pair_start = 5;
+    PairReady pair_ready = 6;
+    PairConfirm pair_confirm = 7;
+    PairReject pair_reject = 8;
+    PermissionState permission_state = 9;
+    DeviceStatus device_status = 10;
+    Disconnect disconnect = 11;
+    Unpair unpair = 12;
+    ActivityRequest activity_request = 13;
+    ActivityReply activity_reply = 14;
+    ActivityStop activity_stop = 15;
+  }
+}
