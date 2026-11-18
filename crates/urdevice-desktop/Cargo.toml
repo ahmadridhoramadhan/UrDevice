@@ -14,14 +14,14 @@ path = "src/main.rs"
 
 [dependencies]
 auto-launch.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 directories.workspace = true
 nokhwa.workspace = true
 png.workspace = true
 rqrr.workspace = true
 tracing.workspace = true
 slint.workspace = true
-urdevice-core.workspace = true
+urdevice-core = { workspace = true, features = ["mdns"] }
 urdevice-platform.workspace = true
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]

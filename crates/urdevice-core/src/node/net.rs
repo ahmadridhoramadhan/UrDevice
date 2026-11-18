@@ -1085,6 +1085,10 @@ pub(super) async fn housekeeping_loop(inner: Arc<Inner>) {
                 // Latency on the device view (R4.8).
                 changed = true;
             }
+            for (id, s) in &st.sessions {
+                let rtt_ms = s.conn.rtt().as_secs_f64() * 1000.0;
+                tracing::debug!(peer = %id.short_hex(), rtt_ms, "session rtt");
+            }
         }
         inner.update_policy();
         if last_prune.elapsed() > Duration::from_secs(3600) {

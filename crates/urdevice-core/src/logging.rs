@@ -86,6 +86,22 @@ pub fn init(filter: &str) {
         .try_init();
 }
 
+/// Like [`init`], but writes through `writer` (Android sends lines to logcat).
+pub fn init_with_writer<W>(filter: &str, writer: W)
+where
+    W: for<'a> tracing_subscriber::fmt::MakeWriter<'a> + Send + Sync + 'static,
+{
+    use tracing_subscriber::EnvFilter;
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::new(filter))
+        .fmt_fields(RedactingFields)
+        .with_target(false)
+        .with_ansi(false)
+        .without_time()
+        .with_writer(writer)
+        .try_init();
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};

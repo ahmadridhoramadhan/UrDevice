@@ -100,11 +100,14 @@ fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
 }
 
 fn local_time(ts: u64) -> String {
-    use chrono::TimeZone;
     i64::try_from(ts)
         .ok()
-        .and_then(|t| chrono::Local.timestamp_opt(t, 0).single())
-        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+        .and_then(|t| jiff::Timestamp::from_second(t).ok())
+        .map(|t| {
+            t.to_zoned(jiff::tz::TimeZone::system())
+                .strftime("%Y-%m-%d %H:%M")
+                .to_string()
+        })
         .unwrap_or_default()
 }
 
@@ -725,7 +728,7 @@ impl Ui {
                     .unwrap_or_else(urdevice_platform::data_dir);
                 let path = dir.join(format!(
                     "urdevice-export-{}.txt",
-                    chrono::Local::now().format("%Y%m%d-%H%M%S")
+                    jiff::Zoned::now().strftime("%Y%m%d-%H%M%S")
                 ));
                 match std::fs::write(&path, text) {
                     Ok(()) => {

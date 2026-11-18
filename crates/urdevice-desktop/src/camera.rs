@@ -9,7 +9,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use nokhwa::pixel_format::RgbFormat;
-use nokhwa::utils::{ApiBackend, CameraIndex, RequestedFormat, RequestedFormatType};
+use nokhwa::utils::{
+    ApiBackend, CameraFormat, CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType,
+    Resolution,
+};
 use slint::ComponentHandle;
 
 use crate::ui::ScanWindow;
@@ -83,7 +86,10 @@ fn status(weak: &slint::Weak<ScanWindow>, text: String) {
 }
 
 fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>) {
-    let format = RequestedFormat::new::<RgbFormat>(RequestedFormatType::AbsoluteHighestResolution);
+    // Uncompressed frames: MJPEG decoding would pull in mozjpeg (IJG license).
+    let format = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Closest(
+        CameraFormat::new(Resolution::new(640, 480), FrameFormat::YUYV, 30),
+    ));
     let mut cam = match nokhwa::Camera::new(CameraIndex::Index(0), format) {
         Ok(c) => c,
         Err(e) => {

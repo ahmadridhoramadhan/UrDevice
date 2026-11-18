@@ -19,7 +19,7 @@ publish = false
 
 [workspace.dependencies]
 # Internal crates
-urdevice-core = { path = "crates/urdevice-core" }
+urdevice-core = { path = "crates/urdevice-core", default-features = false }
 urdevice-media = { path = "crates/urdevice-media" }
 urdevice-platform = { path = "crates/urdevice-platform" }
 urdevice-proto = { path = "crates/urdevice-proto" }
@@ -34,7 +34,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 rustls-webpki = { version = "0.103", default-features = false, features = ["std", "ring"] }
 rcgen = { version = "0.14", default-features = false, features = ["ring", "pem"] }
 ring = "0.17"
-rusqlite = { version = "0.38", features = ["bundled"] }
+rusqlite = { version = "0.43", features = ["bundled"] }
 mdns-sd = { version = "0.19", default-features = false }
 socket2 = { version = "0.6", features = ["all"] }
 if-addrs = "0.15"
@@ -45,9 +45,9 @@ keyring = { version = "3", default-features = false }
 starship-battery = "0.12"
 gethostname = "1"
 directories = "6"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+jiff = "0.2"
 auto-launch = "0.6"
-nokhwa = { version = "0.10", features = ["input-native"] }
+nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
 rqrr = "0.10"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "env-filter", "ansi"] }
 
