@@ -5,13 +5,13 @@
 //! they are shown in the window and decoded, never written or sent. Dropping
 //! the [`Scanner`] stops the camera.
 
+use std::borrow::Cow;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use nokhwa::pixel_format::RgbFormat;
 use nokhwa::utils::{
     ApiBackend, CameraFormat, CameraIndex, FrameFormat, RequestedFormat, RequestedFormatType,
-    Resolution,
 };
 use slint::ComponentHandle;
 
@@ -31,11 +31,13 @@ pub(crate) fn available() -> bool {
 pub(crate) struct Scanner {
     stop: Arc<AtomicBool>,
     window: ScanWindow,
+    generation: u64,
 }
 
 impl Drop for Scanner {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        drop(take_callback(self.generation));
         let _ = self.window.hide();
     }
 }
@@ -47,8 +49,11 @@ impl Scanner {
         window.set_status("Starting the camera…".into());
         let stop = Arc::new(AtomicBool::new(false));
         let on_code: Arc<dyn Fn(String)> = Arc::new(on_code);
-        // `on_code` is not Send; keep it on the UI thread behind a thread-local slot.
-        CALLBACK.with(|c| *c.borrow_mut() = Some(on_code));
+        let generation = GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
+        // `on_code` is not Send; keep it on the UI thread behind a thread-local
+        // slot. Frames from an older scan carry an older generation and can't
+        // take it.
+        CALLBACK.with(|c| *c.borrow_mut() = Some((generation, on_code)));
 
         let weak = window.as_weak();
         let stop_cancel = stop.clone();
@@ -64,16 +69,35 @@ impl Scanner {
         let stop_thread = stop.clone();
         std::thread::Builder::new()
             .name("urdevice-camera".into())
-            .spawn(move || run(weak, stop_thread))
+            .spawn(move || run(weak, stop_thread, generation))
             .map_err(|e| e.to_string())?;
-        Ok(Self { stop, window })
+        Ok(Self {
+            stop,
+            window,
+            generation,
+        })
     }
 }
 
 type Callback = Arc<dyn Fn(String)>;
 
+/// Counts scans, so a frame queued by a cancelled scan is ignored.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+
 thread_local! {
-    static CALLBACK: std::cell::RefCell<Option<Callback>> = const { std::cell::RefCell::new(None) };
+    static CALLBACK: std::cell::RefCell<Option<(u64, Callback)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Take the callback if it still belongs to scan `generation`.
+fn take_callback(generation: u64) -> Option<Callback> {
+    CALLBACK.with(|c| {
+        let mut slot = c.borrow_mut();
+        match slot.as_ref() {
+            Some((g, _)) if *g == generation => slot.take().map(|(_, cb)| cb),
+            _ => None,
+        }
+    })
 }
 
 fn status(weak: &slint::Weak<ScanWindow>, text: String) {
@@ -85,12 +109,161 @@ fn status(weak: &slint::Weak<ScanWindow>, text: String) {
     });
 }
 
-fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>) {
-    // Uncompressed frames: MJPEG decoding would pull in mozjpeg (IJG license).
-    let format = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Closest(
-        CameraFormat::new(Resolution::new(640, 480), FrameFormat::YUYV, 30),
-    ));
-    let mut cam = match nokhwa::Camera::new(CameraIndex::Index(0), format) {
+/// Formats `nokhwa` turns into RGB itself.
+const UNCOMPRESSED: [FrameFormat; 4] = [
+    FrameFormat::YUYV,
+    FrameFormat::NV12,
+    FrameFormat::RAWRGB,
+    FrameFormat::RAWBGR,
+];
+/// The size the scanner aims for: enough for a QR code, cheap to decode.
+const TARGET: (u32, u32) = (640, 480);
+/// Uncompressed frames wider than this are slow over USB; MJPEG wins then.
+const MAX_UNCOMPRESSED_WIDTH: u32 = 1280;
+/// Largest MJPEG frame side the decoder accepts.
+const MAX_JPEG_SIDE: usize = 4096;
+/// Frames in a row that fail to decode before the user is told.
+const BAD_FRAME_LIMIT: u32 = 60;
+
+/// Pick the format to scan with (#47): an uncompressed format near 640x480
+/// if the camera has one, else MJPEG near 640x480. Many webcams offer only
+/// MJPEG, or no uncompressed format at 640x480.
+fn pick_format(formats: &[CameraFormat]) -> Option<CameraFormat> {
+    let rank = |f: &CameraFormat| {
+        let (w, h) = (f.resolution().x(), f.resolution().y());
+        let tier = match f.format() {
+            x if UNCOMPRESSED.contains(&x) && w <= MAX_UNCOMPRESSED_WIDTH => 0,
+            FrameFormat::MJPEG => 1,
+            _ => 2,
+        };
+        let dx = i64::from(w) - i64::from(TARGET.0);
+        let dy = i64::from(h) - i64::from(TARGET.1);
+        (tier, dx * dx + dy * dy, f.frame_rate().abs_diff(30))
+    };
+    formats
+        .iter()
+        .filter(|f| f.format() == FrameFormat::MJPEG || UNCOMPRESSED.contains(&f.format()))
+        .min_by_key(|f| rank(f))
+        .copied()
+}
+
+/// One camera frame as packed RGB, with its width and height.
+/// Frames whose size does not match their width and height are dropped, so
+/// later indexing and copying can't panic.
+fn to_rgb(frame: &nokhwa::Buffer) -> Option<(Vec<u8>, u32, u32)> {
+    let (rgb, w, h) = if frame.source_frame_format() == FrameFormat::MJPEG {
+        decode_mjpeg(frame.buffer())?
+    } else {
+        let img = frame.decode_image::<RgbFormat>().ok()?;
+        let (w, h) = (img.width(), img.height());
+        (img.into_raw(), w, h)
+    };
+    rgb_len_ok(&rgb, w, h).then_some((rgb, w, h))
+}
+
+fn rgb_len_ok(rgb: &[u8], w: u32, h: u32) -> bool {
+    (w as usize)
+        .checked_mul(h as usize)
+        .and_then(|n| n.checked_mul(3))
+        .is_some_and(|n| n == rgb.len())
+}
+
+/// An APP0 segment reading "AVI1": it tells the decoder the frame is MJPEG.
+const AVI1_APP0: [u8; 9] = [0xff, 0xe0, 0x00, 0x07, b'A', b'V', b'I', b'1', 0x00];
+
+/// True when the JPEG carries its own Huffman tables (a DHT segment before
+/// the scan data).
+fn has_dht(jpeg: &[u8]) -> bool {
+    let mut i = 2;
+    loop {
+        // Fill bytes: any number of 0xFF before a marker.
+        while jpeg.get(i) == Some(&0xff) && jpeg.get(i + 1) == Some(&0xff) {
+            i += 1;
+        }
+        if jpeg.get(i) != Some(&0xff) {
+            return false;
+        }
+        let Some(&marker) = jpeg.get(i + 1) else {
+            return false;
+        };
+        match marker {
+            0xc4 => return true,
+            0xda | 0xd9 => return false,
+            // Markers without a length: TEM and RST0-RST7.
+            0x01 | 0xd0..=0xd7 => i += 2,
+            _ => {
+                let Some(len) = jpeg.get(i + 2..i + 4) else {
+                    return false;
+                };
+                let len = usize::from(u16::from_be_bytes([len[0], len[1]]));
+                if len < 2 {
+                    return false;
+                }
+                i += 2 + len;
+            }
+        }
+    }
+}
+
+/// Webcam MJPEG often leaves out the Huffman tables. The decoder fills in
+/// the standard ones only for frames marked "AVI1", so mark frames that
+/// have none.
+fn with_mjpeg_mark(jpeg: &[u8]) -> Cow<'_, [u8]> {
+    if !jpeg.starts_with(&[0xff, 0xd8]) || has_dht(jpeg) {
+        return Cow::Borrowed(jpeg);
+    }
+    let mut out = Vec::with_capacity(jpeg.len() + AVI1_APP0.len());
+    out.extend_from_slice(&jpeg[..2]);
+    out.extend_from_slice(&AVI1_APP0);
+    out.extend_from_slice(&jpeg[2..]);
+    Cow::Owned(out)
+}
+
+/// Decode an MJPEG frame in pure Rust.
+fn decode_mjpeg(data: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+    use zune_jpeg::zune_core::colorspace::ColorSpace;
+    use zune_jpeg::zune_core::options::DecoderOptions;
+
+    let options = DecoderOptions::default()
+        .jpeg_set_out_colorspace(ColorSpace::RGB)
+        .set_max_width(MAX_JPEG_SIDE)
+        .set_max_height(MAX_JPEG_SIDE);
+    let data = with_mjpeg_mark(data);
+    let mut d =
+        zune_jpeg::JpegDecoder::new_with_options(std::io::Cursor::new(data.as_ref()), options);
+    let rgb = d.decode().ok()?;
+    let (w, h) = d.dimensions()?;
+    if rgb.len() != w.checked_mul(h)?.checked_mul(3)? {
+        return None;
+    }
+    Some((rgb, u32::try_from(w).ok()?, u32::try_from(h).ok()?))
+}
+
+fn open_camera(index: u32) -> Result<nokhwa::Camera, nokhwa::NokhwaError> {
+    let any = RequestedFormat::new::<RgbFormat>(RequestedFormatType::None);
+    let mut cam = nokhwa::Camera::new(CameraIndex::Index(index), any)?;
+    match cam.compatible_camera_formats().map(|f| pick_format(&f)) {
+        Ok(Some(f)) => {
+            let exact = RequestedFormat::new::<RgbFormat>(RequestedFormatType::Exact(f));
+            if let Err(e) = cam.set_camera_requset(exact) {
+                tracing::debug!(error = %e, "keeping the camera's own format");
+            }
+        }
+        Ok(None) => {}
+        Err(e) => tracing::debug!(error = %e, "camera formats unknown"),
+    }
+    let f = cam.camera_format();
+    tracing::info!(
+        format = %f.format(),
+        width = f.resolution().x(),
+        height = f.resolution().y(),
+        "camera format"
+    );
+    Ok(cam)
+}
+
+fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>, generation: u64) {
+    let mut cam = match open_camera(0) {
         Ok(c) => c,
         Err(e) => {
             tracing::warn!(error = %e, "camera open failed");
@@ -107,27 +280,33 @@ fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>) {
         &weak,
         "Hold the other device's QR code in front of the camera.".into(),
     );
+    let mut bad_frames = 0u32;
     while !stop.load(Ordering::Relaxed) {
-        let Ok(frame) = cam.frame() else { continue };
-        let Ok(rgb) = frame.decode_image::<RgbFormat>() else {
+        let Some((raw, w, h)) = cam.frame().ok().as_ref().and_then(to_rgb) else {
+            bad_frames += 1;
+            if bad_frames == BAD_FRAME_LIMIT {
+                tracing::warn!(format = %cam.camera_format().format(), "camera frames can't be read");
+                status(
+                    &weak,
+                    "This camera's picture can't be read. Try another camera.".into(),
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(15));
             continue;
         };
-        let (w, h) = (rgb.width(), rgb.height());
-        let raw = rgb.into_raw();
+        bad_frames = 0;
         let found = decode(&raw, w, h);
         let mut buf = slint::SharedPixelBuffer::<slint::Rgb8Pixel>::new(w, h);
-        buf.make_mut_bytes()
-            .copy_from_slice(&raw[..(w * h * 3) as usize]);
+        buf.make_mut_bytes().copy_from_slice(&raw);
         let weak2 = weak.clone();
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(win) = weak2.upgrade() {
                 win.set_frame(slint::Image::from_rgb8(buf));
             }
-            if let Some(text) = found {
-                let cb = CALLBACK.with(|c| c.borrow_mut().take());
-                if let Some(cb) = cb {
-                    cb(text);
-                }
+            if let Some(text) = found
+                && let Some(cb) = take_callback(generation)
+            {
+                cb(text);
             }
         });
     }
@@ -165,6 +344,185 @@ fn camera_help() -> String {
 
 #[cfg(test)]
 mod tests {
+    use nokhwa::utils::{CameraFormat, FrameFormat, Resolution};
+
+    use super::pick_format;
+
+    /// A 320x240 4:2:2 JPEG of a QR code, like an MJPEG webcam frame.
+    const QR_JPEG: &[u8] = include_bytes!("../tests/fixtures/qr-320x240.jpg");
+
+    fn fmt(w: u32, h: u32, f: FrameFormat, fps: u32) -> CameraFormat {
+        CameraFormat::new(Resolution::new(w, h), f, fps)
+    }
+
+    #[test]
+    fn picks_uncompressed_near_640x480() {
+        let formats = [
+            fmt(1920, 1080, FrameFormat::MJPEG, 30),
+            fmt(640, 480, FrameFormat::MJPEG, 30),
+            fmt(800, 600, FrameFormat::YUYV, 15),
+            fmt(640, 480, FrameFormat::YUYV, 30),
+        ];
+        assert_eq!(
+            pick_format(&formats),
+            Some(fmt(640, 480, FrameFormat::YUYV, 30))
+        );
+    }
+
+    #[test]
+    fn falls_back_to_mjpeg_when_there_is_no_yuyv() {
+        let formats = [
+            fmt(1920, 1080, FrameFormat::MJPEG, 30),
+            fmt(1280, 720, FrameFormat::MJPEG, 30),
+            fmt(640, 480, FrameFormat::MJPEG, 30),
+            fmt(640, 480, FrameFormat::GRAY, 30),
+        ];
+        assert_eq!(
+            pick_format(&formats),
+            Some(fmt(640, 480, FrameFormat::MJPEG, 30))
+        );
+    }
+
+    #[test]
+    fn prefers_small_mjpeg_over_huge_yuyv() {
+        let formats = [
+            fmt(1920, 1080, FrameFormat::YUYV, 5),
+            fmt(640, 360, FrameFormat::MJPEG, 30),
+        ];
+        assert_eq!(
+            pick_format(&formats),
+            Some(fmt(640, 360, FrameFormat::MJPEG, 30))
+        );
+    }
+
+    #[test]
+    fn yuyv_at_another_size_is_still_used() {
+        // nokhwa's own `Closest` request fails here: it looks up frame rates
+        // at the requested size, not the one it found.
+        let formats = [fmt(1280, 720, FrameFormat::YUYV, 10)];
+        assert_eq!(pick_format(&formats), Some(formats[0]));
+        assert_eq!(pick_format(&[]), None);
+    }
+
+    #[test]
+    fn decodes_an_mjpeg_frame_and_finds_the_code() {
+        let (rgb, w, h) = super::decode_mjpeg(QR_JPEG).unwrap();
+        assert_eq!((w, h), (320, 240));
+        assert_eq!(
+            super::decode(&rgb, w, h).as_deref(),
+            Some("urdevice://pair?d=TEST-FIXTURE-0123456789")
+        );
+    }
+
+    #[test]
+    fn decodes_mjpeg_without_huffman_tables() {
+        // Many webcams send MJPEG frames with no DHT segment.
+        let stripped = strip_dht(QR_JPEG);
+        assert!(super::has_dht(QR_JPEG));
+        assert!(!super::has_dht(&stripped));
+        let (rgb, w, h) = super::decode_mjpeg(&stripped).unwrap();
+        assert!(super::decode(&rgb, w, h).is_some());
+    }
+
+    #[test]
+    fn dht_walker_handles_odd_marker_sequences() {
+        use super::has_dht;
+        // Fill bytes and a restart marker before the DHT.
+        assert!(has_dht(&[0xff, 0xd8, 0xff, 0xff, 0xd0, 0xff, 0xc4, 0, 2]));
+        // SOS first: no tables.
+        assert!(!has_dht(&[0xff, 0xd8, 0xff, 0xda, 0, 2]));
+        // Cut off in the middle of a length, a zero length, and junk.
+        assert!(!has_dht(&[0xff, 0xd8, 0xff, 0xe0, 0]));
+        assert!(!has_dht(&[0xff, 0xd8, 0xff, 0xe0, 0, 0]));
+        assert!(!has_dht(&[0xff, 0xd8, 1, 2, 3]));
+        // Random input never panics.
+        let mut x = 0x9e37_79b9_u32;
+        for len in 0..400 {
+            let bytes: Vec<u8> = (0..len)
+                .map(|_| {
+                    x ^= x << 13;
+                    x ^= x >> 17;
+                    x ^= x << 5;
+                    if x.is_multiple_of(3) { 0xff } else { x as u8 }
+                })
+                .collect();
+            let _ = has_dht(&bytes);
+            let _ = super::decode_mjpeg(&bytes);
+        }
+    }
+
+    #[test]
+    fn short_rgb_buffers_are_rejected() {
+        assert!(super::rgb_len_ok(&[0; 12], 2, 2));
+        assert!(!super::rgb_len_ok(&[0; 11], 2, 2));
+        assert!(!super::rgb_len_ok(&[0; 13], 2, 2));
+        assert!(!super::rgb_len_ok(&[], u32::MAX, u32::MAX));
+    }
+
+    #[test]
+    fn a_cancelled_scan_cannot_take_the_new_callback() {
+        use std::sync::Arc;
+        let cb: super::Callback = Arc::new(|_| {});
+        super::CALLBACK.with(|c| *c.borrow_mut() = Some((7, cb)));
+        assert!(super::take_callback(6).is_none());
+        assert!(super::take_callback(7).is_some());
+        assert!(super::take_callback(7).is_none());
+    }
+
+    #[test]
+    fn broken_mjpeg_is_skipped() {
+        assert!(super::decode_mjpeg(&QR_JPEG[..200]).is_none());
+        assert!(super::decode_mjpeg(b"not a jpeg").is_none());
+    }
+
+    /// Drop every DHT (0xFFC4) segment before the scan data.
+    fn strip_dht(jpeg: &[u8]) -> Vec<u8> {
+        let mut out = jpeg[..2].to_vec();
+        let mut i = 2;
+        while i + 4 <= jpeg.len() && jpeg[i] == 0xff {
+            let marker = jpeg[i + 1];
+            let len = usize::from(u16::from_be_bytes([jpeg[i + 2], jpeg[i + 3]]));
+            if marker == 0xda {
+                break;
+            }
+            if marker != 0xc4 {
+                out.extend_from_slice(&jpeg[i..i + 2 + len]);
+            }
+            i += 2 + len;
+        }
+        out.extend_from_slice(&jpeg[i..]);
+        out
+    }
+
+    /// Manual check with a real camera: hold a UrDevice QR code in front of it.
+    /// `cargo test -p urdevice-desktop real_camera -- --ignored --nocapture`
+    /// Set `URDEVICE_TEST_CAMERA` to use another camera index than 0.
+    #[test]
+    #[ignore = "needs a camera"]
+    fn real_camera_finds_a_code() {
+        let index = std::env::var("URDEVICE_TEST_CAMERA")
+            .ok()
+            .and_then(|i| i.parse().ok())
+            .unwrap_or(0);
+        let mut cam = super::open_camera(index).unwrap();
+        let f = cam.camera_format();
+        println!("format {} {}", f.format(), f.resolution());
+        cam.open_stream().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let mut frames = 0;
+        while std::time::Instant::now() < deadline {
+            let Some((rgb, w, h)) = cam.frame().ok().as_ref().and_then(super::to_rgb) else {
+                continue;
+            };
+            frames += 1;
+            if let Some(text) = super::decode(&rgb, w, h) {
+                println!("found after {frames} frames: {} chars", text.len());
+                return;
+            }
+        }
+        panic!("no code found in {frames} frames");
+    }
+
     #[test]
     fn decodes_a_rendered_pairing_code() {
         let text = format!("{}{}", urdevice_core::pairing::QR_PREFIX, "A".repeat(120));

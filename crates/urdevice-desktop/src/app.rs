@@ -7,9 +7,9 @@ use std::error::Error;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use slint::{ComponentHandle, Image, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use slint::{ComponentHandle, Image, Model, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use urdevice_core::node::{EventSink, PeerStatus, PermissionView, Snapshot};
 use urdevice_core::{Capability, Mode, Node, NodeConfig, NodeEvent};
 
@@ -35,9 +35,9 @@ impl EventSink for Sink {
                 return;
             }
             let pending = self.pending.clone();
-            let _ = slint::invoke_from_event_loop(move || {
-                pending.store(false, Ordering::Release);
-                with_ui(|ui| ui.refresh());
+            let _ = slint::invoke_from_event_loop(move || match UI.with(|u| u.borrow().clone()) {
+                Some(ui) => ui.schedule_refresh(pending),
+                None => pending.store(false, Ordering::Release),
             });
             return;
         }
@@ -68,7 +68,23 @@ fn mode_from_index(i: i32) -> Mode {
     }
 }
 
+thread_local! {
+    static ICONS: RefCell<HashMap<String, Image>> = RefCell::new(HashMap::new());
+}
+
+/// The icon for a capability. Each SVG is parsed once; the same image is
+/// handed out after that, so unchanged rows compare equal.
 fn icon(cap: &str) -> Image {
+    ICONS.with(|icons| {
+        icons
+            .borrow_mut()
+            .entry(cap.to_owned())
+            .or_insert_with(|| load_icon(cap))
+            .clone()
+    })
+}
+
+fn load_icon(cap: &str) -> Image {
     let svg: &[u8] = match cap {
         "clipboard.v1" => include_bytes!("../ui/icons/clipboard.svg"),
         "files.v1" => include_bytes!("../ui/icons/folder.svg"),
@@ -98,6 +114,49 @@ fn platform_label(p: &str) -> String {
 fn model<T: Clone + 'static>(v: Vec<T>) -> ModelRc<T> {
     ModelRc::new(VecModel::from(v))
 }
+
+/// Bring `m` in line with `rows`, touching only rows that changed. Replacing
+/// the whole model makes Slint rebuild every row, which drops a click that
+/// is in progress (#45).
+fn sync<T: Clone + PartialEq + 'static>(m: &VecModel<T>, rows: Vec<T>) {
+    if m.row_count() != rows.len() {
+        m.set_vec(rows);
+        return;
+    }
+    for (i, row) in rows.into_iter().enumerate() {
+        if m.row_data(i).as_ref() != Some(&row) {
+            m.set_row_data(i, row);
+        }
+    }
+}
+
+/// The list models the window shows. They are set on the window once and
+/// then updated in place.
+#[derive(Default)]
+struct Models {
+    permissions: Rc<VecModel<PermItem>>,
+    onboarding_perms: Rc<VecModel<PermItem>>,
+    peers: Rc<VecModel<PeerItem>>,
+    tiles: Rc<VecModel<TileItem>>,
+    nearby: Rc<VecModel<NearbyItem>>,
+    codes: Rc<VecModel<CodeItem>>,
+    activities: Rc<VecModel<ActivityItem>>,
+}
+
+impl Models {
+    fn attach(&self, w: &MainWindow) {
+        w.set_permissions(self.permissions.clone().into());
+        w.set_onboarding_perms(self.onboarding_perms.clone().into());
+        w.set_peers(self.peers.clone().into());
+        w.set_tiles(self.tiles.clone().into());
+        w.set_nearby(self.nearby.clone().into());
+        w.set_codes(self.codes.clone().into());
+        w.set_activities(self.activities.clone().into());
+    }
+}
+
+/// Fewest milliseconds between two redraws caused by core events (#45).
+const MIN_REFRESH_GAP: Duration = Duration::from_millis(250);
 
 fn local_time(ts: u64) -> String {
     i64::try_from(ts)
@@ -191,8 +250,12 @@ impl App {
             data_dir: data_dir.display().to_string(),
             last_snapshot: RefCell::new(None),
             onboard_shown: Cell::new(false),
+            models: Models::default(),
+            last_refresh: Cell::new(Instant::now()),
+            refresh_timer: Timer::default(),
         });
         UI.with(|u| *u.borrow_mut() = Some(ui.clone()));
+        ui.models.attach(window);
         ui.wire(window);
         window.set_core_version(urdevice_core::core_version().into());
         window.set_has_camera(crate::camera::available());
@@ -250,9 +313,29 @@ struct Ui {
     data_dir: String,
     last_snapshot: RefCell<Option<Snapshot>>,
     onboard_shown: Cell<bool>,
+    models: Models,
+    last_refresh: Cell<Instant>,
+    refresh_timer: Timer,
 }
 
 impl Ui {
+    /// Redraw for a core `Changed` event, at most once per [`MIN_REFRESH_GAP`].
+    /// `pending` is cleared just before the redraw reads the snapshot, so no
+    /// change is lost.
+    fn schedule_refresh(&self, pending: Arc<AtomicBool>) {
+        let wait = MIN_REFRESH_GAP.saturating_sub(self.last_refresh.get().elapsed());
+        if wait.is_zero() {
+            pending.store(false, Ordering::Release);
+            self.refresh();
+            return;
+        }
+        self.refresh_timer
+            .start(TimerMode::SingleShot, wait, move || {
+                pending.store(false, Ordering::Release);
+                with_ui(|ui| ui.refresh());
+            });
+    }
+
     fn labels(w: &MainWindow) -> Labels<'_> {
         w.global::<Labels>()
     }
@@ -287,6 +370,7 @@ impl Ui {
         let Some(w) = self.window.upgrade() else {
             return;
         };
+        self.last_refresh.set(Instant::now());
         let snap = self.node.snapshot();
         let l = Self::labels(&w);
 
@@ -320,19 +404,21 @@ impl Ui {
         );
         w.set_me_hidden(snap.me.hidden);
 
-        w.set_permissions(model(
+        sync(
+            &self.models.permissions,
             snap.permissions
                 .iter()
                 .map(|p| Self::perm_item(&w, p.capability, p.mode))
                 .collect(),
-        ));
-        w.set_onboarding_perms(model(
+        );
+        sync(
+            &self.models.onboarding_perms,
             self.onboarding_modes
                 .borrow()
                 .iter()
                 .map(|p| Self::perm_item(&w, p.capability, p.mode))
                 .collect(),
-        ));
+        );
 
         let peers: Vec<PeerItem> = snap
             .peers
@@ -410,13 +496,14 @@ impl Ui {
                     });
                 }
             }
-            w.set_tiles(model(tiles));
+            sync(&self.models.tiles, tiles);
         } else if w.get_page() == crate::ui::Page::Peer {
             w.set_page(crate::ui::Page::ThisDevice);
         }
-        w.set_peers(model(peers));
+        sync(&self.models.peers, peers);
 
-        w.set_nearby(model(
+        sync(
+            &self.models.nearby,
             snap.nearby
                 .iter()
                 .filter(|n| !snap.code_pairings.iter().any(|c| c.key.starts_with(&n.key)))
@@ -427,8 +514,9 @@ impl Ui {
                     address: n.address.clone().into(),
                 })
                 .collect(),
-        ));
-        w.set_codes(model(
+        );
+        sync(
+            &self.models.codes,
             snap.code_pairings
                 .iter()
                 .map(|c| CodeItem {
@@ -439,8 +527,9 @@ impl Ui {
                     incoming: c.incoming,
                 })
                 .collect(),
-        ));
-        w.set_activities(model(
+        );
+        sync(
+            &self.models.activities,
             snap.activities
                 .iter()
                 .map(|a| ActivityItem {
@@ -450,7 +539,7 @@ impl Ui {
                     incoming: a.incoming,
                 })
                 .collect(),
-        ));
+        );
 
         match &snap.pair_screen {
             Some(p) => {

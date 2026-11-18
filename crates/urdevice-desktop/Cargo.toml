@@ -19,6 +19,7 @@ directories.workspace = true
 nokhwa.workspace = true
 png.workspace = true
 rqrr.workspace = true
+zune-jpeg.workspace = true
 tracing.workspace = true
 slint.workspace = true
 urdevice-core = { workspace = true, features = ["mdns"] }

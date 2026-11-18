@@ -2,7 +2,7 @@
 
 #![allow(clippy::unwrap_used)]
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -43,13 +43,10 @@ struct Dev {
     id: String,
 }
 
-fn free_port() -> u16 {
-    UdpSocket::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
-}
+/// Budget for waits that have no time requirement. `wait_until` returns as
+/// soon as the condition holds, so a large budget costs nothing when the test
+/// passes and keeps slow CI runners from failing at random (#48).
+const WAIT: u64 = 15;
 
 impl Dev {
     fn new(name: &str) -> Self {
@@ -67,7 +64,8 @@ impl Dev {
             events: Arc::new(Events::default()),
             secrets: Arc::new(MemorySecretStore::new()),
             dir,
-            port: free_port(),
+            // The OS picks a free port on the first start; restarts reuse it.
+            port: 0,
             name: name.into(),
             ask_timeout,
             id: String::new(),
@@ -94,7 +92,9 @@ impl Dev {
         cfg.invite_addrs = Some(vec![IpAddr::V4(Ipv4Addr::LOCALHOST)]);
         cfg.ask_timeout = self.ask_timeout;
         self.node = Some(Node::start(cfg).unwrap());
-        self.id = self.snap().me.id;
+        let me = self.snap().me;
+        self.id = me.id;
+        self.port = me.port;
     }
 
     fn stop(&mut self) {
@@ -156,11 +156,22 @@ fn wait_until(what: &str, secs: u64, f: impl Fn() -> bool) {
     panic!("timed out waiting for {what}");
 }
 
+/// Check that `f` holds for the whole of `ms` milliseconds: for things that
+/// must not happen. Fails at the first poll where it does not hold.
+fn holds_for(what: &str, ms: u64, f: impl Fn() -> bool) {
+    let deadline = Instant::now() + Duration::from_millis(ms);
+    while Instant::now() < deadline {
+        assert!(f(), "{what} broke");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert!(f(), "{what} broke");
+}
+
 fn qr_pair(host: &Dev, scanner: &Dev) {
     host.node().open_pair_screen();
     let uri = host.snap().pair_screen.unwrap().qr_uri;
     scanner.node().scan_qr(&uri).unwrap();
-    wait_until("QR pairing", 10, || {
+    wait_until("QR pairing", WAIT, || {
         host.connected_to(scanner) && scanner.connected_to(host)
     });
     host.node().close_pair_screen();
@@ -186,7 +197,7 @@ fn qr_pairing_then_permissions() {
     qr_pair(&a, &b);
 
     // Defaults from onboarding reach the peer (R5.7).
-    wait_until("PermissionState", 2, || {
+    wait_until("PermissionState", WAIT, || {
         remote_mode(&b, &a, Capability::Input) == Some(Mode::Ask)
     });
 
@@ -200,7 +211,7 @@ fn qr_pairing_then_permissions() {
     b.node()
         .request_activity(&a.id(), Capability::Input)
         .unwrap();
-    wait_until("denied reply", 5, || {
+    wait_until("denied reply", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::ActivityResult { granted: false, reason, .. } if reason == "denied"))
             .is_some()
@@ -214,7 +225,7 @@ fn qr_pairing_then_permissions() {
     b.node()
         .request_activity(&a.id(), Capability::Input)
         .unwrap();
-    wait_until("prompt", 5, || {
+    wait_until("prompt", WAIT, || {
         a.events
             .find(|e| matches!(e, NodeEvent::Prompt(_)))
             .is_some()
@@ -225,7 +236,7 @@ fn qr_pairing_then_permissions() {
     assert_eq!(p.device_name, "Pixel");
     assert_eq!(p.capability, "input.v1");
     a.node().answer_prompt(p.id, true);
-    wait_until("granted", 5, || {
+    wait_until("granted", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::ActivityResult { granted: true, .. }))
             .is_some()
@@ -233,11 +244,13 @@ fn qr_pairing_then_permissions() {
     let act = a.snap().activities;
     assert_eq!(act.len(), 1);
     assert!(act[0].incoming);
-    wait_until("controller activity", 2, || b.snap().activities.len() == 1);
+    wait_until("controller activity", WAIT, || {
+        b.snap().activities.len() == 1
+    });
 
     // Stop ends it on both sides (R5.5).
     a.node().stop_activity(act[0].id);
-    wait_until("stopped", 2, || b.snap().activities.is_empty());
+    wait_until("stopped", WAIT, || b.snap().activities.is_empty());
     assert!(a.snap().activities.is_empty());
 
     // Allow starts with no prompt; setting Deny revokes it.
@@ -247,11 +260,11 @@ fn qr_pairing_then_permissions() {
     b.node()
         .request_activity(&a.id(), Capability::Input)
         .unwrap();
-    wait_until("allowed activity", 5, || a.snap().activities.len() == 1);
+    wait_until("allowed activity", WAIT, || a.snap().activities.len() == 1);
     a.node()
         .set_permission(Capability::Input, Mode::Deny, false)
         .unwrap();
-    wait_until("revoked", 2, || {
+    wait_until("revoked", WAIT, || {
         a.snap().activities.is_empty() && b.snap().activities.is_empty()
     });
 
@@ -268,7 +281,7 @@ fn always_ask_times_out_as_deny() {
     b.node()
         .request_activity(&a.id(), Capability::Screen)
         .unwrap();
-    wait_until("timeout reply", 5, || {
+    wait_until("timeout reply", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::ActivityResult { granted: false, reason, .. } if reason == "timeout"))
             .is_some()
@@ -319,10 +332,10 @@ fn qr_token_is_single_use_and_wrong_key_is_refused() {
     a.node().open_pair_screen();
     let uri = a.snap().pair_screen.unwrap().qr_uri;
     b.node().scan_qr(&uri).unwrap();
-    wait_until("first scan", 10, || a.connected_to(&b));
+    wait_until("first scan", WAIT, || a.connected_to(&b));
     // The same QR code again: the token was used up (R3.2).
     c.node().scan_qr(&uri).unwrap();
-    wait_until("replay refused", 10, || {
+    wait_until("replay refused", WAIT, || {
         c.events
             .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, .. }))
             .is_some()
@@ -336,7 +349,7 @@ fn qr_token_is_single_use_and_wrong_key_is_refused() {
     let forged = forge_device_id(&fresh, &c.id());
     b.events.clear();
     b.node().scan_qr(&forged).unwrap();
-    wait_until("wrong fingerprint refused", 10, || {
+    wait_until("wrong fingerprint refused", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, reason, .. } if reason == "unreachable"))
             .is_some()
@@ -365,13 +378,13 @@ fn lockout_after_five_failures() {
         let stale = tamper_token(&uri);
         b.events.clear();
         b.node().scan_qr(&stale).unwrap();
-        wait_until(&format!("failure {i}"), 10, || {
+        wait_until(&format!("failure {i}"), WAIT, || {
             b.events
                 .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, .. }))
                 .is_some()
         });
     }
-    wait_until("locked", 3, || {
+    wait_until("locked", WAIT, || {
         a.snap().pair_screen.unwrap().locked_secs > 0
     });
     assert!(
@@ -401,10 +414,10 @@ fn code_pairing_needs_both_confirmations() {
     a.node().open_pair_screen();
     b.node().open_pair_screen();
     b.see(&a);
-    wait_until("nearby", 3, || !b.snap().nearby.is_empty());
+    wait_until("nearby", WAIT, || !b.snap().nearby.is_empty());
     let key = b.snap().nearby[0].key.clone();
     b.node().pair_nearby(&key).unwrap();
-    wait_until("codes shown", 10, || {
+    wait_until("codes shown", WAIT, || {
         !a.snap().code_pairings.is_empty() && !b.snap().code_pairings.is_empty()
     });
     let ca = a.snap().code_pairings[0].clone();
@@ -415,12 +428,18 @@ fn code_pairing_needs_both_confirmations() {
 
     // One side alone is not enough.
     a.node().confirm_code(&ca.key, true).unwrap();
-    std::thread::sleep(Duration::from_millis(500));
-    assert!(a.snap().peers.is_empty());
-    assert!(a.snap().code_pairings[0].confirmed_here);
+    wait_until("confirmed here", WAIT, || {
+        a.snap()
+            .code_pairings
+            .first()
+            .is_some_and(|c| c.confirmed_here)
+    });
+    holds_for("not paired yet", 500, || {
+        a.snap().peers.is_empty() && b.snap().peers.is_empty()
+    });
 
     b.node().confirm_code(&cb.key, true).unwrap();
-    wait_until("paired and connected", 10, || {
+    wait_until("paired and connected", WAIT, || {
         a.connected_to(&b) && b.connected_to(&a)
     });
 }
@@ -432,12 +451,12 @@ fn code_pairing_cancel_stores_nothing() {
     a.node().open_pair_screen();
     b.node().open_pair_screen();
     b.see(&a);
-    wait_until("nearby", 3, || !b.snap().nearby.is_empty());
+    wait_until("nearby", WAIT, || !b.snap().nearby.is_empty());
     b.node().pair_nearby(&b.snap().nearby[0].key).unwrap();
-    wait_until("codes shown", 10, || !a.snap().code_pairings.is_empty());
+    wait_until("codes shown", WAIT, || !a.snap().code_pairings.is_empty());
     let ca = a.snap().code_pairings[0].clone();
     a.node().confirm_code(&ca.key, false).unwrap();
-    wait_until("cancel seen", 10, || {
+    wait_until("cancel seen", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, .. }))
             .is_some()
@@ -453,7 +472,7 @@ fn pairing_refused_when_pair_screen_is_closed() {
     let uri = a.snap().pair_screen.unwrap().qr_uri;
     a.node().close_pair_screen();
     b.node().scan_qr(&uri).unwrap();
-    wait_until("refused", 10, || {
+    wait_until("refused", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, .. }))
             .is_some()
@@ -467,7 +486,7 @@ fn disconnect_and_reconnect() {
     let b = Dev::new("Pixel");
     qr_pair(&a, &b);
     b.node().disconnect(&a.id()).unwrap();
-    wait_until("both disconnected", 5, || {
+    wait_until("both disconnected", WAIT, || {
         matches!(a.status_of(&b), Some(PeerStatus::Disconnected { .. }))
             && matches!(b.status_of(&a), Some(PeerStatus::Disconnected { .. }))
     });
@@ -475,14 +494,17 @@ fn disconnect_and_reconnect() {
         a.status_of(&b),
         Some(PeerStatus::Disconnected { by: "Pixel".into() })
     );
-    // No automatic reconnect while disconnected (R4.7).
+    // No automatic reconnect while disconnected (R4.7). The connector looks
+    // every 500 ms and an announcement makes it try at once, so a few ticks
+    // are enough to see it stay away.
     a.see(&b);
     b.see(&a);
-    std::thread::sleep(Duration::from_secs(3));
-    assert!(!a.connected_to(&b));
+    holds_for("stays disconnected", 2000, || {
+        !a.connected_to(&b) && !b.connected_to(&a)
+    });
     // Reconnect on the other device than the one that disconnected.
     a.node().reconnect(&b.id()).unwrap();
-    wait_until("reconnected", 10, || {
+    wait_until("reconnected", WAIT, || {
         a.connected_to(&b) && b.connected_to(&a)
     });
 }
@@ -499,7 +521,7 @@ fn restart_reconnects_on_its_own() {
     a.start();
     b.start();
     // Pairings survive the restart, and the stored addresses are enough.
-    wait_until("reconnect after restart", 15, || {
+    wait_until("reconnect after restart", WAIT, || {
         a.connected_to(&b) && b.connected_to(&a)
     });
 }
@@ -510,11 +532,13 @@ fn reconnects_after_the_peer_comes_back() {
     let mut b = Dev::new("Pixel");
     qr_pair(&a, &b);
     b.stop();
-    wait_until("offline", 35, || {
+    // Stopping sends a close frame, so A sees it at once; it does not have
+    // to wait for the 30 s idle timeout.
+    wait_until("offline", WAIT, || {
         a.status_of(&b) == Some(PeerStatus::Offline)
     });
     b.start();
-    wait_until("back", 15, || a.connected_to(&b));
+    wait_until("back", WAIT, || a.connected_to(&b));
 }
 
 #[test]
@@ -523,7 +547,7 @@ fn unpair_closes_and_blocks() {
     let mut b = Dev::new("Pixel");
     qr_pair(&a, &b);
     a.node().forget(&b.id()).unwrap();
-    wait_until("both forgot", 5, || {
+    wait_until("both forgot", WAIT, || {
         a.snap().peers.is_empty() && b.snap().peers.is_empty()
     });
     assert!(
@@ -538,10 +562,10 @@ fn unpair_closes_and_blocks() {
     b.stop();
     a.node().forget(&b.id()).unwrap();
     b.start();
-    std::thread::sleep(Duration::from_secs(4));
-    assert!(a.snap().peers.is_empty());
-    assert!(!b.connected_to(&a));
-    assert_eq!(b.status_of(&a), Some(PeerStatus::Offline));
+    // B dials A at once and again after 1 s and 2 s of backoff.
+    holds_for("A keeps refusing B", 3500, || {
+        a.snap().peers.is_empty() && b.status_of(&a) == Some(PeerStatus::Offline)
+    });
 }
 
 #[test]
@@ -550,7 +574,7 @@ fn battery_reaches_the_peer() {
     let b = Dev::new("Pixel");
     b.node().set_battery(Some((64, true)));
     qr_pair(&a, &b);
-    wait_until("battery", 3, || {
+    wait_until("battery", WAIT, || {
         a.snap()
             .peers
             .first()

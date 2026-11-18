@@ -29,7 +29,7 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 2: App shells
 
-- [x] T2.1 Desktop: Slint app with a tray icon and start at login, following the layout in `docs/mockup/urdevice-layout.html` (design §12). Add onboarding (`docs/mockup/onboarding.html`), the sidebar device list (connected, disconnected, offline with last seen), the "This device" view with permission settings, the paired-device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`), the Pair screen (QR display with countdown, available devices with code confirmation), and the Settings screen (name, Device ID, hidden mode, start at login, download folder, clipboard pause, language, activity log, reset identity, data export and delete). _Req: R1.4, R1.5, R2, R3, R4.7–R4.9, R5, R14.1, R14.2, R16.3_
+- [x] T2.1 Desktop: Slint app with a tray icon and start at login, following the layout in `docs/mockup/urdevice-layout.html` (design §12). Add onboarding (`docs/mockup/onboarding.html`), the sidebar device list (connected, disconnected, offline with last seen), the "This device" view with permission settings, the paired-device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`), the Pair screen (QR display with countdown, available devices with code confirmation), and the Settings screen (name, Device ID, hidden mode, start at login, language, activity log, reset identity, data export and delete). The download folder and "Pause clipboard on all devices" settings come with their features in T3.7 and T3.2. _Req: R1.4, R1.5, R2, R3, R4.7–R4.9, R5, R14.1, R14.2, R16.3_
 - [x] T2.2 Desktop: Always Ask prompt window (Allow / Deny, 30 s timeout), the warning and extra confirmation when the user sets terminal or file changes to Allow, a "being controlled/viewed" indicator with a Stop button, and an Activity log view. _Req: R5.2–R5.6_
 - [x] T2.3 Android: foreground service that hosts the core, NsdManager discovery adapter, and Compose Devices/Pair screens (CameraX + ML Kit QR scanner, the app's own QR display with countdown, code confirmation), and the device view (Disconnect/Reconnect, Forget, connection path and latency, battery, feature tiles that follow the host's `PermissionState`). _Req: R2, R3, R4.7–R4.9, R15.1_
 - [x] T2.4 Android: onboarding with the permission defaults (including Gallery), following `docs/mockup/onboarding.html`, the "This device" permission sheet, OS permission explanation screens, a notification with Stop, the Always Ask notification with Allow and Deny, and the Settings screen. _Req: R5, R15.2, R16.3_
@@ -40,12 +40,12 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 ## Phase 3: Clipboard and files
 
 - [ ] T3.1 Clipboard service in the core: the Clip message, echo prevention, the size limit, and large images over bulk streams. _Req: R7.1, R7.2, R7.4_
-- [ ] T3.2 Desktop clipboard adapters with change events and sensitive-flag detection on each OS. _Req: R7.3_
+- [ ] T3.2 Desktop clipboard adapters with change events and sensitive-flag detection on each OS, and the "Pause clipboard on all devices" setting in desktop Settings. _Req: R7.3, R7.6_
 - [ ] T3.3 Android clipboard: write incoming content; send through the notification action, Quick Settings tile, and share sheet; detect `EXTRA_IS_SENSITIVE`; add per-device and global toggles. _Req: R7.3, R7.5, R7.6_
 - [ ] T3.4 File transfer service: Offer/Accept/Data/Done, `.urdevice-part` files with streaming SHA-256, resume sidecars, cancel, and progress events. _Req: R8.2–R8.5_
 - [ ] T3.5 Path cleaning and collision renaming. _Req: R8.6_
 - [ ]* T3.6 Property tests for path cleaning and fuzzing for transfer framing.
-- [ ] T3.7 Desktop transfers UI: file picker, drag-and-drop, progress list, and incoming-folder setting. _Req: R8.1, R8.3, R8.6_
+- [ ] T3.7 Desktop transfers UI: file picker, drag-and-drop, progress list, and the download folder setting in Settings. _Req: R8.1, R8.3, R8.6_
 - [ ] T3.8 Android transfers: share-sheet target, picker, progress notifications, and saving through MediaStore Downloads. _Req: R8.1, R8.3, R15.3_
 - [ ] T3.9 Gallery: Android MediaStore provider with thumbnails and paging, and a desktop gallery browser with download. _Req: R8.7_
 - [ ] T3.10 Measure transfer throughput and tune chunk size and QUIC window settings. _Req: R8.8_

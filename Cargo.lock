@@ -7141,6 +7141,7 @@ dependencies = [
  "tray-icon",
  "urdevice-core",
  "urdevice-platform",
+ "zune-jpeg",
 ]
 
 [[package]]

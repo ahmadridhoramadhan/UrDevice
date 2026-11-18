@@ -38,6 +38,8 @@ pub const MAX_BACKOFF: Duration = Duration::from_secs(30);
 pub const NEARBY_TTL: Duration = Duration::from_secs(20);
 /// At most one battery update per this interval (R4.9).
 pub const BATTERY_INTERVAL: Duration = Duration::from_secs(60);
+/// How long the list of this device's addresses is reused.
+const ADDR_CACHE_TTL: Duration = Duration::from_secs(5);
 
 /// Settings for [`Node::start`].
 pub struct NodeConfig {
@@ -230,6 +232,7 @@ pub(crate) struct Inner {
     seen_tx: mpsc::Sender<Seen>,
     invite_addrs: Option<Vec<IpAddr>>,
     ask_timeout: Duration,
+    addr_cache: Mutex<Option<(Instant, Vec<IpAddr>)>>,
 }
 
 /// A running UrDevice core.
@@ -294,6 +297,7 @@ impl Node {
             seen_tx,
             invite_addrs: cfg.invite_addrs,
             ask_timeout: cfg.ask_timeout,
+            addr_cache: Mutex::new(None),
         });
         inner.restart_discovery()?;
 
@@ -761,11 +765,22 @@ impl Inner {
         Ok(())
     }
 
+    /// This device's addresses. Reading the interfaces is slow on some
+    /// systems, and the UI asks on every redraw, so the list is kept for
+    /// [`ADDR_CACHE_TTL`].
     fn local_addrs(&self) -> Vec<IpAddr> {
         if let Some(a) = &self.invite_addrs {
             return a.clone();
         }
-        local_ipv4_addrs()
+        let mut cache = lock(&self.addr_cache);
+        if let Some((at, addrs)) = cache.as_ref()
+            && at.elapsed() < ADDR_CACHE_TTL
+        {
+            return addrs.clone();
+        }
+        let addrs = local_ipv4_addrs();
+        *cache = Some((Instant::now(), addrs.clone()));
+        addrs
     }
 
     fn new_pair_screen(&self, st: &State) -> Result<PairScreen> {
@@ -1037,7 +1052,7 @@ impl Inner {
                     last_seen: if s.is_some() { unix_now() } else { d.last_seen },
                     address,
                     path: "wifi".into(),
-                    rtt_ms: s.map(|s| u32::try_from(s.conn.rtt().as_millis()).unwrap_or(u32::MAX)),
+                    rtt_ms: s.map(|s| rtt_ms(&s.conn)),
                     battery_pct: s.and_then(|s| s.battery.map(|b| b.0)),
                     charging: s.and_then(|s| s.battery).is_some_and(|b| b.1),
                     remote_permissions: s.map(|s| s.remote_perms.clone()).unwrap_or_default(),
@@ -1110,6 +1125,10 @@ impl Inner {
             activities,
         }
     }
+}
+
+fn rtt_ms(conn: &quinn::Connection) -> u32 {
+    u32::try_from(conn.rtt().as_millis()).unwrap_or(u32::MAX)
 }
 
 /// Non-loopback IPv4 addresses, skipping container and VM bridges.

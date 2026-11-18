@@ -1,6 +1,7 @@
 //! Network flows of the node: accept, connect, pairing, and the session loop
 //! (design §6, §7).
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -1050,10 +1051,14 @@ async fn connect_paired(inner: &Arc<Inner>, id: DeviceId, addrs: &[SocketAddr]) 
     client_session(inner.clone(), conn, send, Reader::new(recv), id).await
 }
 
+/// Latency changes smaller than this do not redraw the UI (R4.8).
+const RTT_STEP_MS: u32 = 2;
+
 pub(super) async fn housekeeping_loop(inner: Arc<Inner>) {
     let mut tick = tokio::time::interval(Duration::from_secs(1));
     let mut last_prune = Instant::now();
     let mut was_locked = false;
+    let mut shown_rtt: HashMap<DeviceId, u32> = HashMap::new();
     loop {
         tick.tick().await;
         let mut changed = false;
@@ -1081,13 +1086,17 @@ pub(super) async fn housekeeping_loop(inner: Arc<Inner>) {
             st.nearby
                 .retain(|_, n| now.duration_since(n.last_seen) < super::NEARBY_TTL);
             changed |= st.nearby.len() != before;
-            if !st.sessions.is_empty() {
-                // Latency on the device view (R4.8).
-                changed = true;
-            }
+            // Latency on the device view (R4.8): redraw only when it moved.
+            shown_rtt.retain(|id, _| st.sessions.contains_key(id));
             for (id, s) in &st.sessions {
-                let rtt_ms = s.conn.rtt().as_secs_f64() * 1000.0;
-                tracing::debug!(peer = %id.short_hex(), rtt_ms, "session rtt");
+                let rtt = super::rtt_ms(&s.conn);
+                let moved = shown_rtt
+                    .get(id)
+                    .is_none_or(|old| old.abs_diff(rtt) >= RTT_STEP_MS);
+                if moved {
+                    shown_rtt.insert(*id, rtt);
+                    changed = true;
+                }
             }
         }
         inner.update_policy();
