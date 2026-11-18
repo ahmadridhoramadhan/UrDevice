@@ -49,6 +49,9 @@ jiff = "0.2"
 auto-launch = "0.6"
 nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
 rqrr = "0.10"
+# Pure-Rust MJPEG decoding for webcams without uncompressed formats (#47).
+# Already in the tree through Slint's image loading.
+zune-jpeg = "0.5"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "env-filter", "ansi"] }
 
 # Desktop UI
