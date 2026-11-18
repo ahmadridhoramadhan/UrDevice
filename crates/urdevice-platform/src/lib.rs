@@ -12,7 +12,12 @@ use std::sync::Arc;
 
 use urdevice_core::platform::{Clipboard, FileStore, InputSink, MediaHost, Overlay, ScreenSource};
 
+mod secrets;
 mod stub;
+mod system;
+
+pub use secrets::DesktopSecretStore;
+pub use system::{battery, data_dir, device_name, platform_id};
 
 #[cfg(target_os = "linux")]
 pub mod linux;

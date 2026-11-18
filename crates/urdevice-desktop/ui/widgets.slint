@@ -1,0 +1,173 @@
+// Small reusable parts of the desktop UI.
+import { Theme } from "theme.slint";
+
+export component Icon inherits Image {
+    in property <color> tint: Theme.text;
+    width: 18px;
+    height: 18px;
+    colorize: tint;
+    image-fit: contain;
+}
+
+export component IconBox inherits Rectangle {
+    in property <image> icon;
+    in property <length> size: 36px;
+    width: size;
+    height: size;
+    border-radius: 8px;
+    background: Theme.icon-bg;
+    Icon {
+        source: icon;
+        tint: Theme.accent;
+        width: size * 0.5;
+        height: size * 0.5;
+    }
+}
+
+// kind: 0 primary, 1 outline, 2 danger outline, 3 quiet
+export component Btn inherits Rectangle {
+    in property <string> text;
+    in property <int> kind: 1;
+    in property <bool> enabled: true;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+    callback clicked();
+    horizontal-stretch: 0;
+    height: 34px;
+    min-width: 72px;
+    border-radius: 17px;
+    background: !enabled ? Theme.surface-2
+        : kind == 0 ? (ta.has-hover ? Theme.accent.darker(0.15) : Theme.accent)
+        : (ta.has-hover ? Theme.surface-2 : transparent);
+    border-width: kind == 3 ? 0 : 1px;
+    border-color: kind == 2 ? Theme.deny-fg : kind == 0 ? Theme.accent : Theme.border;
+    opacity: enabled ? 1 : 0.6;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 6px;
+        alignment: center;
+        if root.has-icon: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 14px;
+            height: 14px;
+            source: root.icon;
+            tint: kind == 0 ? Theme.on-accent : kind == 2 ? Theme.deny-fg : Theme.text;
+        }
+        Text {
+            text: root.text;
+            vertical-alignment: center;
+            font-size: Theme.font-body;
+            font-weight: 600;
+            color: kind == 0 ? Theme.on-accent : kind == 2 ? Theme.deny-fg : Theme.text;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component Card inherits Rectangle {
+    background: Theme.surface;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+}
+
+export component Chip inherits Rectangle {
+    in property <string> text;
+    in property <color> bg: Theme.surface-2;
+    in property <color> fg: Theme.text;
+    height: 22px;
+    border-radius: 11px;
+    background: bg;
+    HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 9px;
+        Text {
+            text: root.text;
+            color: root.fg;
+            font-size: Theme.font-small;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component Dot inherits Rectangle {
+    in property <bool> on;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: on ? Theme.online : Theme.offline;
+}
+
+// Allow / Always Ask / Deny. mode: 0 allow, 1 ask, 2 deny.
+export component ModeSwitch inherits Rectangle {
+    in property <int> mode;
+    callback picked(int);
+    width: 238px;
+    height: 32px;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.border;
+    background: Theme.surface;
+    clip: true;
+    HorizontalLayout {
+        for label[i] in [@tr("Allow"), @tr("Always Ask"), @tr("Deny")]: Rectangle {
+            width: i == 1 ? 104px : 66px;
+            background: root.mode == i ? (i == 0 ? Theme.allow-bg : i == 1 ? Theme.ask-bg : Theme.deny-bg)
+                : (seg.has-hover ? Theme.surface-2 : transparent);
+            Text {
+                text: label;
+                font-size: Theme.font-small + 1px;
+                font-weight: root.mode == i ? 700 : 500;
+                color: root.mode == i ? (i == 0 ? Theme.allow-fg : i == 1 ? Theme.ask-fg : Theme.deny-fg) : Theme.muted;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            seg := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.picked(i); }
+            }
+        }
+    }
+}
+
+export component Toggle inherits Rectangle {
+    in-out property <bool> checked;
+    callback toggled(bool);
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: checked ? Theme.accent : Theme.border;
+    Rectangle {
+        x: root.checked ? root.width - self.width - 3px : 3px;
+        y: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        background: root.checked ? Theme.on-accent : Theme.surface;
+    }
+    TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+}
+
+export component SectionTitle inherits Text {
+    font-size: Theme.font-title;
+    font-weight: 600;
+    color: Theme.text;
+}
+
+export component Muted inherits Text {
+    font-size: Theme.font-body;
+    color: Theme.muted;
+    wrap: word-wrap;
+}

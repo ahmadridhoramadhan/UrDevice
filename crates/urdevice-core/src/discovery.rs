@@ -209,11 +209,22 @@ fn bind_udp(port: u16) -> Result<UdpSocket> {
     UdpSocket::from_std(s.into()).map_err(CoreError::from)
 }
 
+/// Interface name prefixes of container and VM bridges. Devices are never
+/// behind them, so discovery and QR codes skip them.
+pub const SKIP_INTERFACES: &[&str] = &[
+    "docker", "br-", "veth", "virbr", "vmnet", "vboxnet", "lxc", "cni", "flannel",
+];
+
+/// True for interfaces discovery should not use.
+pub fn skip_interface(name: &str) -> bool {
+    SKIP_INTERFACES.iter().any(|s| name.starts_with(s))
+}
+
 /// Directed broadcast addresses of the local IPv4 interfaces.
 fn broadcast_targets() -> Vec<Ipv4Addr> {
     let mut out = vec![Ipv4Addr::BROADCAST];
     if let Ok(ifs) = if_addrs::get_if_addrs() {
-        for i in ifs {
+        for i in ifs.into_iter().filter(|i| !skip_interface(&i.name)) {
             if let if_addrs::IfAddr::V4(v4) = i.addr
                 && let Some(b) = v4.broadcast
                 && !v4.ip.is_loopback()

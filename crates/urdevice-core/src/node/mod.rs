@@ -1114,13 +1114,10 @@ impl Inner {
 
 /// Non-loopback IPv4 addresses, skipping container and VM bridges.
 pub fn local_ipv4_addrs() -> Vec<IpAddr> {
-    const SKIP: &[&str] = &[
-        "docker", "br-", "veth", "virbr", "vmnet", "vboxnet", "lxc", "cni", "flannel",
-    ];
     let mut out: Vec<IpAddr> = if_addrs::get_if_addrs()
         .unwrap_or_default()
         .into_iter()
-        .filter(|i| !SKIP.iter().any(|s| i.name.starts_with(s)))
+        .filter(|i| !crate::discovery::skip_interface(&i.name))
         .filter_map(|i| match i.addr {
             if_addrs::IfAddr::V4(v4) if !v4.ip.is_loopback() && !v4.ip.is_link_local() => {
                 Some(IpAddr::V4(v4.ip))

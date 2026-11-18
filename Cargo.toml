@@ -41,6 +41,14 @@ if-addrs = "0.15"
 qrcode = { version = "0.14", default-features = false }
 data-encoding = "2"
 tracing = "0.1"
+keyring = { version = "3", default-features = false }
+starship-battery = "0.12"
+gethostname = "1"
+directories = "6"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+auto-launch = "0.6"
+nokhwa = { version = "0.10", features = ["input-native"] }
+rqrr = "0.10"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "env-filter", "ansi"] }
 
 # Desktop UI

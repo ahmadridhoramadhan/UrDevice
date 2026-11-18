@@ -1,0 +1,39 @@
+// Colors and sizes for the desktop app. Light and dark follow the OS setting.
+import { Palette } from "std-widgets.slint";
+
+export global Theme {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+
+    // Brand (ui.md): dark green and lime.
+    out property <color> forest: #0f1f10;
+    out property <color> lime: #c6f19d;
+
+    out property <color> bg: dark ? #0c180d : #f4f0e8;
+    out property <color> sidebar: dark ? #0f1d10 : #faf7f0;
+    out property <color> surface: dark ? #142415 : #fffdf8;
+    out property <color> surface-2: dark ? #1a2e1c : #f6f2ea;
+    out property <color> border: dark ? #2a3d2c : #e6dfd2;
+    out property <color> text: dark ? #e8f5dc : #1c2a1d;
+    out property <color> muted: dark ? #9fb59a : #6b7468;
+    out property <color> header: dark ? #1f3321 : #4a5248;
+    out property <color> on-header: #f4f7ef;
+    out property <color> accent: dark ? #c6f19d : #1f4d24;
+    out property <color> on-accent: dark ? #0f1f10 : #ffffff;
+    out property <color> icon-bg: dark ? #213723 : #e4f1e6;
+
+    out property <color> allow-bg: dark ? #2f4d1f : #d7f2b5;
+    out property <color> allow-fg: dark ? #d7f2b5 : #2e5d12;
+    out property <color> ask-bg: dark ? #4a3b17 : #f6e7c8;
+    out property <color> ask-fg: dark ? #f3d9a0 : #8a5c12;
+    out property <color> deny-bg: dark ? #3b2222 : #f1dddd;
+    out property <color> deny-fg: dark ? #f0b8b8 : #8a2c2c;
+    out property <color> online: #1f8a6a;
+    out property <color> offline: #c9b98f;
+    out property <color> warn-bg: dark ? #4a3b17 : #fbefd2;
+
+    out property <length> radius: 10px;
+    out property <length> font-small: 11px;
+    out property <length> font-body: 13px;
+    out property <length> font-title: 16px;
+    out property <length> font-hero: 24px;
+}
