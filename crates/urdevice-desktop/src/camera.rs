@@ -7,7 +7,7 @@
 
 use std::borrow::Cow;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use nokhwa::pixel_format::RgbFormat;
 use nokhwa::utils::{
@@ -31,11 +31,13 @@ pub(crate) fn available() -> bool {
 pub(crate) struct Scanner {
     stop: Arc<AtomicBool>,
     window: ScanWindow,
+    generation: u64,
 }
 
 impl Drop for Scanner {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
+        drop(take_callback(self.generation));
         let _ = self.window.hide();
     }
 }
@@ -47,8 +49,11 @@ impl Scanner {
         window.set_status("Starting the camera…".into());
         let stop = Arc::new(AtomicBool::new(false));
         let on_code: Arc<dyn Fn(String)> = Arc::new(on_code);
-        // `on_code` is not Send; keep it on the UI thread behind a thread-local slot.
-        CALLBACK.with(|c| *c.borrow_mut() = Some(on_code));
+        let generation = GENERATION.fetch_add(1, Ordering::Relaxed) + 1;
+        // `on_code` is not Send; keep it on the UI thread behind a thread-local
+        // slot. Frames from an older scan carry an older generation and can't
+        // take it.
+        CALLBACK.with(|c| *c.borrow_mut() = Some((generation, on_code)));
 
         let weak = window.as_weak();
         let stop_cancel = stop.clone();
@@ -64,16 +69,35 @@ impl Scanner {
         let stop_thread = stop.clone();
         std::thread::Builder::new()
             .name("urdevice-camera".into())
-            .spawn(move || run(weak, stop_thread))
+            .spawn(move || run(weak, stop_thread, generation))
             .map_err(|e| e.to_string())?;
-        Ok(Self { stop, window })
+        Ok(Self {
+            stop,
+            window,
+            generation,
+        })
     }
 }
 
 type Callback = Arc<dyn Fn(String)>;
 
+/// Counts scans, so a frame queued by a cancelled scan is ignored.
+static GENERATION: AtomicU64 = AtomicU64::new(0);
+
 thread_local! {
-    static CALLBACK: std::cell::RefCell<Option<Callback>> = const { std::cell::RefCell::new(None) };
+    static CALLBACK: std::cell::RefCell<Option<(u64, Callback)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Take the callback if it still belongs to scan `generation`.
+fn take_callback(generation: u64) -> Option<Callback> {
+    CALLBACK.with(|c| {
+        let mut slot = c.borrow_mut();
+        match slot.as_ref() {
+            Some((g, _)) if *g == generation => slot.take().map(|(_, cb)| cb),
+            _ => None,
+        }
+    })
 }
 
 fn status(weak: &slint::Weak<ScanWindow>, text: String) {
@@ -124,13 +148,24 @@ fn pick_format(formats: &[CameraFormat]) -> Option<CameraFormat> {
 }
 
 /// One camera frame as packed RGB, with its width and height.
+/// Frames whose size does not match their width and height are dropped, so
+/// later indexing and copying can't panic.
 fn to_rgb(frame: &nokhwa::Buffer) -> Option<(Vec<u8>, u32, u32)> {
-    if frame.source_frame_format() == FrameFormat::MJPEG {
-        return decode_mjpeg(frame.buffer());
-    }
-    let img = frame.decode_image::<RgbFormat>().ok()?;
-    let (w, h) = (img.width(), img.height());
-    Some((img.into_raw(), w, h))
+    let (rgb, w, h) = if frame.source_frame_format() == FrameFormat::MJPEG {
+        decode_mjpeg(frame.buffer())?
+    } else {
+        let img = frame.decode_image::<RgbFormat>().ok()?;
+        let (w, h) = (img.width(), img.height());
+        (img.into_raw(), w, h)
+    };
+    rgb_len_ok(&rgb, w, h).then_some((rgb, w, h))
+}
+
+fn rgb_len_ok(rgb: &[u8], w: u32, h: u32) -> bool {
+    (w as usize)
+        .checked_mul(h as usize)
+        .and_then(|n| n.checked_mul(3))
+        .is_some_and(|n| n == rgb.len())
 }
 
 /// An APP0 segment reading "AVI1": it tells the decoder the frame is MJPEG.
@@ -140,14 +175,34 @@ const AVI1_APP0: [u8; 9] = [0xff, 0xe0, 0x00, 0x07, b'A', b'V', b'I', b'1', 0x00
 /// the scan data).
 fn has_dht(jpeg: &[u8]) -> bool {
     let mut i = 2;
-    while i + 4 <= jpeg.len() && jpeg[i] == 0xff {
-        match jpeg[i + 1] {
+    loop {
+        // Fill bytes: any number of 0xFF before a marker.
+        while jpeg.get(i) == Some(&0xff) && jpeg.get(i + 1) == Some(&0xff) {
+            i += 1;
+        }
+        if jpeg.get(i) != Some(&0xff) {
+            return false;
+        }
+        let Some(&marker) = jpeg.get(i + 1) else {
+            return false;
+        };
+        match marker {
             0xc4 => return true,
-            0xda => return false,
-            _ => i += 2 + usize::from(u16::from_be_bytes([jpeg[i + 2], jpeg[i + 3]])),
+            0xda | 0xd9 => return false,
+            // Markers without a length: TEM and RST0-RST7.
+            0x01 | 0xd0..=0xd7 => i += 2,
+            _ => {
+                let Some(len) = jpeg.get(i + 2..i + 4) else {
+                    return false;
+                };
+                let len = usize::from(u16::from_be_bytes([len[0], len[1]]));
+                if len < 2 {
+                    return false;
+                }
+                i += 2 + len;
+            }
         }
     }
-    false
 }
 
 /// Webcam MJPEG often leaves out the Huffman tables. The decoder fills in
@@ -207,7 +262,7 @@ fn open_camera(index: u32) -> Result<nokhwa::Camera, nokhwa::NokhwaError> {
     Ok(cam)
 }
 
-fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>) {
+fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>, generation: u64) {
     let mut cam = match open_camera(0) {
         Ok(c) => c,
         Err(e) => {
@@ -248,11 +303,10 @@ fn run(weak: slint::Weak<ScanWindow>, stop: Arc<AtomicBool>) {
             if let Some(win) = weak2.upgrade() {
                 win.set_frame(slint::Image::from_rgb8(buf));
             }
-            if let Some(text) = found {
-                let cb = CALLBACK.with(|c| c.borrow_mut().take());
-                if let Some(cb) = cb {
-                    cb(text);
-                }
+            if let Some(text) = found
+                && let Some(cb) = take_callback(generation)
+            {
+                cb(text);
             }
         });
     }
@@ -368,6 +422,51 @@ mod tests {
         assert!(!super::has_dht(&stripped));
         let (rgb, w, h) = super::decode_mjpeg(&stripped).unwrap();
         assert!(super::decode(&rgb, w, h).is_some());
+    }
+
+    #[test]
+    fn dht_walker_handles_odd_marker_sequences() {
+        use super::has_dht;
+        // Fill bytes and a restart marker before the DHT.
+        assert!(has_dht(&[0xff, 0xd8, 0xff, 0xff, 0xd0, 0xff, 0xc4, 0, 2]));
+        // SOS first: no tables.
+        assert!(!has_dht(&[0xff, 0xd8, 0xff, 0xda, 0, 2]));
+        // Cut off in the middle of a length, a zero length, and junk.
+        assert!(!has_dht(&[0xff, 0xd8, 0xff, 0xe0, 0]));
+        assert!(!has_dht(&[0xff, 0xd8, 0xff, 0xe0, 0, 0]));
+        assert!(!has_dht(&[0xff, 0xd8, 1, 2, 3]));
+        // Random input never panics.
+        let mut x = 0x9e37_79b9_u32;
+        for len in 0..400 {
+            let bytes: Vec<u8> = (0..len)
+                .map(|_| {
+                    x ^= x << 13;
+                    x ^= x >> 17;
+                    x ^= x << 5;
+                    if x.is_multiple_of(3) { 0xff } else { x as u8 }
+                })
+                .collect();
+            let _ = has_dht(&bytes);
+            let _ = super::decode_mjpeg(&bytes);
+        }
+    }
+
+    #[test]
+    fn short_rgb_buffers_are_rejected() {
+        assert!(super::rgb_len_ok(&[0; 12], 2, 2));
+        assert!(!super::rgb_len_ok(&[0; 11], 2, 2));
+        assert!(!super::rgb_len_ok(&[0; 13], 2, 2));
+        assert!(!super::rgb_len_ok(&[], u32::MAX, u32::MAX));
+    }
+
+    #[test]
+    fn a_cancelled_scan_cannot_take_the_new_callback() {
+        use std::sync::Arc;
+        let cb: super::Callback = Arc::new(|_| {});
+        super::CALLBACK.with(|c| *c.borrow_mut() = Some((7, cb)));
+        assert!(super::take_callback(6).is_none());
+        assert!(super::take_callback(7).is_some());
+        assert!(super::take_callback(7).is_none());
     }
 
     #[test]
