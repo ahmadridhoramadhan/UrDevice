@@ -27,6 +27,21 @@ urdevice-proto = { path = "crates/urdevice-proto" }
 # Shared third-party crates
 futures-core = "0.3"
 thiserror = "2"
+prost = { version = "0.14", default-features = false, features = ["std", "derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-ring", "log"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "logging", "tls12"] }
+rustls-webpki = { version = "0.103", default-features = false, features = ["std", "ring"] }
+rcgen = { version = "0.14", default-features = false, features = ["ring", "pem"] }
+ring = "0.17"
+rusqlite = { version = "0.38", features = ["bundled"] }
+mdns-sd = { version = "0.19", default-features = false }
+socket2 = { version = "0.6", features = ["all"] }
+if-addrs = "0.15"
+qrcode = { version = "0.14", default-features = false }
+data-encoding = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "env-filter", "ansi"] }
 
 # Desktop UI
 slint = { version = "1.18", default-features = false, features = [
