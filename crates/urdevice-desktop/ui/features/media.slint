@@ -61,12 +61,15 @@ component MediaSlider inherits Rectangle {
     height: 22px;
     opacity: root.enabled ? 1 : 0.5;
     Rectangle {
+        x: 0px;
         y: (parent.height - self.height) / 2;
+        width: parent.width;
         height: 4px;
         border-radius: 2px;
         background: Theme.border;
     }
     Rectangle {
+        x: 0px;
         y: (parent.height - self.height) / 2;
         height: 4px;
         width: parent.width * root.shown;
