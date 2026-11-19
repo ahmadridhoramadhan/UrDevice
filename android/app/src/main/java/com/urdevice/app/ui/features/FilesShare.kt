@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -50,9 +52,9 @@ class ShareActivity : ComponentActivity() {
                         p.status == "connected" &&
                             p.remotePermissions.firstOrNull { it.capability == "files.v1" }?.mode != FfiMode.DENY
                     }
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(Modifier.safeDrawingPadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            stringResource(R.string.files_share_title, uris.size),
+                            pluralStringResource(R.plurals.files_share_title, uris.size, uris.size),
                             style = MaterialTheme.typography.titleMedium,
                         )
                         if (peers.isEmpty()) Text(stringResource(R.string.files_share_none))

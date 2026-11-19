@@ -198,7 +198,7 @@ object FilesFeature : Feature {
         FfiTransferState.DONE -> if (t.outgoing) ctx.getString(R.string.files_sent, size(ctx, t.total))
             else ctx.getString(R.string.files_saved, t.saved.firstOrNull() ?: "Download/UrDevice")
         FfiTransferState.FAILED -> when {
-            t.failed > 0u -> ctx.getString(R.string.files_failed_check, t.failed.toInt())
+            t.failed > 0u -> ctx.resources.getQuantityString(R.plurals.files_failed_count, t.failed.toInt(), t.failed.toInt())
             t.reason == "storage" -> ctx.getString(R.string.files_failed_storage)
             else -> ctx.getString(R.string.files_failed)
         }

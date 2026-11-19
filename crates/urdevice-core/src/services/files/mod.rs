@@ -56,6 +56,10 @@ const ACCEPT_TIMEOUT: Duration = Duration::from_secs(60);
 const STREAM_TIMEOUT: Duration = Duration::from_secs(30);
 /// Automatic resume attempts after reconnects.
 const MAX_RESUMES: u32 = 20;
+/// Interrupted transfers to a connected device are tried again this many
+/// ticks apart (5 s), for an attempt that broke while the session stayed up
+/// or was replaced by a new one.
+const RESUME_EVERY: u64 = 50;
 /// Progress events at most this often (design §9.2: about every 100 ms).
 const TICK: Duration = Duration::from_millis(100);
 
@@ -639,6 +643,33 @@ pub fn sources_from_paths(paths: &[PathBuf]) -> Result<Vec<Source>> {
     Ok(out)
 }
 
+/// Start interrupted outgoing transfers again whose device is connected
+/// (R8.5). Each transfer gets at most [`MAX_RESUMES`] automatic attempts.
+fn resume_due(ctx: &ServiceCtx, sh: &Arc<Shared>) {
+    let connected = ctx.connected();
+    let due: Vec<u64> = {
+        let mut table = sh.table();
+        table
+            .list
+            .iter_mut()
+            .filter(|t| {
+                t.outgoing
+                    && t.state == TransferState::Interrupted
+                    && t.resumes < MAX_RESUMES
+                    && connected.contains(&t.peer)
+                    && t.running.try_lock().is_ok()
+            })
+            .map(|t| {
+                t.resumes += 1;
+                t.handle
+            })
+            .collect()
+    };
+    for h in due {
+        ctx.spawn(run_outgoing(ctx.clone(), sh.clone(), h));
+    }
+}
+
 /// Tell the host where a verified file landed, with its cleaned folder
 /// relative to the download folder.
 fn saved_hook(host: Arc<dyn FilesHost>) -> engine::OnSaved {
@@ -974,6 +1005,8 @@ async fn run_incoming(ctx: ServiceCtx, sh: Arc<Shared>, handle: u64, offer: Offe
         .collect();
     let (stx, srx) = oneshot::channel();
     let meter = Arc::new(engine::Meter::default());
+    // Bytes kept from an earlier attempt count as done, not as speed.
+    meter.set(targets.iter().map(|t| t.start).sum());
     let discard = Arc::new(AtomicBool::new(false));
     let view = sh.with(handle, |t| {
         t.targets = targets.clone();
@@ -1142,6 +1175,7 @@ async fn run_download(
         };
     let starts: Vec<u64> = targets.iter().map(|t| t.start).collect();
     let meter = Arc::new(engine::Meter::default());
+    meter.set(starts.iter().sum());
     let discard = Arc::new(AtomicBool::new(false));
     sh.with(handle, |t| {
         t.targets = targets.clone();
@@ -1227,12 +1261,18 @@ impl Service for Files {
 
     fn start(&self, ctx: ServiceCtx) {
         let weak: Weak<Shared> = Arc::downgrade(&self.shared);
+        let ctx2 = ctx.clone();
         ctx.spawn(async move {
+            let mut n = 0u64;
             loop {
                 tokio::time::sleep(TICK).await;
                 let Some(sh) = weak.upgrade() else { return };
                 if sh.tick() {
                     sh.changed();
+                }
+                n += 1;
+                if n.is_multiple_of(RESUME_EVERY) {
+                    resume_due(&ctx2, &sh);
                 }
             }
         });

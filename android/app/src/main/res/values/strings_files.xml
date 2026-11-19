@@ -12,6 +12,10 @@
     <string name="files_cancel">Cancel</string>
     <string name="files_retry">Retry</string>
     <string name="files_and_more">%1$s and %2$d more</string>
+    <plurals name="files_failed_count">
+        <item quantity="one">%1$d file failed the check and was discarded</item>
+        <item quantity="other">%1$d files failed the check and were discarded</item>
+    </plurals>
     <string name="files_waiting">Waiting for %1$s to accept…</string>
     <string name="files_progress">%1$d%% · %2$s of %3$s</string>
     <string name="files_progress_eta">%1$d%% · %2$s of %3$s · %4$s/s · %5$s left</string>
@@ -21,7 +25,6 @@
     <string name="files_interrupted">Interrupted at %1$s of %2$s. It continues when %3$s is back.</string>
     <string name="files_sent">Sent %1$s, checked with SHA-256</string>
     <string name="files_saved">Saved to %1$s</string>
-    <string name="files_failed_check">%1$d files failed the check and were discarded</string>
     <string name="files_failed_storage">Could not write the file</string>
     <string name="files_failed">Failed</string>
     <string name="files_cancelled">Cancelled</string>
@@ -34,7 +37,10 @@
     <string name="files_notif_sending">Sending %1$s to %2$s</string>
     <string name="files_notif_receiving">Receiving %1$s from %2$s</string>
     <string name="files_share_label">Send with UrDevice</string>
-    <string name="files_share_title">Send %1$d files to</string>
+    <plurals name="files_share_title">
+        <item quantity="one">Send %1$d file to</item>
+        <item quantity="other">Send %1$d files to</item>
+    </plurals>
     <string name="files_share_none">No connected device accepts files. Open UrDevice and connect a device first.</string>
     <string name="files_share_started">Sending to %1$s</string>
     <string name="files_share_failed">Could not send to %1$s</string>
