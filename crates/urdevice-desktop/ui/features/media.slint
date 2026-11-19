@@ -1,17 +1,283 @@
-// Media control (#20): the desktop feature view.
+// Media control (#20, design §9.4): the desktop feature view.
 // Rust side: src/features/media.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Icon, Btn, Card, Chip, Toggle, Muted } from "../widgets.slint";
+import { Theme } from "../theme.slint";
 
 // State and callbacks shared with src/features/media.rs.
 export global MediaFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    // The media player for this host is on (R11.6).
+    in-out property <bool> on: true;
+    // Why there is nothing to show (0 none, 1 offline, 2 turned off by the
+    // host, 3 player off, 4 waiting, 5 Android notification access off,
+    // 6 host cannot read sessions, 7 nothing playing, 8 request refused).
+    in property <int> message-kind;
+    // One tab per media app on the host, and the one selected.
+    in property <[string]> tabs;
+    in-out property <int> selected: 0;
+    // The selected session.
+    in property <string> app-name;
+    in property <string> title;
+    in property <string> artist;
+    in property <image> artwork;
+    in property <bool> has-artwork;
+    in property <bool> playing;
+    // Position as a fraction of the track (0..1), and as text.
+    in property <float> progress;
+    in property <string> position-text;
+    in property <string> duration-text;
+    // Only the controls the session supports are shown (R11.5).
+    in property <bool> can-seek;
+    in property <bool> can-prev;
+    in property <bool> can-next;
+    in property <bool> can-play-pause;
+    // The host's system volume.
+    in property <float> volume;
+    in property <bool> muted;
+    in property <bool> can-volume;
+
+    callback set-on(bool);
+    callback pick(int);
+    callback play-pause();
+    callback prev();
+    callback next();
+    // Jump to a fraction of the track.
+    callback seek(float);
+    // Set the volume to a fraction, while dragging (throttled in Rust) and on release.
+    callback set-volume(float, bool);
+    callback set-muted(bool);
+}
+
+// A horizontal slider: `value` is 0..1. `moved` fires while dragging and
+// `released` when the pointer is let go.
+component MediaSlider inherits Rectangle {
+    in property <float> value;
+    in property <bool> enabled: true;
+    out property <bool> dragging: ta.pressed;
+    callback moved(float);
+    callback released(float);
+    property <float> shown: ta.pressed ? max(0, min(1, ta.mouse-x / root.width)) : max(0, min(1, root.value));
+    height: 22px;
+    opacity: root.enabled ? 1 : 0.5;
+    Rectangle {
+        x: 0px;
+        y: (parent.height - self.height) / 2;
+        width: parent.width;
+        height: 4px;
+        border-radius: 2px;
+        background: Theme.border;
+    }
+    Rectangle {
+        x: 0px;
+        y: (parent.height - self.height) / 2;
+        height: 4px;
+        width: parent.width * root.shown;
+        border-radius: 2px;
+        background: Theme.accent;
+    }
+    Rectangle {
+        x: max(0px, min(parent.width - self.width, parent.width * root.shown - self.width / 2));
+        y: (parent.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: Theme.accent;
+        visible: root.enabled;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        moved => { root.moved(max(0, min(1, self.mouse-x / root.width))); }
+        changed pressed => {
+            if (!self.pressed) {
+                root.released(max(0, min(1, self.mouse-x / root.width)));
+            }
+        }
+    }
+}
+
+component RoundButton inherits Rectangle {
+    in property <image> icon;
+    in property <length> size: 40px;
+    in property <bool> primary: false;
+    in property <string> label;
+    callback clicked();
+    width: size;
+    height: size;
+    border-radius: size / 2;
+    background: primary ? (ta.has-hover ? Theme.accent.darker(0.15) : Theme.accent) : (ta.has-hover ? Theme.surface-2 : transparent);
+    border-width: primary ? 0 : 1px;
+    border-color: Theme.border;
+    accessible-role: button;
+    accessible-label: root.label;
+    Icon {
+        source: root.icon;
+        tint: root.primary ? Theme.on-accent : Theme.text;
+        width: root.size * 0.45;
+        height: root.size * 0.45;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
 }
 
 export component MediaView inherits VerticalLayout {
     // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
     in property <string> peer-name;
-    spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    spacing: 12px;
+    alignment: start;
+
+    HorizontalLayout {
+        spacing: 10px;
+        Toggle {
+            y: (parent.height - self.height) / 2;
+            checked: MediaFeature.on;
+            toggled(on) => { MediaFeature.set-on(on); }
+        }
+        Text {
+            text: @tr("Show what is playing on {}", root.peer-name);
+            color: Theme.text;
+            font-size: Theme.font-body;
+            vertical-alignment: center;
+        }
+    }
+
+    if MediaFeature.message-kind != 0: Muted {
+        text: [
+            "",
+            @tr("{} is offline.", root.peer-name),
+            @tr("Media control is turned off by {}.", root.peer-name),
+            @tr("The media player is off."),
+            @tr("Waiting for {}…", root.peer-name),
+            @tr("Notification access is off on {}. Turn it on in the Android settings so other devices can see and control media.", root.peer-name),
+            @tr("{} cannot read its media apps.", root.peer-name),
+            @tr("Nothing is playing on {}.", root.peer-name),
+            @tr("{} did not allow that.", root.peer-name),
+        ][MediaFeature.message-kind];
+    }
+
+    if MediaFeature.on && MediaFeature.tabs.length > 0: HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        for name[i] in MediaFeature.tabs: Btn {
+            text: name;
+            kind: MediaFeature.selected == i ? 0 : 1;
+            clicked => { MediaFeature.pick(i); }
+        }
+    }
+
+    if MediaFeature.on && MediaFeature.tabs.length > 0: Card {
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+            HorizontalLayout {
+                spacing: 16px;
+                Rectangle {
+                    width: 112px;
+                    height: 112px;
+                    border-radius: 8px;
+                    background: Theme.icon-bg;
+                    clip: true;
+                    if MediaFeature.has-artwork: Image {
+                        source: MediaFeature.artwork;
+                        image-fit: contain;
+                        width: parent.width;
+                        height: parent.height;
+                    }
+                    if !MediaFeature.has-artwork: Icon {
+                        source: @image-url("../icons/play.svg");
+                        tint: Theme.accent;
+                        width: 40px;
+                        height: 40px;
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    alignment: center;
+                    Text {
+                        text: MediaFeature.title != "" ? MediaFeature.title : @tr("Unknown title");
+                        font-size: Theme.font-title;
+                        font-weight: 700;
+                        color: Theme.text;
+                        overflow: elide;
+                    }
+                    if MediaFeature.artist != "": Text {
+                        text: MediaFeature.artist;
+                        font-size: Theme.font-body;
+                        color: Theme.muted;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: MediaFeature.app-name;
+                        font-size: Theme.font-small;
+                        color: Theme.muted;
+                        overflow: elide;
+                    }
+                }
+            }
+            if MediaFeature.can-seek: VerticalLayout {
+                spacing: 2px;
+                MediaSlider {
+                    value: MediaFeature.progress;
+                    released(v) => { MediaFeature.seek(v); }
+                }
+                HorizontalLayout {
+                    Text { text: MediaFeature.position-text; font-size: Theme.font-small; color: Theme.muted; }
+                    Rectangle { }
+                    Text { text: MediaFeature.duration-text; font-size: Theme.font-small; color: Theme.muted; }
+                }
+            }
+            HorizontalLayout {
+                spacing: 14px;
+                alignment: center;
+                if MediaFeature.can-prev: RoundButton {
+                    icon: @image-url("../icons/media-prev.svg");
+                    label: @tr("Previous");
+                    clicked => { MediaFeature.prev(); }
+                }
+                if MediaFeature.can-play-pause: RoundButton {
+                    icon: MediaFeature.playing ? @image-url("../icons/media-pause.svg") : @image-url("../icons/media-play.svg");
+                    label: MediaFeature.playing ? @tr("Pause") : @tr("Play");
+                    primary: true;
+                    size: 48px;
+                    clicked => { MediaFeature.play-pause(); }
+                }
+                if MediaFeature.can-next: RoundButton {
+                    icon: @image-url("../icons/media-next.svg");
+                    label: @tr("Next");
+                    clicked => { MediaFeature.next(); }
+                }
+            }
+        }
+    }
+
+    if MediaFeature.on && MediaFeature.can-volume: Card {
+        HorizontalLayout {
+            padding: 12px;
+            spacing: 12px;
+            RoundButton {
+                size: 34px;
+                icon: MediaFeature.muted ? @image-url("../icons/media-mute.svg") : @image-url("../icons/media-volume.svg");
+                label: MediaFeature.muted ? @tr("Unmute") : @tr("Mute");
+                clicked => { MediaFeature.set-muted(!MediaFeature.muted); }
+            }
+            MediaSlider {
+                y: (parent.height - self.height) / 2;
+                value: MediaFeature.muted ? 0 : MediaFeature.volume;
+                moved(v) => { MediaFeature.set-volume(v, false); }
+                released(v) => { MediaFeature.set-volume(v, true); }
+            }
+            Text {
+                width: 40px;
+                text: round((MediaFeature.muted ? 0 : MediaFeature.volume) * 100) + "%";
+                color: Theme.muted;
+                font-size: Theme.font-small;
+                vertical-alignment: center;
+                horizontal-alignment: right;
+            }
+        }
+    }
 }

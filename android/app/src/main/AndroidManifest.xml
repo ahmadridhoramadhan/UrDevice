@@ -18,6 +18,13 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- media: lets the media remote find media apps' sessions (R11.4). -->
+    <queries>
+        <intent>
+            <action android:name="android.media.browse.MediaBrowserService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".UrDeviceApp"
         android:allowBackup="false"
@@ -44,6 +51,17 @@
             android:name=".UrDeviceService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- media: the notification listener whose access unlocks MediaSessionManager (R11.4). -->
+        <service
+            android:name=".host.MediaListenerService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".ActionReceiver"

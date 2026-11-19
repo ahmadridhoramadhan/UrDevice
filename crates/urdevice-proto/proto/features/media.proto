@@ -1,0 +1,59 @@
+// Media control (#20, design §9.4). Reference copy of
+// `src/features/media.rs`, which is the source of truth. Never reuse or
+// renumber a field. Carried as the body of a `Feature` envelope for service 5.
+// There is no shuffle and no repeat (R11.5).
+
+syntax = "proto3";
+package urdevice.v1.media;
+
+message Media {
+  oneof msg {
+    Subscribe subscribe = 1;  // controller -> host (R11.6)
+    State state = 2;          // host -> controller
+    Cmd cmd = 3;              // controller -> host
+    VolumeCmd volume = 4;     // controller -> host
+  }
+}
+
+message Subscribe { bool on = 1; }
+
+enum PlayState { STOPPED = 0; PLAYING = 1; PAUSED = 2; }
+
+message Session {
+  string id = 1;
+  string app_name = 2;
+  string title = 3;
+  string artist = 4;
+  bytes artwork_png = 5;       // <= 256 px, <= 96 KiB
+  PlayState state = 6;
+  optional uint64 position_ms = 7;
+  optional uint64 duration_ms = 8;
+  bool can_seek = 9;
+  bool can_next = 10;
+  bool can_prev = 11;
+  bool can_play_pause = 12;
+}
+
+message State {
+  repeated Session sessions = 1;  // at most 16
+  float volume = 2;               // 0.0 - 1.0, system output
+  bool muted = 3;
+  bool can_volume = 4;
+  string unavailable = 5;         // "", "listener_permission", "unsupported"
+}
+
+enum CmdKind { PLAY_PAUSE = 0; NEXT = 1; PREV = 2; SEEK = 3; }
+
+message Cmd {
+  string session_id = 1;
+  CmdKind kind = 2;
+  uint64 seek_ms = 3;
+}
+
+message VolumeCmd {
+  oneof cmd {
+    float set = 1;     // 0.0 - 1.0
+    sint32 step = 2;   // 2 % steps, negative is down
+    bool mute = 3;
+  }
+}

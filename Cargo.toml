@@ -75,10 +75,15 @@ x11rb = { version = "0.13", default-features = false, features = ["xfixes"] }
 clipboard-win = { version = "5", features = ["monitor", "std"] }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard", "NSPasteboardItem"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSEnumerator", "NSString"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSEnumerator", "NSGeometry", "NSString", "objc2-core-foundation"] }
 
 # Android bindings
 uniffi = "0.32"
+
+# Media control host adapters (#20): MPRIS on Linux, SMTC and Core Audio on
+# Windows, media keys on macOS. All are already in the tree through other crates.
+zbus = "5"
+windows = "0.62"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

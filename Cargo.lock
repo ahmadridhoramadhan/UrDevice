@@ -7178,7 +7178,10 @@ dependencies = [
  "tracing",
  "urdevice-core",
  "urdevice-proto",
+ "windows",
  "x11rb",
+ "zbus 5.19.0",
+ "zune-jpeg",
 ]
 
 [[package]]
