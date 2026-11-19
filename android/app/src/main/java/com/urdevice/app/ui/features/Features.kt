@@ -32,6 +32,10 @@ interface Feature {
     @Composable
     fun Screen(peer: FfiPeer, tile: String) {}
 
+    /** Settings rows this feature adds to the Settings screen (for example a global switch). */
+    @Composable
+    fun Settings() {}
+
     /** Called once after the core started, on the main thread: register host adapters and listeners. */
     fun onCoreStarted(context: Context, node: UrDeviceNode) {}
 }

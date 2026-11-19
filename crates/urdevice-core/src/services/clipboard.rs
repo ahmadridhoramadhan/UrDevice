@@ -418,7 +418,11 @@ impl Clipboard {
         self.submit(data, sensitive, peer, false)
     }
 
-    fn submit(
+    /// Hand content over to send. `automatic` content (a change noticed
+    /// without a user action) is checked against what this device just
+    /// received or sent, so it is not echoed (R7.4). `only` limits delivery
+    /// to one device.
+    pub fn submit(
         &self,
         data: ClipData,
         sensitive: bool,

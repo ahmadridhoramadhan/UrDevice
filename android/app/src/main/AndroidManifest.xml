@@ -48,6 +48,51 @@
         <receiver
             android:name=".ActionReceiver"
             android:exported="false" />
+
+        <!-- clipboard (#16): send from the notification, the Quick Settings tile, and the share sheet. -->
+        <activity
+            android:name=".ClipboardSendActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <activity
+            android:name=".ClipboardShareActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/clip_share_label"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="image/png" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".ClipboardTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_urdevice_symbol"
+            android:label="@string/clip_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Images received from another device are handed to the app the user pastes into. -->
+        <provider
+            android:name=".host.ClipboardFileProvider"
+            android:authorities="com.urdevice.app.clipboard"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clipboard_paths" />
+        </provider>
     </application>
 
 </manifest>

@@ -5,6 +5,7 @@ import { Theme } from "theme.slint";
 import { Icon, IconBox, Btn, Card, Chip, Dot, ModeSwitch, Toggle, SectionTitle, Muted } from "widgets.slint";
 import { Labels } from "labels.slint";
 import { FeatureView } from "features/features.slint";
+import { ClipboardFeature } from "features/clipboard.slint";
 
 export { Labels } from "labels.slint";
 // The feature globals, for src/features/*.rs.
@@ -909,6 +910,15 @@ export component MainWindow inherits Window {
                                         Muted { text: @tr("Open UrDevice in the tray when you sign in."); }
                                     }
                                     Toggle { checked: root.autostart; toggled(v) => { root.set-autostart(v); } y: (parent.height - self.height) / 2; }
+                                }
+                                // clipboard (#16, R7.6)
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    VerticalLayout {
+                                        Text { text: @tr("Pause clipboard on all devices"); font-weight: 600; color: Theme.text; }
+                                        Muted { text: @tr("Nothing you copy is sent, and nothing from other devices is written to your clipboard. Switch it off per device on its page."); }
+                                    }
+                                    Toggle { checked: ClipboardFeature.paused; toggled(v) => { ClipboardFeature.set-paused(v); } y: (parent.height - self.height) / 2; }
                                 }
                                 HorizontalLayout {
                                     VerticalLayout {
