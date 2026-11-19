@@ -64,9 +64,9 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 5: Media control
 
-- [ ] T5.1 Media protocol (MediaSubscribe, MediaState with sessions and capability flags, MediaCmd with Seek, VolumeCmd with Mute) and the core service. _Req: R11.1, R11.5, R11.6_
-- [ ] T5.2 Hosts: Windows SMTC sessions, Linux MPRIS players, macOS "System" session with media keys and CoreAudio volume, Android MediaSession with a NotificationListener. _Req: R11.2–R11.5_
-- [ ] T5.3 Media player UI on Android and desktop: source tabs, seek bar, controls shown only when supported, volume and mute, and the on/off switch. _Req: R11.1, R11.2, R11.5, R11.6_
+- [x] T5.1 Media protocol (MediaSubscribe, MediaState with sessions and capability flags, MediaCmd with Seek, VolumeCmd with Mute) and the core service. _Req: R11.1, R11.5, R11.6_
+- [x] T5.2 Hosts: Windows SMTC sessions, Linux MPRIS players, macOS "System" session with media keys and CoreAudio volume, Android MediaSession with a NotificationListener. _Req: R11.2–R11.5_
+- [x] T5.3 Media player UI on Android and desktop: source tabs, seek bar, controls shown only when supported, volume and mute, and the on/off switch. _Req: R11.1, R11.2, R11.5, R11.6_
 
 ## Phase 6: Screen sharing
 

@@ -344,7 +344,7 @@ TextInput    { text }    // Unicode text, sent as-is (R10.4)
 |---|---|
 | Windows | `GlobalSystemMediaTransportControlsSessionManager` (WinRT, `windows` crate) |
 | Linux | MPRIS over D-Bus (`zbus`) |
-| macOS | Media keys sent through `NSEvent` system-defined events, and system volume through CoreAudio. Now-playing info is not shown, because the MediaRemote framework is private API (R11.3) |
+| macOS | Media keys sent through `NSEvent` system-defined events, and system volume and mute through the system's `volume settings` (AppleScript), which also covers output devices without a master channel, where a raw CoreAudio scalar does not work. Now-playing info is not shown, because the MediaRemote framework is private API (R11.3) |
 | Android | `MediaSessionManager.getActiveSessions` with a `NotificationListenerService` (R11.4), and `AudioManager` for volume |
 
 Messages:
@@ -362,6 +362,9 @@ VolumeCmd { VolSet(f32) | VolStep(i8) | Mute(bool) }               // system out
 
 - **Sessions (R11.2):** one entry per media app. Windows lists `GetSessions()`, Linux lists each `org.mpris.MediaPlayer2.*` bus name, and Android lists `getActiveSessions`. The controller shows them as source tabs and sends commands with the selected `session_id`. Selecting a source only changes the controller's view, so no extra message is needed.
 - **Capability flags (R11.5):** `can_seek` comes from SMTC `IsPlaybackPositionEnabled`, MPRIS `CanSeek`, and Android `PlaybackState.ACTION_SEEK_TO`, and the next/previous flags come from the matching properties. The controller hides controls whose flag is false. Shuffle and repeat are not part of the protocol.
+- **Updates (R11.6):** a subscribed host reads its sessions once a second and pushes a `MediaState` only when something other than the playback clock changed (a position that stays within 2 s of where the clock predicts is not a change). The controller moves the position of a playing session forward between pushes. A host stops pushing when the controller turns the player off, when the session closes, when the host's setting becomes Deny, and when an Always Ask approval ends.
+- **Limits:** a `MediaState` has at most 16 sessions, 96 KiB of artwork per session and 512 KiB in total, and the controller drops artwork that is not a PNG. Commands from the controller are applied in order, at most 64 queued.
+- **Artwork:** hosts send PNGs of at most 256 px. Linux reads `file://` cover URLs only, and Android reads bitmaps and `content://` URIs only. A host never fetches a remote URL for a player, so remote-only covers (for example Spotify on Linux) show the app icon.
 - **macOS (R11.3):** the host sends one session named "System" with no title or artwork, `can_seek = false`, and next and previous set to true. Its commands become media keys.
 - **On and off (R11.6):** the controller sends `MediaSubscribe { on: false }` when the user turns the player off. The host then stops sending `MediaState` to that controller. Turning it on again sends `MediaSubscribe { on: true }`, and the host replies with the current state.
 

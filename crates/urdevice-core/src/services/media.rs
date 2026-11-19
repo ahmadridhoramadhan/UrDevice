@@ -22,7 +22,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 use tokio::sync::{Notify, mpsc};
-use urdevice_proto::features::media::{self as wire, Media as WireMedia, media::Msg};
+use urdevice_proto::features::media::{self as wire, Media as WireMedia, message::Msg};
 
 use super::{Access, Direction, Grant, Message, Registry, Service, ServiceCtx, ServiceId, Slot};
 use crate::identity::DeviceId;
@@ -227,11 +227,7 @@ impl Media {
         if !on && let Some(e) = self.shared.events.get() {
             e.updated(host);
         }
-        self.send_to_host(
-            ctx,
-            host,
-            wire::media::Msg::Subscribe(wire::Subscribe { on }),
-        )
+        self.send_to_host(ctx, host, Msg::Subscribe(wire::Subscribe { on }))
     }
 
     /// True while the player for `host` is on.

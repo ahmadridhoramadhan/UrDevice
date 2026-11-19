@@ -42,12 +42,12 @@ pub const MAX_VOLUME_STEP: i32 = 25;
 #[derive(Clone, PartialEq, Message)]
 pub struct Media {
     /// The message.
-    #[prost(oneof = "media::Msg", tags = "1, 2, 3, 4")]
-    pub msg: Option<media::Msg>,
+    #[prost(oneof = "message::Msg", tags = "1, 2, 3, 4")]
+    pub msg: Option<message::Msg>,
 }
 
-/// Nested types for [`Media`].
-pub mod media {
+/// Nested types for [`Media`]: `message::Msg` is the oneof.
+pub mod message {
     /// One media message.
     #[derive(Clone, PartialEq, prost::Oneof)]
     pub enum Msg {
@@ -66,8 +66,8 @@ pub mod media {
     }
 }
 
-impl From<media::Msg> for Media {
-    fn from(msg: media::Msg) -> Self {
+impl From<message::Msg> for Media {
+    fn from(msg: message::Msg) -> Self {
         Self { msg: Some(msg) }
     }
 }
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        let m = Media::from(media::Msg::State(State {
+        let m = Media::from(message::Msg::State(State {
             sessions: vec![session("a")],
             volume: 0.5,
             muted: true,
@@ -314,7 +314,7 @@ mod tests {
         }));
         let bytes = m.encode_to_vec();
         assert_eq!(Media::decode(bytes.as_slice()).unwrap(), m);
-        let c = Media::from(media::Msg::Volume(VolumeCmd {
+        let c = Media::from(message::Msg::Volume(VolumeCmd {
             cmd: Some(volume_cmd::Cmd::Step(-3)),
         }));
         assert_eq!(Media::decode(c.encode_to_vec().as_slice()).unwrap(), c);
