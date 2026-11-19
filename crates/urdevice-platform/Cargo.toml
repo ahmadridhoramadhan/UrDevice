@@ -17,19 +17,23 @@ ring.workspace = true
 starship-battery.workspace = true
 tracing.workspace = true
 urdevice-core.workspace = true
+urdevice-proto.workspace = true
 zune-jpeg.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { workspace = true, features = ["async-secret-service", "tokio", "crypto-rust"] }
+x11rb.workspace = true
 zbus.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { workspace = true, features = ["apple-native"] }
 objc2.workspace = true
+objc2-app-kit.workspace = true
 objc2-foundation.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { workspace = true, features = ["windows-native"] }
+clipboard-win.workspace = true
 windows = { workspace = true, features = [
     "Foundation",
     "Foundation_Collections",

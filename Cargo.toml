@@ -69,6 +69,14 @@ png = "0.18"
 tray-icon = "0.26"
 ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
 
+# Desktop clipboard (#16). All three are already in the tree through Slint's
+# winit backend (arboard).
+x11rb = { version = "0.13", default-features = false, features = ["xfixes"] }
+clipboard-win = { version = "5", features = ["monitor", "std"] }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard", "NSPasteboardItem"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSEnumerator", "NSGeometry", "NSString", "objc2-core-foundation"] }
+
 # Android bindings
 uniffi = "0.32"
 
@@ -76,8 +84,6 @@ uniffi = "0.32"
 # Windows, media keys on macOS. All are already in the tree through other crates.
 zbus = "5"
 windows = "0.62"
-objc2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "objc2-core-foundation"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

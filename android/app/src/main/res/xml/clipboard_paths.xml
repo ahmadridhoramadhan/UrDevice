@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Images received from another device, shared with the app the user pastes into. -->
+    <cache-path name="clipboard" path="clipboard/" />
+</paths>

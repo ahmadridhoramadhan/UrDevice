@@ -623,6 +623,27 @@ impl ServiceCtx {
         );
     }
 
+    /// Read one of this service's own settings, for example a toggle the
+    /// user set. Stored with the other device settings; the key is private to
+    /// the service. Never store content here.
+    pub fn setting(&self, key: &str) -> Option<String> {
+        let inner = self.inner().ok()?;
+        lock(&inner.store).meta(&self.setting_key(key)).ok()?
+    }
+
+    /// Write one of this service's own settings. See [`ServiceCtx::setting`].
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        if key.len() > 96 || value.len() > 256 {
+            return Err(CoreError::InvalidInput("setting too long".into()));
+        }
+        let inner = self.inner()?;
+        lock(&inner.store).set_meta(&self.setting_key(key), value)
+    }
+
+    fn setting_key(&self, key: &str) -> String {
+        format!("svc{}.{key}", self.service.to_wire())
+    }
+
     /// Ask the UI to redraw from a fresh snapshot.
     pub fn changed(&self) {
         if let Ok(inner) = self.inner() {

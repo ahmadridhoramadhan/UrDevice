@@ -297,11 +297,14 @@ The service receives a `Grant` that only the node can create. Services ask for a
 
 ### 9.1 Clipboard (R7)
 
-- On desktop, the watcher uses OS change events where they exist (`AddClipboardFormatListener` on Windows, X11 XFixes / Wayland `wlr-data-control`) and polls `NSPasteboard.changeCount` every 500 ms on macOS.
-- Sensitive content is never sent (R7.3).
-- Echo prevention: the core keeps the hash of the last written and last received content and ignores watcher events that match it (R7.4).
-- Message: `Clip { id, mime, bytes (≤10 MB), origin_device }`. Images over 1 MB go over a bulk stream.
-- Android: content is read only while the app is in the foreground or through a user action (notification button, Quick Settings tile, share sheet). Incoming content is written with `ClipboardManager.setPrimaryClip`, which Android allows from a foreground service (R7.5).
+- On desktop, the watcher uses OS change events where they exist (`AddClipboardFormatListener` on Windows, X11 XFixes) and polls `NSPasteboard.changeCount` every 500 ms on macOS. On Linux the X11 back-end also serves Wayland sessions through XWayland: GNOME's Mutter keeps both clipboards in sync and has no `wlr-data-control`. A native `wlr-data-control` / `ext-data-control` back-end for compositors without XWayland is not built yet.
+- Sensitive content is never sent (R7.3). It is recognised by `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory = 0`, and `CanUploadToCloudClipboard = 0` on Windows, `org.nspasteboard.ConcealedType` and `TransientType` on macOS, `x-kde-passwordManagerHint` on X11, and `EXTRA_IS_SENSITIVE` on Android. A marked item is not read at all.
+- Echo prevention: the core keeps the hash of the last written, last received, and last sent content and ignores watcher events that match it (R7.4). Text is hashed with line endings normalised, because Windows turns `\n` into `\r\n`. Back-ends also skip the change event of their own write where the OS tells them apart (X11 owner window, Windows sequence number, macOS change count).
+- Message: `Clip { id, mime, bytes (≤10 MB), origin_device, alt_text }`. Items up to 512 KiB go in a control message. Larger items go over a unidirectional stream (`StreamOpen.kind = 1`, `meta = ClipHeader { id, mime, size, sha256 }`), which the receiver reads to exactly `size` bytes and checks against the hash before writing. Allowed types: `text/plain`, `text/html`, `image/png`. The receiver checks the type, the size, UTF-8, and the PNG header (at most 100 megapixels), drops what fails, and rate-limits each peer to 20 items per 10 s.
+- Always Ask on the receiving device: the sender requests an activity, which covers one item, and stops it after sending. The sender asks again if its copy of the setting was stale (`ask` refusal).
+- Settings (R7.6): "Pause clipboard on all devices" and a switch per paired device are stored with the other device settings (`svc1.paused`, `svc1.peer.<id>`). Both directions stop: nothing is sent and nothing received is written.
+- Android: content is read only while the app is in the foreground or through a user action. While the app is open, a change of the system clipboard is sent on its own. In the background the user sends with the notification action ("Send clipboard" on the service notification), the Quick Settings tile, or the share sheet; the first two open an invisible activity that reads the clipboard once it has focus. Incoming content is written with `ClipboardManager.setPrimaryClip`, which Android allows from a foreground service (R7.5); images go through a `FileProvider` URI.
+- Windows writes images as `PNG` and `CF_DIBV5` (Windows then offers `CF_DIB` and `CF_BITMAP`), and reads `PNG`, `CF_DIBV5`, or `CF_DIB`.
 
 ### 9.2 File transfer (R8)
 

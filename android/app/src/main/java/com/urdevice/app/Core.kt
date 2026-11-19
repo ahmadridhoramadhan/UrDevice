@@ -102,6 +102,9 @@ object Core {
         return n
     }
 
+    /** The application context, once the core started. */
+    fun appContext(): Context = app
+
     /** The running core, or null before the service started it. */
     fun node(): UrDeviceNode? = node
 }

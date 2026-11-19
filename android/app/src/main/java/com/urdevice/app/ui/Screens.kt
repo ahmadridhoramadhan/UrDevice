@@ -353,6 +353,8 @@ fun SettingsScreen(
                 }
                 Switch(checked = snap.me.hidden, onCheckedChange = onHidden)
             }
+            // Feature settings, such as "Pause clipboard on all devices" (ui/features/).
+            allFeatures.forEach { it.Settings() }
             Text(stringResource(R.string.set_language), fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.set_language_body), style = MaterialTheme.typography.bodySmall)
         }
