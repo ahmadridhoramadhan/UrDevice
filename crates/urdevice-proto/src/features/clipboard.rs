@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn inline_item_with_alt_text_fits_a_control_frame() {
-        assert!(MAX_INLINE_BYTES + MAX_ALT_TEXT_BYTES + 256 < crate::MAX_FRAME);
+        const { assert!(MAX_INLINE_BYTES + MAX_ALT_TEXT_BYTES + 256 < crate::MAX_FRAME) };
     }
 
     #[test]
