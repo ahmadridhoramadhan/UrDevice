@@ -1,0 +1,24 @@
+// Clipboard sharing (#16, design §9.1): messages of ServiceId::CLIPBOARD.
+// Mirrors crates/urdevice-proto/src/features/clipboard.rs. Never reuse or
+// renumber a field.
+syntax = "proto3";
+package urdevice.clipboard;
+
+// Control message, direction ToHost: the receiver is the device that writes.
+// bytes <= 512 KiB; bigger items use a stream (kind 1) with ClipHeader.
+message Clip {
+  bytes id = 1;              // 16 random bytes
+  string mime = 2;           // text/plain, text/html, image/png
+  bytes bytes = 3;           // the content
+  bytes origin_device = 4;   // 32-byte Device ID, display only
+  string alt_text = 5;       // plain text version of text/html
+}
+
+// StreamOpen.meta of a stream with kind 1. The body is exactly `size` bytes.
+message ClipHeader {
+  bytes id = 1;
+  string mime = 2;
+  uint64 size = 3;
+  bytes sha256 = 4;
+  bytes origin_device = 5;
+}

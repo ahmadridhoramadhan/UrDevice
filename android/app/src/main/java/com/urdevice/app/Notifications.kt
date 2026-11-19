@@ -66,6 +66,11 @@ object Notifications {
                 if (n > 0) ctx.getString(R.string.notif_running, n) else ctx.getString(R.string.notif_waiting),
             )
         }
+        // Send the clipboard now (R7.5). Android only lets a focused app read it, so this opens
+        // a transparent activity (ClipboardSendActivity).
+        b.addAction(
+            Notification.Action.Builder(null, ctx.getString(R.string.clip_send_action), ClipboardSendActivity.pending(ctx)).build(),
+        )
         return b.build()
     }
 

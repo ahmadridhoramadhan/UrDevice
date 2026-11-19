@@ -39,9 +39,9 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 3: Clipboard and files
 
-- [ ] T3.1 Clipboard service in the core: the Clip message, echo prevention, the size limit, and large images over bulk streams. _Req: R7.1, R7.2, R7.4_
-- [ ] T3.2 Desktop clipboard adapters with change events and sensitive-flag detection on each OS, and the "Pause clipboard on all devices" setting in desktop Settings. _Req: R7.3, R7.6_
-- [ ] T3.3 Android clipboard: write incoming content; send through the notification action, Quick Settings tile, and share sheet; detect `EXTRA_IS_SENSITIVE`; add per-device and global toggles. _Req: R7.3, R7.5, R7.6_
+- [x] T3.1 Clipboard service in the core: the Clip message, echo prevention, the size limit, and large images over bulk streams. _Req: R7.1, R7.2, R7.4_
+- [x] T3.2 Desktop clipboard adapters with change events and sensitive-flag detection on each OS, and the "Pause clipboard on all devices" setting in desktop Settings. _Req: R7.3, R7.6_
+- [x] T3.3 Android clipboard: write incoming content; send through the notification action, Quick Settings tile, and share sheet; detect `EXTRA_IS_SENSITIVE`; add per-device and global toggles. _Req: R7.3, R7.5, R7.6_
 - [ ] T3.4 File transfer service: Offer/Accept/Data/Done, `.urdevice-part` files with streaming SHA-256, resume sidecars, cancel, and progress events. _Req: R8.2–R8.5_
 - [ ] T3.5 Path cleaning and collision renaming. _Req: R8.6_
 - [ ]* T3.6 Property tests for path cleaning and fuzzing for transfer framing.
