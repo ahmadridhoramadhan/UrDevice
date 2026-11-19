@@ -7,6 +7,8 @@ import { Labels } from "labels.slint";
 import { FeatureView } from "features/features.slint";
 import { ClipboardFeature } from "features/clipboard.slint";
 import { FilesSettings } from "features/files.slint";
+// Localhost sharing (#22): this device's shared ports and the LAN indicator.
+import { TunnelHostSection, TunnelLanBanner } from "features/tunnel.slint";
 
 export { Labels } from "labels.slint";
 // The feature globals, for src/features/*.rs.
@@ -658,6 +660,8 @@ export component MainWindow inherits Window {
                     Btn { text: @tr("Stop"); kind: 2; y: (parent.height - self.height) / 2; clicked => { root.stop-activity(a.id); } }
                 }
             }
+            // Ports open on the LAN (R13.6), on every page.
+            TunnelLanBanner { }
             if root.toast != "": Rectangle {
                 height: 36px;
                 background: Theme.allow-bg;
@@ -717,6 +721,7 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
+                        TunnelHostSection { }
                     }
 
                     // ------------------------------------------------ Paired device
