@@ -723,3 +723,279 @@ where
         r = reader => r.map(|()| Vec::new()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    fn temp(tag: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!(
+            "urdevice-engine-{tag}-{}-{}",
+            std::process::id(),
+            crate::crypto::random_u64().unwrap()
+        ));
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    fn rt() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    fn data(len: usize, seed: u8) -> Vec<u8> {
+        (0..len)
+            .map(|i| (i as u8).wrapping_mul(31).wrapping_add(seed))
+            .collect()
+    }
+
+    fn source(dir: &Path, rel: &str, bytes: &[u8]) -> Source {
+        let p = dir.join(rel.replace('/', "_"));
+        std::fs::write(&p, bytes).unwrap();
+        Source {
+            rel_path: rel.into(),
+            size: bytes.len() as u64,
+            open: Arc::new(move || File::open(&p)),
+        }
+    }
+
+    fn sha(b: &[u8]) -> [u8; 32] {
+        let mut h = [0u8; 32];
+        h.copy_from_slice(ring::digest::digest(&SHA256, b).as_ref());
+        h
+    }
+
+    fn no_saved() -> OnSaved {
+        Arc::new(|_, _| None)
+    }
+
+    /// Run sender and receiver against each other over in-memory pipes.
+    fn transfer(srcs: &[Source], starts: &[u64], targets: Vec<Target>) -> (Vec<u8>, Vec<Outcome>) {
+        rt().block_on(async {
+            let (mut data_w, mut data_r) = tokio::io::duplex(256 * 1024);
+            let (mut ack_w, mut ack_r) = tokio::io::duplex(64 * 1024);
+            let meter = Meter::default();
+            let rmeter = Arc::new(Meter::default());
+            let (s, r) = tokio::join!(
+                send(&mut data_w, &mut ack_r, srcs, starts, &meter),
+                receive(
+                    &mut data_r,
+                    &mut ack_w,
+                    targets,
+                    rmeter.clone(),
+                    Arc::default(),
+                    no_saved()
+                ),
+            );
+            let total: u64 = srcs.iter().map(|s| s.size).sum();
+            assert_eq!(meter.get(), total);
+            (s.unwrap(), r.unwrap())
+        })
+    }
+
+    fn entries(srcs: &[Source], id: u64) -> Vec<(String, u64, u64)> {
+        srcs.iter()
+            .map(|s| (s.rel_path.clone(), s.size, id))
+            .collect()
+    }
+
+    fn parts_left(dir: &Path) -> usize {
+        fn walk(d: &Path, n: &mut usize) {
+            for e in std::fs::read_dir(d).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    walk(&p, n);
+                } else if p.to_string_lossy().contains(".urdevice-part") {
+                    *n += 1;
+                }
+            }
+        }
+        let mut n = 0;
+        walk(dir, &mut n);
+        n
+    }
+
+    #[test]
+    fn files_arrive_verified_in_their_folders() {
+        let src = temp("src");
+        let dst = temp("dst");
+        let big = data(2 * CHUNK + 12345, 1);
+        let srcs = vec![
+            source(&src, "a.txt", b"hello"),
+            source(&src, "Folder/sub/big.bin", &big),
+            source(&src, "Folder/empty", b""),
+        ];
+        let targets = plan(&dst, "peer", &entries(&srcs, 1)).unwrap();
+        let (status, out) = transfer(&srcs, &[0, 0, 0], targets);
+        assert_eq!(status, vec![wire::OK; 3]);
+        assert!(out.iter().all(|o| matches!(o, Outcome::Saved(_))));
+        assert_eq!(std::fs::read(dst.join("a.txt")).unwrap(), b"hello");
+        assert_eq!(std::fs::read(dst.join("Folder/sub/big.bin")).unwrap(), big);
+        assert_eq!(std::fs::read(dst.join("Folder/empty")).unwrap(), b"");
+        assert_eq!(parts_left(&dst), 0);
+        std::fs::remove_dir_all(&src).unwrap();
+        std::fs::remove_dir_all(&dst).unwrap();
+    }
+
+    #[test]
+    fn existing_files_are_never_overwritten() {
+        let src = temp("src");
+        let dst = temp("dst");
+        std::fs::write(dst.join("a.txt"), b"keep").unwrap();
+        let srcs = vec![
+            source(&src, "a.txt", b"new"),
+            source(&src, "A.TXT", b"other"),
+        ];
+        let targets = plan(&dst, "peer", &entries(&srcs, 1)).unwrap();
+        let (_, out) = transfer(&srcs, &[0, 0], targets);
+        assert_eq!(std::fs::read(dst.join("a.txt")).unwrap(), b"keep");
+        let Outcome::Saved(p) = &out[0] else { panic!() };
+        assert!(p.ends_with("a (1).txt"), "{p}");
+        assert!(matches!(&out[1], Outcome::Saved(_)));
+        std::fs::remove_dir_all(&src).unwrap();
+        std::fs::remove_dir_all(&dst).unwrap();
+    }
+
+    #[test]
+    fn a_second_attempt_resumes_from_the_sidecar() {
+        let src = temp("src");
+        let dst = temp("dst");
+        let big = data(3 * CHUNK + 7, 2);
+        let srcs = vec![source(&src, "big.bin", &big)];
+        let first = plan(&dst, "peer", &entries(&srcs, 9)).unwrap();
+        assert_eq!(first[0].start, 0);
+        // An interrupted attempt left 1.5 chunks and a sidecar.
+        let have = CHUNK as u64 + CHUNK as u64 / 2;
+        std::fs::write(&first[0].part, &big[..have as usize]).unwrap();
+        write_sidecar(&first[0].part, &first[0].key, big.len() as u64, have).unwrap();
+        // Another sender or another transfer id does not match it.
+        let other = plan(&dst, "peer", &entries(&srcs, 10)).unwrap();
+        assert_eq!(other[0].start, 0);
+        assert_ne!(other[0].part, first[0].part);
+        discard(&other);
+        let again = plan(&dst, "peer", &entries(&srcs, 9)).unwrap();
+        assert_eq!(again[0].part, first[0].part);
+        assert_eq!(again[0].start, have);
+        let (status, _) = transfer(&srcs, &[have], again);
+        assert_eq!(status, vec![wire::OK]);
+        assert_eq!(std::fs::read(dst.join("big.bin")).unwrap(), big);
+        assert_eq!(parts_left(&dst), 0);
+        std::fs::remove_dir_all(&src).unwrap();
+        std::fs::remove_dir_all(&dst).unwrap();
+    }
+
+    /// Drive a receiver with hand-written frames and collect its acks.
+    fn drive(targets: Vec<Target>, frames: Vec<u8>) -> (io::Result<Vec<Outcome>>, Vec<AckFrame>) {
+        rt().block_on(async {
+            let (mut ack_w, mut ack_r) = tokio::io::duplex(64 * 1024);
+            let mut input: &[u8] = &frames;
+            let r = receive(
+                &mut input,
+                &mut ack_w,
+                targets,
+                Arc::default(),
+                Arc::default(),
+                no_saved(),
+            )
+            .await;
+            drop(ack_w);
+            let mut acks = Vec::new();
+            while let Ok(Some(a)) = wire::read_ack(&mut ack_r).await {
+                acks.push(a);
+            }
+            (r, acks)
+        })
+    }
+
+    async fn frame_file(out: &mut Vec<u8>, index: u32, bytes: &[u8], hash: [u8; 32]) {
+        wire::write_data(out, index, 0, bytes).await.unwrap();
+        wire::write_end(out, index, &hash).await.unwrap();
+    }
+
+    #[test]
+    fn a_bad_hash_is_retried_once_then_discarded() {
+        let dst = temp("dst");
+        let body = b"payload";
+        let mk = || plan(&dst, "peer", &[("x.bin".into(), body.len() as u64, 1)]).unwrap();
+        // Wrong, then right: saved after one retry.
+        let mut f = Vec::new();
+        rt().block_on(async {
+            frame_file(&mut f, 0, body, [0; 32]).await;
+            frame_file(&mut f, 0, body, sha(body)).await;
+        });
+        let (r, acks) = drive(mk(), f);
+        assert!(matches!(r.unwrap()[0], Outcome::Saved(_)));
+        assert!(acks.contains(&AckFrame::Result {
+            index: 0,
+            status: wire::RETRY
+        }));
+        assert!(acks.contains(&AckFrame::Result {
+            index: 0,
+            status: wire::OK
+        }));
+        assert_eq!(std::fs::read(dst.join("x.bin")).unwrap(), body);
+        // Wrong twice: failed and nothing left behind.
+        let mut f = Vec::new();
+        rt().block_on(async {
+            frame_file(&mut f, 0, body, [0; 32]).await;
+            frame_file(&mut f, 0, body, [1; 32]).await;
+        });
+        let (r, acks) = drive(mk(), f);
+        assert_eq!(r.unwrap(), vec![Outcome::Failed]);
+        assert!(acks.contains(&AckFrame::Result {
+            index: 0,
+            status: wire::FAILED
+        }));
+        assert!(!dst.join("x (1).bin").exists());
+        assert_eq!(parts_left(&dst), 0);
+        std::fs::remove_dir_all(&dst).unwrap();
+    }
+
+    #[test]
+    fn frames_that_break_the_order_end_the_transfer() {
+        let dst = temp("dst");
+        let mk = || plan(&dst, "peer", &[("a".into(), 4, 1), ("b".into(), 4, 1)]).unwrap();
+        let cases: Vec<Vec<u8>> = rt().block_on(async {
+            let mut gap = Vec::new();
+            wire::write_data(&mut gap, 0, 1, b"abc").await.unwrap();
+            let mut past_end = Vec::new();
+            wire::write_data(&mut past_end, 0, 0, b"abcde")
+                .await
+                .unwrap();
+            let mut interleave = Vec::new();
+            wire::write_data(&mut interleave, 0, 0, b"ab")
+                .await
+                .unwrap();
+            wire::write_data(&mut interleave, 1, 0, b"ab")
+                .await
+                .unwrap();
+            let mut unknown = Vec::new();
+            wire::write_data(&mut unknown, 7, 0, b"ab").await.unwrap();
+            vec![gap, past_end, interleave, unknown]
+        });
+        for f in cases {
+            let (r, _) = drive(mk(), f);
+            assert!(r.is_err());
+        }
+        // The sender stopping early is an error too; the parts stay for a resume.
+        let (r, _) = drive(mk(), Vec::new());
+        assert!(r.is_err());
+        assert_eq!(parts_left(&dst), 2 * 2);
+        std::fs::remove_dir_all(&dst).unwrap();
+    }
+
+    #[test]
+    fn plans_refuse_bad_names_and_leave_nothing() {
+        let dst = temp("dst");
+        let r = plan(&dst, "p", &[("ok.txt".into(), 1, 1), ("../x".into(), 1, 1)]);
+        assert!(matches!(r, Err(PlanError::Name(_))));
+        assert_eq!(parts_left(&dst), 0);
+        assert!(!dst.parent().unwrap().join("x").exists());
+        std::fs::remove_dir_all(&dst).unwrap();
+    }
+}

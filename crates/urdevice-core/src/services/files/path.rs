@@ -362,3 +362,94 @@ mod tests {
         std::fs::remove_dir_all(&outside).unwrap();
     }
 }
+
+#[cfg(test)]
+mod props {
+    #![allow(clippy::unwrap_used)]
+
+    use std::path::Component;
+
+    use proptest::prelude::*;
+
+    use super::*;
+
+    /// Pieces that hostile names are made of.
+    fn piece() -> impl Strategy<Value = String> {
+        prop_oneof![
+            Just("..".to_owned()),
+            Just(".".to_owned()),
+            Just("/".to_owned()),
+            Just("\\".to_owned()),
+            Just("C:".to_owned()),
+            Just("CON".to_owned()),
+            Just("nul.txt".to_owned()),
+            Just("\0".to_owned()),
+            Just(" .".to_owned()),
+            Just(".urdevice-part".to_owned()),
+            "[a-zA-Z0-9 ._-]{1,12}",
+            "\\PC{1,6}",
+        ]
+    }
+
+    fn hostile() -> impl Strategy<Value = String> {
+        proptest::collection::vec(piece(), 1..12).prop_map(|v| v.concat())
+    }
+
+    proptest! {
+        /// A cleaned path never leaves the folder it is joined to (design §16).
+        #[test]
+        fn cleaned_paths_stay_inside(raw in hostile()) {
+            if let Ok(parts) = clean_rel_path(&raw) {
+                prop_assert!(!parts.is_empty() && parts.len() <= MAX_DEPTH);
+                let root = Path::new("/root/downloads");
+                let mut joined = root.to_path_buf();
+                for p in &parts {
+                    prop_assert!(!p.is_empty() && p.len() <= MAX_NAME);
+                    prop_assert!(p != "." && p != "..");
+                    prop_assert!(!p.contains(['/', '\\', ':', '\0']));
+                    prop_assert!(!p.chars().any(char::is_control));
+                    prop_assert!(!is_reserved(p), "{p}");
+                    prop_assert!(!p.ends_with(PART_SUFFIX) && !p.ends_with(RESUME_SUFFIX));
+                    prop_assert!(!p.ends_with('.') && !p.ends_with(' '));
+                    joined.push(p);
+                }
+                prop_assert!(joined.starts_with(root));
+                let extra: Vec<_> = joined.strip_prefix(root).unwrap().components().collect();
+                prop_assert_eq!(extra.len(), parts.len());
+                prop_assert!(extra.iter().all(|c| matches!(c, Component::Normal(_))));
+            }
+        }
+
+        /// Cleaning is stable: a clean path cleans to itself.
+        #[test]
+        fn cleaning_is_idempotent(raw in hostile()) {
+            if let Ok(parts) = clean_rel_path(&raw) {
+                prop_assert_eq!(clean_rel_path(&parts.join("/")).unwrap(), parts);
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(48))]
+
+        /// Folders made for a hostile path are inside the root on the real
+        /// file system.
+        #[test]
+        fn folders_are_made_inside_the_root(raw in hostile()) {
+            if let Ok(parts) = clean_rel_path(&raw) {
+                let root = std::env::temp_dir().join(format!(
+                    "urdevice-prop-{}-{}",
+                    std::process::id(),
+                    crate::crypto::random_u64().unwrap()
+                ));
+                let (_, dirs) = parts.split_last().unwrap();
+                let made = ensure_dirs(&root, dirs);
+                let canon = root.canonicalize().unwrap();
+                if let Ok(d) = made {
+                    prop_assert!(d.starts_with(&canon));
+                }
+                std::fs::remove_dir_all(&root).unwrap();
+            }
+        }
+    }
+}
