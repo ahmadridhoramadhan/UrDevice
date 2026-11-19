@@ -1072,6 +1072,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "052af7878466feccda12ba7a6a67d019d712f296809559b47c12c8cc196d3a9a"
 dependencies = [
  "error-code",
+ "windows-win",
 ]
 
 [[package]]
@@ -7163,14 +7164,21 @@ version = "0.1.0"
 name = "urdevice-platform"
 version = "0.1.0"
 dependencies = [
+ "clipboard-win",
  "directories",
  "futures-core",
  "gethostname",
  "keyring",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "png",
  "ring",
  "starship-battery",
  "tracing",
  "urdevice-core",
+ "urdevice-proto",
+ "x11rb",
 ]
 
 [[package]]
@@ -7949,6 +7957,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3949bd5b99cafdf1c7ca86b43ca564028dfe27d66958f2470940f73d86d75b37"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "windows-win"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58e23e33622b3b52f948049acbec9bcc34bf6e26d74176b88941f213c75cf2dc"
+dependencies = [
+ "error-code",
 ]
 
 [[package]]
