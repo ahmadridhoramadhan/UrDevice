@@ -51,6 +51,10 @@ pub enum CoreError {
     /// The device, prompt, or activity does not exist.
     #[error("not found")]
     NotFound,
+    /// The other device refused a request: `denied`, `declined`, `timeout`,
+    /// `unsupported`, or `offline`.
+    #[error("refused: {0}")]
+    Refused(String),
     /// The node has stopped.
     #[error("the node has stopped")]
     Stopped,

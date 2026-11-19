@@ -38,6 +38,30 @@
     <string name="cap_term_desc">Other devices open a shell here. Only this device can change it.</string>
     <string name="cap_fswrite">File changes</string>
     <string name="cap_fswrite_desc">Upload, rename, and delete. Only this device can change it.</string>
+    <string name="cap_notify">Notifications</string>
+    <string name="cap_notify_desc">Other devices show the notifications you pick</string>
+    <string name="cap_ring">Find my device</string>
+    <string name="cap_ring_desc">Other devices make this device ring</string>
+    <string name="cap_camera">Webcam</string>
+    <string name="cap_camera_desc">Other devices use this camera</string>
+    <string name="cap_mic">Microphone</string>
+    <string name="cap_mic_desc">Other devices use this microphone</string>
+    <string name="cap_telephony">SMS and calls</string>
+    <string name="cap_telephony_desc">Other devices read and send SMS and answer calls</string>
+    <string name="cap_kvm">Shared mouse and keyboard</string>
+    <string name="cap_kvm_desc">Another desktop\'s mouse and keyboard move over to this one</string>
+    <string name="cap_display">Second display</string>
+    <string name="cap_display_desc">Other devices show an extra screen of this device</string>
+    <string name="cap_audio_out">Speaker</string>
+    <string name="cap_audio_out_desc">Other devices play their sound here</string>
+    <string name="cap_cliphist">Clipboard history</string>
+    <string name="cap_cliphist_desc">Other devices sync the clipboard history</string>
+    <string name="cap_lock">Proximity lock</string>
+    <string name="cap_lock_desc">A desktop locks itself when this device leaves</string>
+    <string name="cap_adb">DevTools and ADB</string>
+    <string name="cap_adb_desc">Other devices reach this device\'s ADB and DevTools</string>
+    <string name="cap_fsbrowse">Browse files</string>
+    <string name="cap_fsbrowse_desc">Other devices browse and search the folders you share</string>
 
     <!-- Feature tiles -->
     <string name="tile_send_files">Send files</string>

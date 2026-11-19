@@ -130,6 +130,10 @@ URDEVICE_DATA_DIR=/tmp/urdevice-b URDEVICE_PORT=47902 cargo run -p urdevice-desk
 
 On Android, core logs go to logcat with the tag `UrDevice`: `adb logcat -s UrDevice`.
 
+## Adding a feature and testing on devices
+
+[`docs/dev/adding-a-feature.md`](dev/adding-a-feature.md) shows where each feature's files go, the service ids, the permission check, and the in-process test harness. `scripts/dev/` has helpers to run the app and take screenshots on Linux, the USB Android phone, and the Windows test machine.
+
 ## Ports
 
 - UDP discovery: `47810`

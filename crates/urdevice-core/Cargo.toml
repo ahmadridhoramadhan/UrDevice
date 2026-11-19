@@ -14,10 +14,12 @@ default = ["mdns"]
 mdns = ["dep:mdns-sd"]
 
 [dependencies]
+bytes.workspace = true
 data-encoding.workspace = true
 futures-core.workspace = true
 if-addrs.workspace = true
 mdns-sd = { workspace = true, optional = true }
+prost.workspace = true
 qrcode.workspace = true
 quinn.workspace = true
 rcgen.workspace = true
@@ -34,6 +36,3 @@ urdevice-proto.workspace = true
 
 [lints]
 workspace = true
-
-[dev-dependencies]
-prost.workspace = true

@@ -14,8 +14,8 @@ use tokio::time::timeout;
 use urdevice_proto::{PROTO_VERSION, control};
 
 use super::{
-    Activity, Backoff, CodePairing, Inner, MAX_BACKOFF, NodeEvent, PermissionView, Prompt,
-    PromptView, Session, lock, unix_now,
+    Activity, Backoff, CodePairing, GrantEntry, Inner, MAX_BACKOFF, NodeEvent, PermissionView,
+    Prompt, PromptView, Session, feature, lock, unix_now,
 };
 use crate::discovery::Seen;
 use crate::identity::DeviceId;
@@ -228,7 +228,7 @@ async fn serve_session(
     };
     write_msg(&mut send, control::Msg::Welcome(welcome)).await?;
     inner.refresh_peer_info(peer, &h.name, &h.platform);
-    run_session(inner, conn, send, reader, peer, false).await
+    run_session(inner, conn, send, reader, peer, false, &h.capabilities).await
 }
 
 /// Client side after the TLS handshake (and pairing, if any): Hello, Welcome.
@@ -268,7 +268,7 @@ async fn client_session(
     }
     check_caps(&w.capabilities)?;
     inner.refresh_peer_info(peer, &w.name, &w.platform);
-    run_session(inner, conn, send, reader, peer, true).await
+    run_session(inner, conn, send, reader, peer, true, &w.capabilities).await
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +287,7 @@ async fn run_session(
     mut reader: Reader,
     peer: DeviceId,
     initiated_here: bool,
+    peer_caps: &[String],
 ) -> Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel::<control::Msg>();
     let my_id = inner.id();
@@ -312,6 +313,8 @@ async fn run_session(
                 tx: tx.clone(),
                 remote_perms: Vec::new(),
                 battery: None,
+                // Unknown strings come from newer versions; ignore them.
+                caps: peer_caps.iter().filter_map(|c| c.parse().ok()).collect(),
             },
         );
         st.backoff.remove(&peer);
@@ -325,7 +328,11 @@ async fn run_session(
     let _ = lock(&inner.store).touch(peer, unix_now(), &[conn.remote_address()]);
     let _ = inner.reload_paired();
     tracing::info!(peer = %peer.short_hex(), addr = %conn.remote_address(), "session open");
+    inner.notify_peer(peer, true);
     inner.changed();
+
+    // Streams and datagrams for the feature services (design §6.2).
+    let traffic = tokio::spawn(feature::accept_traffic(inner.clone(), conn.clone(), peer));
 
     let writer = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -359,6 +366,7 @@ async fn run_session(
         }
     };
     writer.abort();
+    traffic.abort();
 
     let still_ours = {
         let mut st = lock(&inner.state);
@@ -376,11 +384,15 @@ async fn run_session(
                 },
             );
             st.pending_requests.retain(|(p, _), _| *p != peer);
+            // Dropping a waiter tells its service the peer went offline.
+            st.waiters.retain(|(p, _), _| *p != peer);
         }
         ours
     };
     if still_ours {
         inner.stop_activities(|a| a.peer == peer, "stopped");
+        inner.end_grants(|(p, _), _| *p == peer);
+        inner.notify_peer(peer, false);
         let _ = lock(&inner.store).touch(peer, unix_now(), &[conn.remote_address()]);
         let _ = inner.reload_paired();
         tracing::info!(peer = %peer.short_hex(), "session closed");
@@ -390,7 +402,7 @@ async fn run_session(
     result
 }
 
-fn record_violation(inner: &Inner, peer: DeviceId) {
+pub(super) fn record_violation(inner: &Inner, peer: DeviceId) {
     let mut st = lock(&inner.state);
     let now = Instant::now();
     let v = st.violations.entry(peer).or_default();
@@ -465,13 +477,28 @@ fn handle_msg(
             tokio::spawn(handle_request(inner.clone(), peer, r));
         }
         control::Msg::ActivityReply(r) => {
-            let (cap, name, started) = {
+            let reason: String = r.reason.chars().take(16).collect();
+            let (cap, name, started, waiter, evicted) = {
                 let mut st = lock(&inner.state);
                 let Some(cap) = st.pending_requests.remove(&(peer, r.request_id)) else {
                     return Ok(Flow::Continue);
                 };
                 let name = st.peer_name(peer);
                 let started = r.granted && cap.is_watched();
+                let waiter = st.waiters.remove(&(peer, r.request_id));
+                let mut evicted = None;
+                if r.granted && !started && waiter.is_some() {
+                    // A service asked: keep the approval so its traffic can name it.
+                    evicted = feature::add_grant(
+                        &mut st,
+                        peer,
+                        r.request_id,
+                        GrantEntry {
+                            cap,
+                            incoming: false,
+                        },
+                    );
+                }
                 if started {
                     let id = st.next_id();
                     st.activities.push(Activity {
@@ -484,16 +511,24 @@ fn handle_msg(
                         started_at: unix_now(),
                     });
                 }
-                (cap, name, started)
+                (cap, name, started, waiter, evicted)
             };
-            let reason: String = r.reason.chars().take(16).collect();
-            inner.emit(NodeEvent::ActivityResult {
-                device_id: peer.hex(),
-                device_name: name,
-                capability: cap.as_str().into(),
-                granted: r.granted,
-                reason,
-            });
+            if let Some(e) = evicted {
+                inner.notify_ended(&[e]);
+            }
+            match waiter {
+                // The service shows the outcome itself.
+                Some(w) => {
+                    let _ = w.send(if r.granted { Ok(()) } else { Err(reason) });
+                }
+                None => inner.emit(NodeEvent::ActivityResult {
+                    device_id: peer.hex(),
+                    device_name: name,
+                    capability: cap.as_str().into(),
+                    granted: r.granted,
+                    reason,
+                }),
+            }
             if started {
                 inner.changed();
             }
@@ -510,7 +545,16 @@ fn handle_msg(
                     stopped = Some(st.activities.remove(pos));
                 }
             }
+            let grant = if stopped.is_none() {
+                lock(&inner.state).grants.remove(&(peer, s.request_id))
+            } else {
+                None
+            };
+            if let Some(g) = grant {
+                inner.notify_ended(&[(peer, g.cap, s.request_id)]);
+            }
             if let Some(a) = stopped {
+                inner.notify_ended(&[(peer, a.cap, a.request_id)]);
                 if a.incoming {
                     let _ = lock(&inner.store).log_activity(
                         peer,
@@ -528,6 +572,8 @@ fn handle_msg(
                 inner.changed();
             }
         }
+        control::Msg::Feature(f) => feature::on_feature(inner, peer, f)?,
+        control::Msg::FeatureRefused(r) => feature::on_refused(inner, peer, r),
         _ => return Err(CoreError::Protocol("unexpected message in session".into())),
     }
     Ok(Flow::Continue)
@@ -540,7 +586,7 @@ async fn handle_request(inner: Arc<Inner>, peer: DeviceId, r: urdevice_proto::Ac
         .capability
         .parse::<Capability>()
         .ok()
-        .filter(|c| !c.android_only() || inner.platform == "android");
+        .filter(|c| c.offered_on(&inner.platform));
     let (mode, name) = {
         let st = lock(&inner.state);
         (cap.map(|c| st.mode(c)), st.peer_name(peer))
@@ -563,19 +609,36 @@ async fn handle_request(inner: Arc<Inner>, peer: DeviceId, r: urdevice_proto::Ac
     let Some(tx) = st.sessions.get(&peer).map(|s| s.tx.clone()) else {
         return;
     };
-    if granted && let Some(c) = cap.filter(|c| c.is_watched()) {
-        let id = st.next_id();
-        st.activities.push(Activity {
-            id,
-            peer,
-            peer_name: name,
-            cap: c,
-            request_id: r.request_id,
-            incoming: true,
-            started_at: unix_now(),
-        });
+    let mut evicted = None;
+    if granted && let Some(c) = cap {
+        if c.is_watched() {
+            let id = st.next_id();
+            st.activities.push(Activity {
+                id,
+                peer,
+                peer_name: name,
+                cap: c,
+                request_id: r.request_id,
+                incoming: true,
+                started_at: unix_now(),
+            });
+        } else {
+            // No indicator, but feature traffic may name the approval.
+            evicted = feature::add_grant(
+                &mut st,
+                peer,
+                r.request_id,
+                GrantEntry {
+                    cap: c,
+                    incoming: true,
+                },
+            );
+        }
     }
     drop(st);
+    if let Some(e) = evicted {
+        inner.notify_ended(&[e]);
+    }
     let _ = tx.send(control::Msg::ActivityReply(urdevice_proto::ActivityReply {
         request_id: r.request_id,
         granted,

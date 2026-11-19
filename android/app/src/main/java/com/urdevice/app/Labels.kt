@@ -14,6 +14,18 @@ object Labels {
         "screen.h264.v1" -> R.string.cap_screen
         "tunnel.v1" -> R.string.cap_tunnel
         "term.v1" -> R.string.cap_term
+        "notify.v1" -> R.string.cap_notify
+        "ring.v1" -> R.string.cap_ring
+        "camera.v1" -> R.string.cap_camera
+        "mic.v1" -> R.string.cap_mic
+        "telephony.v1" -> R.string.cap_telephony
+        "kvm.v1" -> R.string.cap_kvm
+        "display.v1" -> R.string.cap_display
+        "audio.out.v1" -> R.string.cap_audio_out
+        "cliphist.v1" -> R.string.cap_cliphist
+        "lock.v1" -> R.string.cap_lock
+        "adb.v1" -> R.string.cap_adb
+        "fs.browse.v1" -> R.string.cap_fsbrowse
         else -> R.string.cap_fswrite
     }
 
@@ -26,6 +38,18 @@ object Labels {
         "screen.h264.v1" -> R.string.cap_screen_desc
         "tunnel.v1" -> R.string.cap_tunnel_desc
         "term.v1" -> R.string.cap_term_desc
+        "notify.v1" -> R.string.cap_notify_desc
+        "ring.v1" -> R.string.cap_ring_desc
+        "camera.v1" -> R.string.cap_camera_desc
+        "mic.v1" -> R.string.cap_mic_desc
+        "telephony.v1" -> R.string.cap_telephony_desc
+        "kvm.v1" -> R.string.cap_kvm_desc
+        "display.v1" -> R.string.cap_display_desc
+        "audio.out.v1" -> R.string.cap_audio_out_desc
+        "cliphist.v1" -> R.string.cap_cliphist_desc
+        "lock.v1" -> R.string.cap_lock_desc
+        "adb.v1" -> R.string.cap_adb_desc
+        "fs.browse.v1" -> R.string.cap_fsbrowse_desc
         else -> R.string.cap_fswrite_desc
     }
 

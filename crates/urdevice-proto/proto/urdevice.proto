@@ -64,7 +64,32 @@ message ActivityRequest { uint64 request_id = 1; string capability = 2; }
 message ActivityReply { uint64 request_id = 1; bool granted = 2; string reason = 3; }
 message ActivityStop { uint64 request_id = 1; }
 
+// Feature services (design §6.2, §9). Each feature has a service id
+// (src/services.rs) and its own messages in proto/features/<feature>.proto;
+// their field numbers are local to that feature.
+enum Direction { TO_HOST = 0; TO_CONTROLLER = 1; }
+message Feature {
+  uint32 service = 1;
+  Direction direction = 2;
+  uint64 activity = 3;  // request_id of the granted ActivityRequest, or 0
+  bytes body = 4;       // the feature's own message
+}
+message FeatureRefused { uint32 service = 1; uint64 activity = 2; string reason = 3; }
+
+// First frame on every QUIC stream other than the control stream:
+// [u32 big-endian length][StreamOpen], length <= 16 KiB. The feature's bytes follow.
+message StreamOpen {
+  uint32 service = 1;
+  Direction direction = 2;
+  uint64 activity = 3;
+  uint32 kind = 4;      // defined by the feature
+  bytes meta = 5;
+}
+
+// Datagrams: [u16 service][u8 direction][u64 activity][payload], big-endian.
+
 // Control stream frame: [u32 big-endian length][Control], length <= 1 MiB.
+// Tags 1-63 belong to the core; features never add one.
 message Control {
   oneof msg {
     Hello hello = 1;
@@ -82,5 +107,7 @@ message Control {
     ActivityRequest activity_request = 13;
     ActivityReply activity_reply = 14;
     ActivityStop activity_stop = 15;
+    Feature feature = 16;
+    FeatureRefused feature_refused = 17;
   }
 }

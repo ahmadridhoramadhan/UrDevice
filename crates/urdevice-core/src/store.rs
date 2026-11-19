@@ -349,6 +349,16 @@ impl TrustStore {
         Ok(out)
     }
 
+    /// True when a row for `cap` exists, whether or not its MAC is valid.
+    pub fn has_permission_row(&self, cap: Capability) -> Result<bool> {
+        let n: i64 = self.db.query_row(
+            "SELECT COUNT(*) FROM permission WHERE capability = ?1",
+            [cap.as_str()],
+            |r| r.get(0),
+        )?;
+        Ok(n > 0)
+    }
+
     /// Set one mode.
     pub fn set_permission(&self, cap: Capability, mode: Mode) -> Result<()> {
         let mac = self.permission_mac(cap.as_str(), mode.as_str(), cap.local_only());

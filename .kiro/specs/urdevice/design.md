@@ -129,6 +129,26 @@ Discovery data is unauthenticated by design. It only tells devices where to try 
 
 Control messages are length-prefixed protobuf (`u32` length, max 1 MiB; anything larger is rejected and closes the session, R4.6). Input events use **QUIC datagrams** when the peer supports them, so a lost packet never blocks newer input.
 
+**Feature traffic.** Every feature is a service with a numeric service id (§9). Features never add messages to the core `Control` envelope (its tags 1–63 belong to the core). They use three channels, each tagged with the service id, a direction, and an activity id:
+
+| Channel | Framing | Limit |
+|---|---|---|
+| Control | `Feature { service, direction, activity, body }` in `Control`; `body` is the feature's own protobuf message. The receiver may answer `FeatureRefused { service, activity, reason }` | 1 MiB frame |
+| Stream | Every bidirectional or unidirectional stream other than stream 0 starts with `[u32 length][StreamOpen { service, direction, activity, kind, meta }]`; the feature's bytes follow. `kind` is defined by the feature | 16 KiB header |
+| Datagram | `[u16 service][u8 direction][u64 activity][payload]`, big-endian | path MTU |
+
+`direction` is `ToHost` (to the device that offers the capability, checked by its permission engine, §7.4) or `ToController` (replies and pushed data to the device that uses it; not checked, so the receiver only shows it). `activity` is the `request_id` of a granted `ActivityRequest`, or 0. Message field numbers and stream kinds are local to each feature, so the only numbers features share are the service ids:
+
+| Ids | Use |
+|---|---|
+| 1–8 | Release 1: clipboard 1, files 2, gallery 3, input 4, media 5, screen 6, tunnel 7, Bluetooth fallback 8 |
+| 9–15 | Reserved for Release 1 |
+| 16–32 | Release 2: notify 16, ring 17, camera 18, mic 19, telephony 20, kvm 21, display 22, terminal 23, port profiles 24, inspector 25 (reserved, local only), adb 26, fs.browse 27, fs.write 28, clipboard history 29, proximity lock 30, automations 31 (reserved), speaker 32 |
+| 33–63 | Reserved for Release 2 |
+| 0xFF00–0xFFFF | In-process tests only |
+
+The table with owners is in [`docs/dev/adding-a-feature.md`](../../../docs/dev/adding-a-feature.md); the ids are in `urdevice-proto/src/services.rs`.
+
 ### 6.3 Handshake
 
 ```
@@ -136,7 +156,7 @@ Client → Server: Hello { proto_min, proto_max, app_version, capabilities[] }
 Server → Client: Welcome { proto, capabilities[], session_id }
 ```
 
-Capabilities are strings such as `clipboard.v1`, `files.v1`, `input.v1`, `screen.h264.v1`, `tunnel.v1`, `media.v1`, `ble.fallback.v1`. The session enables only the capabilities both sides list. Local permissions (§7) are then checked for each request.
+Capabilities are strings such as `clipboard.v1`, `files.v1`, `input.v1`, `screen.h264.v1`, `tunnel.v1`, `media.v1`, `ble.fallback.v1`. Each side lists the capabilities it offers as a host, so a host-only capability such as `gallery.v1` appears only in the Android side's list. A device accepts feature traffic for a capability only if it lists that capability itself, and accepts replies only for capabilities the peer listed. Local permissions (§7) are then checked for each request.
 
 Right after `Welcome`, and again whenever something changes, each side sends:
 
@@ -264,6 +284,16 @@ trait UiDelegate  { fn ask(&self, req: PermissionPrompt) -> BoxFuture<Decision>;
 ```
 
 On desktop these traits are implemented in `urdevice-platform`. On Android they are UniFFI **callback interfaces** implemented in Kotlin.
+
+**Service mechanism.** Each feature is one module in `urdevice-core/src/services/` that implements the `Service` trait (service id, capability, and handlers for control messages, streams, datagrams, refusals, activity ends, and session changes) and adds itself to the node's `Registry` in its `register` function. The node routes feature traffic (§6.2) by service id. Before a service sees anything sent `ToHost`, the node runs the permission check with the host's own setting for the service's capability:
+
+- Deny refuses it.
+- Traffic that names an activity is accepted only if this host granted that activity to that peer for that capability and it has not ended.
+- Traffic without an activity is accepted only when the setting is Allow and the capability is not watched. Watched capabilities (input, screen, terminal, camera, mic, kvm, display, speaker) always need an activity, so the indicator and Stop button show (R5.4); Always Ask always needs one, so the user approves each activity (§7.4).
+
+The service receives a `Grant` that only the node can create. Services ask for activities with `ServiceCtx::request`, which sends an `ActivityRequest` and waits for the answer. When an activity ends (Stop, a change to Deny, or the session closing), the services of both devices are told, so they can cancel tasks and close streams within 1 s (R5.5). The traits above move into the service modules as each feature defines what it needs, with settable slots for the platform adapters and UI listeners. Each layer has one file per feature: `urdevice-proto/src/features/`, `urdevice-platform/src/features/`, `urdevice-ffi/src/features/`, `urdevice-desktop/src/features/` with `ui/features/`, and `android/.../ui/features/`.
+
+**Release 2 capabilities** are defined from the start, but a build lists one in the handshake and the settings only after its module marks it shipped. On an install that was onboarded before, the new capability's setting is created once with its default; a default of Allow is stored as Always Ask on upgrade, so a capability is never turned on without the user.
 
 ### 9.1 Clipboard (R7)
 
@@ -464,9 +494,9 @@ The project also runs `cargo audit` and `cargo deny` in CI, uses only well-known
 
 ## 18. Release 2 features
 
-Each feature below is a core service with its own capability string, which is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). Section 18.N covers Requirement 16+N.
+Each feature below is a core service (§9) with its own capability string and service id (§6.2), which is negotiated in the handshake (§6.3) and checked by the permission engine (§7.4). Section 18.N covers Requirement 16+N.
 
-"Default when built" means the default is chosen when the feature is implemented and then added to onboarding (R5.2).
+"Default when built" means the default is chosen when the feature is implemented and then added to onboarding (R5.2). `Capability::default_mode` holds provisional values until then: Ask for notify, camera, mic, telephony, kvm, display, speaker, and fs.browse; Allow for ring, cliphist, and lock; Deny for adb.
 
 | Requirement | Capability | Default and notes |
 |---|---|---|

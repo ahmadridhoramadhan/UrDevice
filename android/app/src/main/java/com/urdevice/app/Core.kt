@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import com.urdevice.app.ui.features.allFeatures
 import com.urdevice.core.FfiEvent
 import com.urdevice.core.FfiSnapshot
 import com.urdevice.core.NodeListener
@@ -93,6 +94,10 @@ object Core {
         )
         node = n
         Log.i(TAG, "core started")
+        // Each feature registers its host adapters and listeners (ui/features/).
+        allFeatures.forEach { f ->
+            runCatching { f.onCoreStarted(app, n) }.onFailure { Log.e(TAG, "feature ${f.id} failed to start", it) }
+        }
         refresh()
         return n
     }

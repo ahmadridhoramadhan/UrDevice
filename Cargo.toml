@@ -25,6 +25,7 @@ urdevice-platform = { path = "crates/urdevice-platform" }
 urdevice-proto = { path = "crates/urdevice-proto" }
 
 # Shared third-party crates
+bytes = "1"
 futures-core = "0.3"
 thiserror = "2"
 prost = { version = "0.14", default-features = false, features = ["std", "derive"] }

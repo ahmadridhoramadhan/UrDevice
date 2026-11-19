@@ -1,0 +1,17 @@
+// Phone or tablet as a second display (#31): the desktop feature view.
+// Rust side: src/features/display.rs. See docs/dev/adding-a-feature.md.
+import { Muted } from "../widgets.slint";
+
+// State and callbacks shared with src/features/display.rs.
+export global DisplayFeature {
+    // The paired device the view is open for (Device ID, hex).
+    in-out property <string> peer-id;
+}
+
+export component DisplayView inherits VerticalLayout {
+    // The tile that opened the view, for features with more than one tile.
+    in property <string> tile;
+    in property <string> peer-name;
+    spacing: 10px;
+    Muted { text: @tr("This feature is not available yet."); }
+}
