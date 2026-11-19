@@ -1,11 +1,115 @@
 // File transfer (#17): the desktop feature view.
 // Rust side: src/features/files.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Btn, Card, Muted } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+
+// One transfer in the list.
+export struct TransferRow {
+    id: int,
+    outgoing: bool,
+    device: string,
+    // First file name.
+    first: string,
+    // Files after the first.
+    more: int,
+    done-text: string,
+    total-text: string,
+    speed-text: string,
+    // Seconds left, -1 when unknown.
+    eta: int,
+    progress: float,
+    // 0 asking, 1 running, 2 interrupted, 3 done, 4 failed, 5 cancelled, 6 declined
+    state: int,
+    reason: string,
+    failed: int,
+    saved: string,
+}
 
 // State and callbacks shared with src/features/files.rs.
 export global FilesFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    in property <[TransferRow]> transfers;
+    in property <string> folder;
+    callback pick-files();
+    callback pick-folder();
+    callback cancel(int);
+    callback retry(int);
+    callback open-folder();
+    callback change-folder();
+    callback clear();
+}
+
+component ProgressBar inherits Rectangle {
+    in property <float> value;
+    height: 6px;
+    border-radius: 3px;
+    background: Theme.surface-2;
+    Rectangle {
+        x: 0;
+        width: parent.width * clamp(root.value, 0, 1);
+        height: parent.height;
+        border-radius: 3px;
+        background: Theme.accent;
+    }
+}
+
+component Row inherits Card {
+    in property <TransferRow> t;
+    VerticalLayout {
+        padding: 12px;
+        spacing: 6px;
+        HorizontalLayout {
+            spacing: 10px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                Text {
+                    text: t.more > 0 ? @tr("{} and {} more", t.first, t.more) : t.first;
+                    font-weight: 600;
+                    color: Theme.text;
+                    overflow: elide;
+                }
+                Muted {
+                    text: t.outgoing ? @tr("To {}", t.device) : @tr("From {}", t.device);
+                }
+            }
+            if t.state <= 2: Btn { text: @tr("Cancel"); kind: 2; clicked => { FilesFeature.cancel(t.id); } }
+            if t.outgoing && (t.state == 2 || t.state == 4): Btn { text: @tr("Retry"); clicked => { FilesFeature.retry(t.id); } }
+        }
+        if t.state == 1 || t.state == 2: ProgressBar { value: t.progress; }
+        Muted {
+            text: t.state == 0 ? @tr("Waiting for {} to accept…", t.device)
+                : t.state == 1 ? (t.eta >= 0
+                    ? @tr("{}% · {} of {} · {}/s · {} left", Math.round(t.progress * 100), t.done-text, t.total-text, t.speed-text, t.eta >= 3600 ? @tr("{} h", Math.floor(t.eta / 3600)) : t.eta >= 60 ? @tr("{} min", Math.ceil(t.eta / 60)) : @tr("{} s", t.eta))
+                    : @tr("{}% · {} of {}", Math.round(t.progress * 100), t.done-text, t.total-text))
+                : t.state == 2 ? @tr("Interrupted at {} of {}. It continues when {} is back.", t.done-text, t.total-text, t.device)
+                : t.state == 3 ? (t.outgoing ? @tr("Sent {}, checked with SHA-256", t.total-text) : @tr("Saved to {}", t.saved))
+                : t.state == 4 ? (t.failed > 0 ? @tr("{} files failed the check and were discarded", t.failed) : t.reason == "storage" ? @tr("Could not write to the download folder") : @tr("Failed"))
+                : t.state == 5 ? (t.reason == "peer" ? @tr("Cancelled on {}", t.device) : @tr("Cancelled"))
+                : t.reason == "denied" ? @tr("{} has Receive files turned off", t.device)
+                : t.reason == "invalid" ? @tr("{} refused the file names", t.device)
+                : t.reason == "busy" ? @tr("{} is busy, try again", t.device)
+                : @tr("Declined on {}", t.device);
+            color: t.state == 4 || t.state == 6 ? Theme.deny-fg : t.state == 3 ? Theme.allow-fg : Theme.muted;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// The download-folder setting, shown in Settings.
+export component FilesSettings inherits Card {
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+        Text { text: @tr("Download folder"); font-weight: 600; color: Theme.text; }
+        Muted { text: @tr("Files from other devices are saved here. Existing files are never replaced."); wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            Text { text: FilesFeature.folder; font-family: "monospace"; color: Theme.muted; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+            Btn { text: @tr("Open"); clicked => { FilesFeature.open-folder(); } }
+            Btn { text: @tr("Change"); clicked => { FilesFeature.change-folder(); } }
+        }
+    }
 }
 
 export component FilesView inherits VerticalLayout {
@@ -13,5 +117,25 @@ export component FilesView inherits VerticalLayout {
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    Card {
+        VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
+            Text { text: @tr("Send files to {}", root.peer-name); font-weight: 600; color: Theme.text; }
+            Muted { text: @tr("Choose files or a folder, or drop files on this window. Each file is checked with SHA-256."); wrap: word-wrap; }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                Btn { text: @tr("Choose files"); kind: 0; clicked => { FilesFeature.pick-files(); } }
+                Btn { text: @tr("Choose folder"); clicked => { FilesFeature.pick-folder(); } }
+                Btn { text: @tr("Open download folder"); kind: 3; clicked => { FilesFeature.open-folder(); } }
+            }
+        }
+    }
+    HorizontalLayout {
+        Text { text: @tr("Transfers"); font-weight: 600; color: Theme.text; vertical-alignment: center; horizontal-stretch: 1; }
+        if FilesFeature.transfers.length > 0: Btn { text: @tr("Clear finished"); kind: 3; clicked => { FilesFeature.clear(); } }
+    }
+    if FilesFeature.transfers.length == 0: Muted { text: @tr("No transfers yet."); }
+    for t in FilesFeature.transfers: Row { t: t; }
 }

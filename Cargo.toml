@@ -88,7 +88,7 @@ windows = "0.62"
 # Files (#17): property tests for path cleaning and transfer framing, the
 # desktop file picker.
 proptest = { version = "1", default-features = false, features = ["std"] }
-rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "tokio"] }
+rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

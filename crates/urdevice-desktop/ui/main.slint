@@ -6,6 +6,7 @@ import { Icon, IconBox, Btn, Card, Chip, Dot, ModeSwitch, Toggle, SectionTitle, 
 import { Labels } from "labels.slint";
 import { FeatureView } from "features/features.slint";
 import { ClipboardFeature } from "features/clipboard.slint";
+import { FilesSettings } from "features/files.slint";
 
 export { Labels } from "labels.slint";
 // The feature globals, for src/features/*.rs.
@@ -928,6 +929,8 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
+                        // Files (#17): the download folder (R8.6).
+                        FilesSettings { }
                         Card {
                             VerticalLayout {
                                 padding: 16px;
