@@ -177,9 +177,10 @@ pub(crate) fn dib_to_png(dib: &[u8]) -> Option<Vec<u8>> {
     encode_png(w, h, &rgba)
 }
 
-/// Convert a PNG to the bytes of a `CF_DIB` item: a 32-bit top-down
-/// `BITMAPINFOHEADER` with straight alpha. `None` when it is not a PNG the
-/// `png` decoder accepts, or is too big.
+/// Convert a PNG to the bytes of a `CF_DIBV5` item: a `BITMAPV5HEADER`
+/// followed by bottom-up 32-bit BGRA pixels with straight alpha. Windows makes
+/// `CF_DIB` and `CF_BITMAP` from it for apps that ask for those. `None` when
+/// it is not a PNG the `png` decoder accepts, or is too big.
 pub(crate) fn png_to_dib(png_bytes: &[u8]) -> Option<Vec<u8>> {
     let mut decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
     decoder.set_transformations(png::Transformations::normalize_to_color8());
@@ -193,23 +194,36 @@ pub(crate) fn png_to_dib(png_bytes: &[u8]) -> Option<Vec<u8>> {
     let (w, h) = (frame.width, frame.height);
     let channels = frame.color_type.samples();
     let src = &buf[..frame.buffer_size()];
-    let mut out = Vec::with_capacity(40 + w as usize * h as usize * 4);
-    out.extend_from_slice(&40u32.to_le_bytes());
+    let row = w as usize * 4;
+    let mut out = Vec::with_capacity(124 + row * h as usize);
+    let u32le = |v: u32| v.to_le_bytes();
+    out.extend_from_slice(&u32le(124)); // bV5Size
     out.extend_from_slice(&(w as i32).to_le_bytes());
-    out.extend_from_slice(&(-(h as i32)).to_le_bytes());
-    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&(h as i32).to_le_bytes()); // positive: bottom-up
+    out.extend_from_slice(&1u16.to_le_bytes()); // planes
     out.extend_from_slice(&32u16.to_le_bytes());
-    out.extend_from_slice(&0u32.to_le_bytes());
-    out.extend_from_slice(&(w * h * 4).to_le_bytes());
-    out.extend_from_slice(&[0; 16]);
-    for px in src.chunks_exact(channels) {
-        let (r, g, b, a) = match channels {
-            1 => (px[0], px[0], px[0], 255),
-            2 => (px[0], px[0], px[0], px[1]),
-            3 => (px[0], px[1], px[2], 255),
-            _ => (px[0], px[1], px[2], px[3]),
-        };
-        out.extend_from_slice(&[b, g, r, a]);
+    out.extend_from_slice(&u32le(3)); // BI_BITFIELDS
+    out.extend_from_slice(&u32le((row * h as usize) as u32));
+    out.extend_from_slice(&[0; 16]); // resolution, colours used and important
+    for mask in [0x00FF_0000u32, 0x0000_FF00, 0x0000_00FF, 0xFF00_0000] {
+        out.extend_from_slice(&u32le(mask));
+    }
+    out.extend_from_slice(&u32le(0x7352_4742)); // LCS_sRGB
+    out.extend_from_slice(&[0; 36 + 12]); // endpoints and gamma
+    out.extend_from_slice(&u32le(4)); // LCS_GM_IMAGES
+    out.extend_from_slice(&[0; 12]); // profile data, size, reserved
+    debug_assert_eq!(out.len(), 124);
+    for y in (0..h as usize).rev() {
+        let line = &src[y * w as usize * channels..(y + 1) * w as usize * channels];
+        for px in line.chunks_exact(channels) {
+            let (r, g, b, a) = match channels {
+                1 => (px[0], px[0], px[0], 255),
+                2 => (px[0], px[0], px[0], px[1]),
+                3 => (px[0], px[1], px[2], 255),
+                _ => (px[0], px[1], px[2], px[3]),
+            };
+            out.extend_from_slice(&[b, g, r, a]);
+        }
     }
     Some(out)
 }
@@ -325,7 +339,7 @@ mod tests {
         let rgba = [255, 0, 0, 255, 0, 0, 255, 128];
         let png = encode_png(2, 1, &rgba).unwrap();
         let dib = png_to_dib(&png).unwrap();
-        assert_eq!(&dib[40..], &[0, 0, 255, 255, 255, 0, 0, 128]);
+        assert_eq!(&dib[124..], &[0, 0, 255, 255, 255, 0, 0, 128]);
         let back = dib_to_png(&dib).unwrap();
         let mut d = png::Decoder::new(std::io::Cursor::new(back));
         d.set_transformations(png::Transformations::normalize_to_color8());

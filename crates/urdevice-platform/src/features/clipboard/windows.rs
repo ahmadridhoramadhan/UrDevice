@@ -72,9 +72,12 @@ fn read() -> std::result::Result<Snapshot, bool> {
             && raw::get_vec(f, &mut b).is_ok()
         {
             snap.png = Some(b);
-        } else if raw::is_format_avail(formats::CF_DIB) {
+        } else if let Some(f) = [formats::CF_DIBV5, formats::CF_DIB]
+            .into_iter()
+            .find(|f| raw::is_format_avail(*f))
+        {
             b.clear();
-            if raw::get_vec(formats::CF_DIB, &mut b).is_ok() && b.len() <= MAX_CLIP_BYTES * 4 {
+            if raw::get_vec(f, &mut b).is_ok() && b.len() <= MAX_CLIP_BYTES * 4 {
                 snap.png = dib_to_png(&b);
             }
         }
@@ -88,9 +91,10 @@ fn write_all(d: &ClipData) -> SysResult<()> {
             if let Some(f) = format(PNG_FORMAT) {
                 raw::set(f, &d.bytes)?;
             }
-            // Apps that predate the PNG format read a DIB.
+            // Apps that predate the PNG format read a bitmap; Windows makes CF_DIB and
+            // CF_BITMAP from this CF_DIBV5.
             if let Some(dib) = png_to_dib(&d.bytes) {
-                raw::set_without_clear(formats::CF_DIB, &dib)?;
+                raw::set_without_clear(formats::CF_DIBV5, &dib)?;
             }
         }
         mime::HTML => {
