@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- File transfer (#17). -->
+<resources>
+    <string name="files_send_to">Send files to %1$s</string>
+    <string name="files_send_hint">Each file is checked with SHA-256. You can also share files to UrDevice from any app.</string>
+    <string name="files_choose">Choose files</string>
+    <string name="files_transfers">Transfers</string>
+    <string name="files_clear">Clear finished</string>
+    <string name="files_none">No transfers yet.</string>
+    <string name="files_to">To %1$s</string>
+    <string name="files_from">From %1$s</string>
+    <string name="files_cancel">Cancel</string>
+    <string name="files_retry">Retry</string>
+    <string name="files_and_more">%1$s and %2$d more</string>
+    <string name="files_waiting">Waiting for %1$s to accept…</string>
+    <string name="files_progress">%1$d%% · %2$s of %3$s</string>
+    <string name="files_progress_eta">%1$d%% · %2$s of %3$s · %4$s/s · %5$s left</string>
+    <string name="files_eta_h">%1$d h</string>
+    <string name="files_eta_min">%1$d min</string>
+    <string name="files_eta_s">%1$d s</string>
+    <string name="files_interrupted">Interrupted at %1$s of %2$s. It continues when %3$s is back.</string>
+    <string name="files_sent">Sent %1$s, checked with SHA-256</string>
+    <string name="files_saved">Saved to %1$s</string>
+    <string name="files_failed_check">%1$d files failed the check and were discarded</string>
+    <string name="files_failed_storage">Could not write the file</string>
+    <string name="files_failed">Failed</string>
+    <string name="files_cancelled">Cancelled</string>
+    <string name="files_cancelled_by">Cancelled on %1$s</string>
+    <string name="files_denied">%1$s has Receive files turned off</string>
+    <string name="files_invalid">%1$s refused the file names</string>
+    <string name="files_busy">%1$s is busy, try again</string>
+    <string name="files_declined">Declined on %1$s</string>
+    <string name="files_channel">File transfers</string>
+    <string name="files_notif_sending">Sending %1$s to %2$s</string>
+    <string name="files_notif_receiving">Receiving %1$s from %2$s</string>
+    <string name="files_share_label">Send with UrDevice</string>
+    <string name="files_share_title">Send %1$d files to</string>
+    <string name="files_share_none">No connected device accepts files. Open UrDevice and connect a device first.</string>
+    <string name="files_share_started">Sending to %1$s</string>
+    <string name="files_share_failed">Could not send to %1$s</string>
+</resources>

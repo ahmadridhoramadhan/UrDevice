@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android gallery (#17). -->
+<resources>
+    <string name="gallery_channel">Gallery access</string>
+    <string name="gallery_access_title">A device wants to browse your photos</string>
+    <string name="gallery_access_body">Tap to let UrDevice read photos and videos.</string>
+</resources>

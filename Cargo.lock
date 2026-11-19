@@ -7277,6 +7277,7 @@ dependencies = [
  "tracing-subscriber",
  "uniffi",
  "urdevice-core",
+ "urdevice-proto",
 ]
 
 [[package]]

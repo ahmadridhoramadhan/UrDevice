@@ -65,11 +65,12 @@ pub trait FilesHost: Send + Sync {
     /// The download folder (R8.6). Created if missing.
     fn incoming_dir(&self) -> PathBuf;
 
-    /// A file was verified and saved at `path`. Android moves it to
-    /// MediaStore Downloads here and returns where it is now; desktops
-    /// leave it and return `None`.
-    fn saved(&self, path: &Path, rel_path: &str) -> Option<String> {
-        let _ = (path, rel_path);
+    /// A file was verified and saved at `path`, in the cleaned folder
+    /// `rel_dir` of the download folder (`/` between names, empty for the
+    /// folder itself). Android moves it to MediaStore Downloads here and
+    /// returns where it is now; desktops leave it and return `None`.
+    fn saved(&self, path: &Path, rel_dir: &str) -> Option<String> {
+        let _ = (path, rel_dir);
         None
     }
 }
@@ -638,6 +639,25 @@ pub fn sources_from_paths(paths: &[PathBuf]) -> Result<Vec<Source>> {
     Ok(out)
 }
 
+/// Tell the host where a verified file landed, with its cleaned folder
+/// relative to the download folder.
+fn saved_hook(host: Arc<dyn FilesHost>) -> engine::OnSaved {
+    let root = host.incoming_dir().canonicalize().ok();
+    Arc::new(move |_, p| {
+        let rel_dir = root
+            .as_ref()
+            .and_then(|r| p.parent()?.strip_prefix(r).ok())
+            .map(|d| {
+                d.components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            })
+            .unwrap_or_default();
+        host.saved(p, &rel_dir)
+    })
+}
+
 /// Wait a moment, then say whether the session to `peer` is still up: an
 /// error while it is up is a real failure, otherwise an interruption.
 async fn still_connected(ctx: &ServiceCtx, peer: DeviceId) -> bool {
@@ -999,10 +1019,7 @@ async fn run_incoming(ctx: ServiceCtx, sh: Arc<Shared>, handle: u64, offer: Offe
         )
         .await;
     };
-    let names: Vec<String> = offer.files.iter().map(|f| f.rel_path.clone()).collect();
-    let host2 = host.clone();
-    let on_saved: engine::OnSaved =
-        Arc::new(move |i, p| host2.saved(p, names.get(i).map(String::as_str).unwrap_or("")));
+    let on_saved = saved_hook(host.clone());
     let result = tokio::select! {
         biased;
         r = engine::receive(&mut recv, &mut send, targets.clone(), meter, discard.clone(), on_saved) => Ok(r),
@@ -1146,9 +1163,7 @@ async fn run_download(
         }
         Err(_) => return sh.set_state(handle, TransferState::Interrupted, ""),
     };
-    let names: Vec<String> = items.iter().map(|(n, _, _)| n.clone()).collect();
-    let on_saved: engine::OnSaved =
-        Arc::new(move |i, p| host.saved(p, names.get(i).map(String::as_str).unwrap_or("")));
+    let on_saved = saved_hook(host.clone());
     let result = tokio::select! {
         biased;
         r = engine::receive(&mut recv, &mut send, targets.clone(), meter, discard.clone(), on_saved) => Ok(r),
