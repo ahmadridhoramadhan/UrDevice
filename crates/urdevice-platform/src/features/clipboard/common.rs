@@ -49,14 +49,14 @@ pub(crate) fn html_from_bytes(b: &[u8]) -> Option<String> {
         return String::from_utf8(rest.to_vec()).ok();
     }
     // UTF-16LE of ASCII-heavy markup has a NUL in every second byte.
-    if b.len() >= 4 && b.len() % 2 == 0 && b[1] == 0 && b[3] == 0 && b[0] != 0 {
+    if b.len() >= 4 && b.len().is_multiple_of(2) && b[1] == 0 && b[3] == 0 && b[0] != 0 {
         return utf16(b, u16::from_le_bytes);
     }
     String::from_utf8(b.to_vec()).ok()
 }
 
 fn utf16(b: &[u8], f: fn([u8; 2]) -> u16) -> Option<String> {
-    if b.len() % 2 != 0 {
+    if !b.len().is_multiple_of(2) {
         return None;
     }
     let units: Vec<u16> = b.chunks_exact(2).map(|c| f([c[0], c[1]])).collect();
