@@ -38,6 +38,8 @@ pub(crate) trait Backend: Send + Sync {
     fn write(&self, data: &ClipData) -> Result<()>;
 }
 
+// Used by the Linux and Windows back-ends and the fallback below, not on macOS.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 pub(crate) fn unsupported() -> CoreError {
     CoreError::Unsupported {
         feature: "clipboard",

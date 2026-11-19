@@ -42,15 +42,16 @@ fn read(pb: &NSPasteboard) -> std::result::Result<Snapshot, bool> {
             return Err(true);
         }
     }
-    let mut snap = Snapshot::default();
-    snap.text = pb.stringForType(&ns(TEXT)).map(|s| s.to_string());
-    snap.html = pb
+    let text = pb.stringForType(&ns(TEXT)).map(|s| s.to_string());
+    let html = pb
         .dataForType(&ns(HTML))
         .and_then(|d| String::from_utf8(d.to_vec()).ok());
-    if snap.text.is_none() && snap.html.is_none() {
-        snap.png = pb.dataForType(&ns(PNG)).map(|d| d.to_vec());
-    }
-    Ok(snap)
+    let png = if text.is_none() && html.is_none() {
+        pb.dataForType(&ns(PNG)).map(|d| d.to_vec())
+    } else {
+        None
+    };
+    Ok(Snapshot { text, html, png })
 }
 
 pub(crate) struct MacOs {

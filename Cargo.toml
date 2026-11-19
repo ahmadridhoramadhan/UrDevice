@@ -75,7 +75,7 @@ x11rb = { version = "0.13", default-features = false, features = ["xfixes"] }
 clipboard-win = { version = "5", features = ["monitor", "std"] }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSPasteboard", "NSPasteboardItem"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSString"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSEnumerator", "NSString"] }
 
 # Android bindings
 uniffi = "0.32"
