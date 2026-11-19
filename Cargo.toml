@@ -72,6 +72,13 @@ ksni = { version = "0.3", default-features = false, features = ["blocking", "asy
 # Android bindings
 uniffi = "0.32"
 
+# Media control host adapters (#20): MPRIS on Linux, SMTC and Core Audio on
+# Windows, media keys on macOS. All are already in the tree through other crates.
+zbus = "5"
+windows = "0.62"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "objc2-core-foundation"] }
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 
