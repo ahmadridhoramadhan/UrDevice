@@ -13,6 +13,7 @@ use std::sync::Arc;
 use urdevice_core::node::{EventSink, PeerStatus, PermissionView};
 use urdevice_core::{Capability, CoreError, Mode, Node, NodeConfig, NodeEvent};
 
+mod features;
 mod log;
 
 uniffi::setup_scaffolding!();
@@ -357,9 +358,16 @@ fn cap(s: &str) -> Result<Capability, FfiError> {
     })
 }
 
+/// Parse a Device ID (hex) passed from Kotlin. For the feature modules.
+#[allow(dead_code)]
+pub(crate) fn device_id(s: &str) -> Result<urdevice_core::identity::DeviceId, FfiError> {
+    urdevice_core::identity::DeviceId::from_hex(s).ok_or(FfiError::NotFound)
+}
+
 /// A running core.
 #[derive(uniffi::Object)]
 pub struct UrDeviceNode {
+    /// Feature modules (`features/<name>.rs`) reach the core through this.
     node: Node,
 }
 

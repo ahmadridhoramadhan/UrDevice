@@ -1,0 +1,17 @@
+// Remote control: pointer, keyboard, text, and presenter (#18, #19): the desktop feature view.
+// Rust side: src/features/input.rs. See docs/dev/adding-a-feature.md.
+import { Muted } from "../widgets.slint";
+
+// State and callbacks shared with src/features/input.rs.
+export global InputFeature {
+    // The paired device the view is open for (Device ID, hex).
+    in-out property <string> peer-id;
+}
+
+export component InputView inherits VerticalLayout {
+    // The tile that opened the view, for features with more than one tile.
+    in property <string> tile;
+    in property <string> peer-name;
+    spacing: 10px;
+    Muted { text: @tr("This feature is not available yet."); }
+}

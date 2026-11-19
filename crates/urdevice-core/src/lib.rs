@@ -18,6 +18,7 @@ pub mod permission;
 pub mod platform;
 pub mod qr;
 pub mod secret;
+pub mod services;
 pub mod store;
 pub mod transport;
 

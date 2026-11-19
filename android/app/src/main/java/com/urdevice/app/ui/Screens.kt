@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.urdevice.app.Labels
 import com.urdevice.app.R
+import com.urdevice.app.ui.features.allFeatures
 import com.urdevice.core.FfiActivity
 import com.urdevice.core.FfiLogEntry
 import com.urdevice.core.FfiMode
@@ -168,8 +169,6 @@ fun ThisDeviceScreen(snap: FfiSnapshot, onSet: (String, FfiMode, Boolean) -> Uni
     }
 }
 
-private data class Tile(val cap: String, val icon: String, val label: Int?)
-
 /** A paired device (R4.7–R4.9, R5.7). */
 @Composable
 fun DeviceScreen(
@@ -179,6 +178,7 @@ fun DeviceScreen(
     onReconnect: () -> Unit,
     onForget: () -> Unit,
     onRequest: (String) -> Unit,
+    onOpenFeature: (feature: String, tile: String) -> Unit,
     onSettings: () -> Unit,
     onStop: (ULong) -> Unit,
 ) {
@@ -240,27 +240,18 @@ fun DeviceScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             val modes = peer.remotePermissions.associate { it.capability to it.mode }
-            val tiles = buildList {
-                add(Tile("clipboard.v1", "clipboard.v1", null))
-                add(Tile("files.v1", "files.v1", R.string.tile_send_files))
-                if (modes.containsKey("gallery.v1")) add(Tile("gallery.v1", "gallery.v1", null))
-                add(Tile("input.v1", "input.v1", R.string.tile_mousepad))
-                add(Tile("input.v1", "presenter", R.string.tile_presenter))
-                add(Tile("input.v1", "keyboard", R.string.tile_keyboard))
-                add(Tile("media.v1", "media.v1", null))
-                add(Tile("screen.h264.v1", "screen.h264.v1", null))
-                add(Tile("tunnel.v1", "tunnel.v1", null))
-            }
+            // Each feature's tiles (ui/features/), in the order of allFeatures.
+            val tiles = allFeatures.flatMap { f -> f.tiles(modes).map { f to it } }
             tiles.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { t ->
+                    row.forEach { (f, t) ->
                         val mode = modes[t.cap] ?: FfiMode.DENY
                         FeatureTile(
                             label = stringResource(t.label ?: Labels.cap(t.cap)),
-                            icon = t.icon,
+                            icon = t.key,
                             mode = mode,
                             host = peer.name,
-                            onClick = { onRequest(t.cap) },
+                            onClick = { if (f.hasScreen) onOpenFeature(f.id, t.key) else onRequest(t.cap) },
                             onGear = onSettings,
                             modifier = Modifier.weight(1f),
                         )

@@ -13,6 +13,7 @@ use slint::{ComponentHandle, Image, Model, ModelRc, SharedString, Timer, TimerMo
 use urdevice_core::node::{EventSink, PeerStatus, PermissionView, Snapshot};
 use urdevice_core::{Capability, Mode, Node, NodeConfig, NodeEvent};
 
+use crate::features::{Feature, FeatureCtx};
 use crate::ui::{
     ActivityItem, CodeItem, Labels, LogItem, MainWindow, NearbyItem, PeerItem, PermItem,
     PromptWindow, TileItem,
@@ -95,6 +96,16 @@ fn load_icon(cap: &str) -> Image {
         "screen.h264.v1" => include_bytes!("../ui/icons/monitor.svg"),
         "tunnel.v1" => include_bytes!("../ui/icons/code.svg"),
         "term.v1" => include_bytes!("../ui/icons/terminal.svg"),
+        "notify.v1" => include_bytes!("../ui/icons/list.svg"),
+        "ring.v1" | "telephony.v1" => include_bytes!("../ui/icons/phone.svg"),
+        "camera.v1" | "mic.v1" => include_bytes!("../ui/icons/camera.svg"),
+        "kvm.v1" => include_bytes!("../ui/icons/mouse.svg"),
+        "display.v1" => include_bytes!("../ui/icons/monitor.svg"),
+        "audio.out.v1" => include_bytes!("../ui/icons/play.svg"),
+        "cliphist.v1" => include_bytes!("../ui/icons/clipboard.svg"),
+        "lock.v1" => include_bytes!("../ui/icons/shield.svg"),
+        "adb.v1" => include_bytes!("../ui/icons/code.svg"),
+        "fs.browse.v1" => include_bytes!("../ui/icons/folder.svg"),
         _ => include_bytes!("../ui/icons/pencil.svg"),
     };
     Image::load_from_svg_data(svg).unwrap_or_default()
@@ -253,10 +264,18 @@ impl App {
             models: Models::default(),
             last_refresh: Cell::new(Instant::now()),
             refresh_timer: Timer::default(),
+            features: crate::features::all(),
+            feature_ctx: FeatureCtx {
+                window: window.as_weak(),
+                node: node.clone(),
+            },
         });
         UI.with(|u| *u.borrow_mut() = Some(ui.clone()));
         ui.models.attach(window);
         ui.wire(window);
+        for f in &ui.features {
+            f.start(&ui.feature_ctx);
+        }
         window.set_core_version(urdevice_core::core_version().into());
         window.set_has_camera(crate::camera::available());
         window.set_autostart(
@@ -316,6 +335,8 @@ struct Ui {
     models: Models,
     last_refresh: Cell<Instant>,
     refresh_timer: Timer,
+    features: Vec<Box<dyn Feature>>,
+    feature_ctx: FeatureCtx,
 }
 
 impl Ui {
@@ -475,29 +496,30 @@ impl Ui {
             if let Some(item) = peers.iter().find(|p| p.id.as_str() == selected) {
                 w.set_peer(item.clone());
             }
+            // Each feature's tiles, for the capabilities the host lists.
             let mut tiles = Vec::new();
-            for rp in &sp.remote_permissions {
-                if rp.capability.local_only() {
-                    continue;
-                }
-                let cap = rp.capability.as_str();
-                tiles.push(TileItem {
-                    cap: cap.into(),
-                    label: l.invoke_tile_label(cap.into()),
-                    icon: icon(cap),
-                    mode: mode_index(rp.mode),
-                });
-                if rp.capability == Capability::Input {
+            for f in &self.features {
+                for t in f.tiles() {
+                    let Some(rp) = sp.remote_permissions.iter().find(|p| p.capability == t.cap)
+                    else {
+                        continue;
+                    };
                     tiles.push(TileItem {
-                        cap: cap.into(),
-                        label: l.invoke_tile_label("keyboard".into()),
-                        icon: icon("keyboard"),
+                        cap: t.cap.as_str().into(),
+                        key: t.key.into(),
+                        feature: f.id().into(),
+                        view: f.has_view(),
+                        label: l.invoke_tile_label(t.key.into()),
+                        icon: icon(t.key),
                         mode: mode_index(rp.mode),
                     });
                 }
             }
             sync(&self.models.tiles, tiles);
-        } else if w.get_page() == crate::ui::Page::Peer {
+        } else if matches!(
+            w.get_page(),
+            crate::ui::Page::Peer | crate::ui::Page::Feature
+        ) {
             w.set_page(crate::ui::Page::ThisDevice);
         }
         sync(&self.models.peers, peers);
@@ -562,6 +584,9 @@ impl Ui {
             None => {
                 self.qr_uri.borrow_mut().clear();
             }
+        }
+        for f in &self.features {
+            f.refresh(&self.feature_ctx, &snap);
         }
         *self.last_snapshot.borrow_mut() = Some(snap);
     }
@@ -753,6 +778,19 @@ impl Ui {
                 let _ = n.request_activity(&id, cap);
             }
         });
+        {
+            let me = me.clone();
+            w.on_open_feature(move |peer, feature, tile| {
+                let Some(ui) = me.upgrade() else { return };
+                let snap = ui.node.snapshot();
+                let Some(p) = snap.peers.iter().find(|p| p.id == peer.as_str()) else {
+                    return;
+                };
+                if let Some(f) = ui.features.iter().find(|f| f.id() == feature.as_str()) {
+                    f.open(&ui.feature_ctx, p, &tile);
+                }
+            });
+        }
         let n = node.clone();
         w.on_stop_activity(move |id| {
             if let Ok(id) = id.parse() {

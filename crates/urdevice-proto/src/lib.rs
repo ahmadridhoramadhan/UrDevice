@@ -10,11 +10,23 @@
 
 use prost::Message;
 
+pub mod features;
+pub mod services;
+
+pub use services::ServiceId;
+
 /// Protocol version spoken by this build. Sent in `Hello`, `Announce`, and `PairInvite`.
 pub const PROTO_VERSION: u32 = 1;
 
 /// Largest control frame accepted, in bytes (R4.6).
 pub const MAX_FRAME: usize = 1024 * 1024;
+
+/// Largest [`StreamOpen`] header accepted, in bytes (design §6.2).
+pub const MAX_STREAM_OPEN: usize = 16 * 1024;
+
+/// Bytes in front of every datagram payload: service (`u16`), direction
+/// (`u8`), and activity (`u64`), all big-endian (design §6.2).
+pub const DATAGRAM_HEADER: usize = 11;
 
 /// Magic bytes in front of every UDP announcement.
 pub const ANNOUNCE_MAGIC: &[u8; 4] = b"URDV";
@@ -287,13 +299,85 @@ pub struct ActivityStop {
     pub request_id: u64,
 }
 
+/// Which side of a feature a message, stream, or datagram is for (design §6.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, prost::Enumeration)]
+#[repr(i32)]
+pub enum Direction {
+    /// To the device that offers the capability. The receiver's permission
+    /// engine checks it before the service sees it. The default, so a missing
+    /// field is always checked.
+    ToHost = 0,
+    /// To the device that uses the capability: replies, pushed state, and
+    /// media for an activity it started. Not checked by the receiver's
+    /// permission engine, so services must never act on the device for it.
+    ToController = 1,
+}
+
+/// A control message for one feature service (design §6.2, §9). The body is
+/// the service's own protobuf message (`features::<name>`).
+#[derive(Clone, PartialEq, Message)]
+pub struct Feature {
+    /// [`ServiceId`] of the service.
+    #[prost(uint32, tag = "1")]
+    pub service: u32,
+    /// Who the message is for.
+    #[prost(enumeration = "Direction", tag = "2")]
+    pub direction: i32,
+    /// `request_id` of the granted [`ActivityRequest`] this belongs to, or 0.
+    #[prost(uint64, tag = "3")]
+    pub activity: u64,
+    /// The service's message, encoded.
+    #[prost(bytes = "vec", tag = "4")]
+    pub body: Vec<u8>,
+}
+
+/// The receiver refused a [`Feature`] message.
+#[derive(Clone, PartialEq, Message)]
+pub struct FeatureRefused {
+    /// [`ServiceId`] of the service.
+    #[prost(uint32, tag = "1")]
+    pub service: u32,
+    /// The activity from the refused message.
+    #[prost(uint64, tag = "2")]
+    pub activity: u64,
+    /// `denied`, `ask` (Always Ask: send an `ActivityRequest` first),
+    /// `no_activity` (unknown or ended activity), or `unsupported`.
+    #[prost(string, tag = "3")]
+    pub reason: String,
+}
+
+/// First frame on every QUIC stream other than the control stream:
+/// `[u32 big-endian length][StreamOpen]`, at most [`MAX_STREAM_OPEN`] bytes.
+/// The service's own bytes follow.
+#[derive(Clone, PartialEq, Message)]
+pub struct StreamOpen {
+    /// [`ServiceId`] of the service.
+    #[prost(uint32, tag = "1")]
+    pub service: u32,
+    /// Who the stream is for.
+    #[prost(enumeration = "Direction", tag = "2")]
+    pub direction: i32,
+    /// `request_id` of the granted activity, or 0.
+    #[prost(uint64, tag = "3")]
+    pub activity: u64,
+    /// Stream kind, defined by the service.
+    #[prost(uint32, tag = "4")]
+    pub kind: u32,
+    /// Extra data for the service, for example an encoded open message.
+    #[prost(bytes = "vec", tag = "5")]
+    pub meta: Vec<u8>,
+}
+
 /// Envelope for every control-stream message.
+///
+/// Tags 1 to 63 belong to the core. Features never add a tag here; they send
+/// [`Feature`] messages instead (design §6.2).
 #[derive(Clone, PartialEq, Message)]
 pub struct Control {
     /// The message.
     #[prost(
         oneof = "control::Msg",
-        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15"
+        tags = "1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17"
     )]
     pub msg: Option<control::Msg>,
 }
@@ -348,6 +432,12 @@ pub mod control {
         /// See [`super::ActivityStop`].
         #[prost(message, tag = "15")]
         ActivityStop(super::ActivityStop),
+        /// See [`super::Feature`].
+        #[prost(message, tag = "16")]
+        Feature(super::Feature),
+        /// See [`super::FeatureRefused`].
+        #[prost(message, tag = "17")]
+        FeatureRefused(super::FeatureRefused),
     }
 }
 
@@ -416,6 +506,83 @@ pub fn decode_announce(packet: &[u8]) -> Result<Announce, ProtoError> {
 /// Encode a pairing invite as protobuf bytes (the QR code wraps them in a URI).
 pub fn encode_invite(invite: &PairInvite) -> Vec<u8> {
     invite.encode_to_vec()
+}
+
+/// Encode a stream header as `[u32 big-endian length][StreamOpen]`.
+pub fn encode_stream_open(open: &StreamOpen) -> Result<Vec<u8>, ProtoError> {
+    let len = open.encoded_len();
+    if len > MAX_STREAM_OPEN {
+        return Err(ProtoError::TooLarge(len));
+    }
+    let mut out = Vec::with_capacity(4 + len);
+    // `len` is at most MAX_STREAM_OPEN, which fits in a u32.
+    out.extend_from_slice(&(len as u32).to_be_bytes());
+    open.encode(&mut out).map_err(|_| ProtoError::Malformed)?;
+    Ok(out)
+}
+
+/// Read the body length from a 4-byte stream header and check the limit.
+pub fn stream_open_len(header: [u8; 4]) -> Result<usize, ProtoError> {
+    let len = u32::from_be_bytes(header) as usize;
+    if len > MAX_STREAM_OPEN {
+        return Err(ProtoError::TooLarge(len));
+    }
+    Ok(len)
+}
+
+/// Decode a stream header body.
+pub fn decode_stream_open(body: &[u8]) -> Result<StreamOpen, ProtoError> {
+    if body.len() > MAX_STREAM_OPEN {
+        return Err(ProtoError::TooLarge(body.len()));
+    }
+    Ok(StreamOpen::decode(body)?)
+}
+
+/// The header in front of a datagram payload (design §6.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DatagramHeader {
+    /// The service the datagram is for.
+    pub service: ServiceId,
+    /// Who it is for.
+    pub direction: Direction,
+    /// The activity it belongs to, or 0.
+    pub activity: u64,
+}
+
+/// Build a datagram: [`DATAGRAM_HEADER`] bytes followed by `payload`.
+pub fn encode_datagram(h: DatagramHeader, payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(DATAGRAM_HEADER + payload.len());
+    out.extend_from_slice(&h.service.0.to_be_bytes());
+    out.push(match h.direction {
+        Direction::ToHost => 0,
+        Direction::ToController => 1,
+    });
+    out.extend_from_slice(&h.activity.to_be_bytes());
+    out.extend_from_slice(payload);
+    out
+}
+
+/// Split a datagram into its header and payload.
+pub fn decode_datagram(d: &[u8]) -> Result<(DatagramHeader, &[u8]), ProtoError> {
+    if d.len() < DATAGRAM_HEADER {
+        return Err(ProtoError::Malformed);
+    }
+    let service = ServiceId(u16::from_be_bytes([d[0], d[1]]));
+    let direction = match d[2] {
+        0 => Direction::ToHost,
+        1 => Direction::ToController,
+        _ => return Err(ProtoError::Malformed),
+    };
+    let mut a = [0u8; 8];
+    a.copy_from_slice(&d[3..11]);
+    Ok((
+        DatagramHeader {
+            service,
+            direction,
+            activity: u64::from_be_bytes(a),
+        },
+        &d[DATAGRAM_HEADER..],
+    ))
 }
 
 /// Decode pairing invite bytes. `max` bounds the input size.
@@ -499,5 +666,63 @@ mod tests {
         let bytes = encode_invite(&invite);
         assert_eq!(decode_invite(&bytes, 1024).unwrap(), invite);
         assert!(decode_invite(&bytes, 4).is_err());
+    }
+
+    #[test]
+    fn feature_frame_round_trip() {
+        let msg = Control::from(control::Msg::Feature(Feature {
+            service: u32::from(ServiceId::CLIPBOARD.0),
+            direction: Direction::ToController as i32,
+            activity: 9,
+            body: vec![1, 2, 3],
+        }));
+        let frame = encode_frame(&msg).unwrap();
+        assert_eq!(decode_control(&frame[4..]).unwrap(), msg.msg.unwrap());
+        // A missing direction reads as ToHost, which is always checked.
+        let f = Feature {
+            service: 1,
+            ..Default::default()
+        };
+        assert_eq!(f.direction(), Direction::ToHost);
+    }
+
+    #[test]
+    fn stream_open_round_trip_and_limits() {
+        let open = StreamOpen {
+            service: 7,
+            direction: 0,
+            activity: 42,
+            kind: 1,
+            meta: vec![5; 10],
+        };
+        let bytes = encode_stream_open(&open).unwrap();
+        let len = stream_open_len(bytes[..4].try_into().unwrap()).unwrap();
+        assert_eq!(len, bytes.len() - 4);
+        assert_eq!(decode_stream_open(&bytes[4..]).unwrap(), open);
+        let header = ((MAX_STREAM_OPEN + 1) as u32).to_be_bytes();
+        assert!(stream_open_len(header).is_err());
+        let big = StreamOpen {
+            meta: vec![0; MAX_STREAM_OPEN],
+            ..open
+        };
+        assert!(encode_stream_open(&big).is_err());
+    }
+
+    #[test]
+    fn datagram_round_trip_and_garbage() {
+        let h = DatagramHeader {
+            service: ServiceId::INPUT,
+            direction: Direction::ToHost,
+            activity: 0x0102_0304_0506_0708,
+        };
+        let d = encode_datagram(h, b"xy");
+        assert_eq!(d.len(), DATAGRAM_HEADER + 2);
+        let (h2, payload) = decode_datagram(&d).unwrap();
+        assert_eq!(h2, h);
+        assert_eq!(payload, b"xy");
+        assert!(decode_datagram(&d[..DATAGRAM_HEADER - 1]).is_err());
+        let mut bad = d.clone();
+        bad[2] = 7;
+        assert!(decode_datagram(&bad).is_err());
     }
 }

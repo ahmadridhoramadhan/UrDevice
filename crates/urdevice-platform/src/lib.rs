@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use urdevice_core::platform::{Clipboard, FileStore, InputSink, MediaHost, Overlay, ScreenSource};
 
+pub mod features;
 mod secrets;
 mod stub;
 mod system;

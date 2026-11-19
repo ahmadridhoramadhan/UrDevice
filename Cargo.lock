@@ -7104,6 +7104,7 @@ dependencies = [
 name = "urdevice-core"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "data-encoding",
  "futures-core",
  "if-addrs",

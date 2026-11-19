@@ -5,6 +5,7 @@
 //! runs on the node's own tokio runtime, and results come back as
 //! [`NodeEvent`]s plus a fresh [`Snapshot`].
 
+mod feature;
 mod net;
 mod types;
 
@@ -17,6 +18,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
 use urdevice_proto::{Announce, PROTO_VERSION, control};
 
+pub use feature::ServiceCtx;
 pub use types::*;
 
 use crate::discovery::{DISCOVERY_PORT, Discovery, DiscoveryConfig, Seen, Via};
@@ -24,6 +26,7 @@ use crate::identity::{DeviceId, Identity};
 use crate::pairing::{self, Lockout, TOKEN_LEN, TOKEN_TTL};
 use crate::permission::{Capability, Mode};
 use crate::secret::{self, SecretStore};
+use crate::services::{self, Registry, Service};
 use crate::store::{PairedDevice, TrustStore};
 use crate::transport::{self, TrustPolicy, close};
 use crate::{CoreError, Result};
@@ -63,7 +66,12 @@ pub struct NodeConfig {
     pub invite_addrs: Option<Vec<IpAddr>>,
     /// Always Ask timeout.
     pub ask_timeout: Duration,
+    /// Extra services, added after the built-in ones (tests).
+    pub services: Vec<ServiceFactory>,
 }
+
+/// Adds services to a starting node's [`Registry`].
+pub type ServiceFactory = Box<dyn FnOnce(&mut Registry) + Send>;
 
 impl NodeConfig {
     /// Defaults for a real device.
@@ -88,8 +96,51 @@ impl NodeConfig {
             bind_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             invite_addrs: None,
             ask_timeout: ASK_TIMEOUT,
+            services: Vec::new(),
         }
     }
+}
+
+/// Meta key listing the capabilities that got a stored setting, so a later
+/// build can add settings for capabilities it introduces.
+const SEEDED_CAPS: &str = "seeded_caps";
+
+/// Give capabilities added after onboarding their default setting (R5.2).
+/// Only a capability that has never been seeded and has no row at all gets
+/// one; a row that fails its MAC keeps reading as Deny. A default of Allow
+/// is stored as Always Ask, so a tampered seed list can never turn
+/// something on without the user.
+fn seed_new_capabilities(store: &TrustStore) -> Result<()> {
+    let mut seeded: Vec<String> = match store.meta(SEEDED_CAPS)? {
+        Some(s) => s
+            .split(',')
+            .filter(|c| !c.is_empty())
+            .map(str::to_owned)
+            .collect(),
+        // Installs from before the list existed were onboarded with these.
+        None => Capability::RELEASE_1
+            .iter()
+            .map(|c| c.as_str().to_owned())
+            .collect(),
+    };
+    let before = seeded.len();
+    for c in Capability::ALL {
+        if seeded.iter().any(|s| s == c.as_str()) {
+            continue;
+        }
+        if !store.has_permission_row(c)? {
+            let mode = match c.default_mode() {
+                Mode::Allow => Mode::Ask,
+                m => m,
+            };
+            store.set_permission(c, mode)?;
+        }
+        seeded.push(c.as_str().to_owned());
+    }
+    if seeded.len() != before || store.meta(SEEDED_CAPS)?.is_none() {
+        store.set_meta(SEEDED_CAPS, &seeded.join(","))?;
+    }
+    Ok(())
 }
 
 fn unix_now() -> u64 {
@@ -109,6 +160,17 @@ struct Session {
     tx: mpsc::UnboundedSender<control::Msg>,
     remote_perms: Vec<PermissionView>,
     battery: Option<(u8, bool)>,
+    /// What the peer offers as a host, from its Hello or Welcome.
+    caps: HashSet<Capability>,
+}
+
+/// An approved request for a capability without an indicator, kept so the
+/// feature traffic that follows can name it (design §7.4).
+#[derive(Clone, Copy, Debug)]
+struct GrantEntry {
+    cap: Capability,
+    /// True when the peer acts on this device.
+    incoming: bool,
 }
 
 struct Activity {
@@ -170,6 +232,10 @@ struct State {
     code_pairings: HashMap<DeviceId, CodePairing>,
     activities: Vec<Activity>,
     pending_requests: HashMap<(DeviceId, u64), Capability>,
+    /// Services waiting for the answer to their request.
+    waiters: HashMap<(DeviceId, u64), oneshot::Sender<std::result::Result<(), String>>>,
+    /// Approvals for capabilities without an indicator, by (peer, request id).
+    grants: HashMap<(DeviceId, u64), GrantEntry>,
     prompts: HashMap<u64, Prompt>,
     battery: Option<(u8, bool)>,
     battery_sent: Option<(Instant, Option<(u8, bool)>)>,
@@ -218,6 +284,8 @@ impl State {
 }
 
 pub(crate) struct Inner {
+    this: std::sync::Weak<Inner>,
+    services: Registry,
     rt: tokio::runtime::Handle,
     platform: String,
     secrets: Arc<dyn SecretStore>,
@@ -265,6 +333,9 @@ impl Node {
             secret::get_or_create_random(cfg.secrets.as_ref(), secret::STORE_MAC_KEY, 32)?;
         let store = TrustStore::open(&cfg.data_dir.join("trust.sqlite3"), mac_key)?;
         let _ = store.prune_activity(unix_now());
+        if store.meta("onboarded")?.as_deref() == Some("1") {
+            seed_new_capabilities(&store)?;
+        }
 
         let mut state = State {
             name: pairing::clean_name(&store.meta("name")?.unwrap_or(cfg.default_name.clone())),
@@ -282,9 +353,18 @@ impl Node {
             transport::bind_endpoint(&identity, policy.clone(), cfg.bind_ip, cfg.quic_port)?;
         let (seen_tx, seen_rx) = mpsc::channel(256);
 
-        let inner = Arc::new(Inner {
+        let platform = pairing::clean_platform(&cfg.platform);
+        let mut registry = Registry::default();
+        services::register_all(&mut registry, &platform);
+        for add in cfg.services {
+            add(&mut registry);
+        }
+
+        let inner = Arc::new_cyclic(|this| Inner {
+            this: this.clone(),
+            services: registry,
             rt: rt.handle().clone(),
-            platform: pairing::clean_platform(&cfg.platform),
+            platform,
             secrets: cfg.secrets,
             events: cfg.events,
             identity: RwLock::new(Arc::new(identity)),
@@ -300,6 +380,9 @@ impl Node {
             addr_cache: Mutex::new(None),
         });
         inner.restart_discovery()?;
+        for s in inner.services.iter() {
+            s.start(inner.service_ctx(s.as_ref()));
+        }
 
         tokio::spawn(net::accept_loop(inner.clone()));
         tokio::spawn(net::seen_loop(inner.clone(), seen_rx));
@@ -315,6 +398,12 @@ impl Node {
     /// Everything the UI draws.
     pub fn snapshot(&self) -> Snapshot {
         self.inner.snapshot()
+    }
+
+    /// The registered service of type `S`, for the UI and the platform glue
+    /// to call its methods and set its adapters (design §9).
+    pub fn service<S: Service>(&self) -> Option<Arc<S>> {
+        self.inner.services.typed::<S>()
     }
 
     /// The activity log, newest first (R5.6).
@@ -354,6 +443,8 @@ impl Node {
             }
             store.set_meta("name", &name)?;
             store.set_meta("onboarded", "1")?;
+            let all: Vec<&str> = Capability::ALL.iter().map(|c| c.as_str()).collect();
+            store.set_meta(SEEDED_CAPS, &all.join(","))?;
         }
         {
             let mut st = lock(&self.inner.state);
@@ -681,6 +772,7 @@ impl Node {
             st.onboarded = false;
             st.permissions.clear();
             st.activities.clear();
+            st.grants.clear();
         }
         self.reset_identity()
     }
@@ -898,6 +990,7 @@ impl Inner {
         }
         self.reload_paired()?;
         self.stop_activities(|a| a.peer == id, "stopped");
+        self.end_grants(|(p, _), _| *p == id);
         Ok(())
     }
 
@@ -961,10 +1054,13 @@ impl Inner {
         for (_, s) in sessions {
             s.conn.close(code.into(), b"");
         }
+        lock(&self.state).waiters.clear();
+        self.end_grants(|_, _| true);
     }
 
     fn revoke_capability(&self, cap: Capability) {
         self.stop_activities(|a| a.incoming && a.cap == cap, "stopped");
+        self.end_grants(|_, g| g.incoming && g.cap == cap);
     }
 
     /// End matching activities and tell the other side.
@@ -983,6 +1079,10 @@ impl Inner {
         if stopped.is_empty() {
             return;
         }
+        let ended: Vec<_> = stopped
+            .iter()
+            .map(|(a, _)| (a.peer, a.cap, a.request_id))
+            .collect();
         for (a, tx) in &stopped {
             if let Some(tx) = tx {
                 let _ = tx.send(control::Msg::ActivityStop(urdevice_proto::ActivityStop {
@@ -999,6 +1099,7 @@ impl Inner {
                 );
             }
         }
+        self.notify_ended(&ended);
         self.changed();
     }
 
@@ -1151,4 +1252,39 @@ pub fn local_ipv4_addrs() -> Vec<IpAddr> {
     out.dedup();
     out.truncate(6);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_capabilities_get_defaults_once() {
+        let store = TrustStore::open_in_memory(vec![7; 32]).unwrap();
+        // An install from before Release 2: only the Release 1 rows exist,
+        // and Media's row was deleted by someone.
+        for c in Capability::RELEASE_1 {
+            if c != Capability::Media {
+                store.set_permission(c, c.default_mode()).unwrap();
+            }
+        }
+        seed_new_capabilities(&store).unwrap();
+        let p = store.permissions().unwrap();
+        assert_eq!(p.get(&Capability::Notify), Some(&Mode::Ask));
+        // Ring defaults to Allow; an upgrade stores Always Ask instead.
+        assert_eq!(p.get(&Capability::Ring), Some(&Mode::Ask));
+        assert_eq!(p.get(&Capability::Adb), Some(&Mode::Deny));
+        // A Release 1 row that is missing stays missing (reads as Deny).
+        assert!(!p.contains_key(&Capability::Media));
+
+        // Once seeded, a changed or deleted setting is never reset.
+        store
+            .set_permission(Capability::Notify, Mode::Deny)
+            .unwrap();
+        seed_new_capabilities(&store).unwrap();
+        assert_eq!(
+            store.permissions().unwrap().get(&Capability::Notify),
+            Some(&Mode::Deny)
+        );
+    }
 }

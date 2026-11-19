@@ -13,19 +13,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Adb
+import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Laptop
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Mouse
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Slideshow
+import androidx.compose.material.icons.outlined.Sms
+import androidx.compose.material.icons.outlined.Speaker
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -63,6 +75,18 @@ fun capIcon(cap: String): ImageVector = when (cap) {
     "screen.h264.v1" -> Icons.Outlined.DesktopWindows
     "tunnel.v1" -> Icons.Outlined.Code
     "term.v1" -> Icons.Outlined.Terminal
+    "notify.v1" -> Icons.Outlined.Notifications
+    "ring.v1" -> Icons.Outlined.NotificationsActive
+    "camera.v1" -> Icons.Outlined.Videocam
+    "mic.v1" -> Icons.Outlined.Mic
+    "telephony.v1" -> Icons.Outlined.Sms
+    "kvm.v1" -> Icons.Outlined.SwapHoriz
+    "display.v1" -> Icons.Outlined.Cast
+    "audio.out.v1" -> Icons.Outlined.Speaker
+    "cliphist.v1" -> Icons.Outlined.History
+    "lock.v1" -> Icons.Outlined.Lock
+    "adb.v1" -> Icons.Outlined.Adb
+    "fs.browse.v1" -> Icons.Outlined.FolderOpen
     else -> Icons.Outlined.Edit
 }
 

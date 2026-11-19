@@ -1,0 +1,55 @@
+// Feature views, one file per feature (design §12). main.slint shows
+// FeatureView when a tile with a view is opened. See docs/dev/adding-a-feature.md.
+import { ClipboardView } from "clipboard.slint";
+import { FilesView } from "files.slint";
+import { GalleryView } from "gallery.slint";
+import { InputView } from "input.slint";
+import { MediaView } from "media.slint";
+import { ScreenView } from "screen.slint";
+import { TunnelView } from "tunnel.slint";
+import { BluetoothView } from "bluetooth.slint";
+import { NotifyView } from "notify.slint";
+import { RingView } from "ring.slint";
+import { WebcamView } from "webcam.slint";
+import { TelephonyView } from "telephony.slint";
+import { KvmView } from "kvm.slint";
+import { DisplayView } from "display.slint";
+import { TerminalView } from "terminal.slint";
+import { PortProfilesView } from "port_profiles.slint";
+import { InspectorView } from "inspector.slint";
+import { AdbView } from "adb.slint";
+import { FileBrowserView } from "file_browser.slint";
+import { ClipHistoryView } from "clip_history.slint";
+import { ProximityLockView } from "proximity_lock.slint";
+import { AutomationsView } from "automations.slint";
+import { SpeakerView } from "speaker.slint";
+
+// The view for `feature` (the feature id, for example "clipboard").
+export component FeatureView inherits VerticalLayout {
+    in property <string> feature;
+    in property <string> tile;
+    in property <string> peer-name;
+    if root.feature == "clipboard": ClipboardView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "files": FilesView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "gallery": GalleryView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "input": InputView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "media": MediaView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "screen": ScreenView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "tunnel": TunnelView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "bluetooth": BluetoothView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "notify": NotifyView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "ring": RingView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "webcam": WebcamView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "telephony": TelephonyView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "kvm": KvmView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "display": DisplayView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "terminal": TerminalView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "port_profiles": PortProfilesView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "inspector": InspectorView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "adb": AdbView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "file_browser": FileBrowserView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "clip_history": ClipHistoryView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "proximity_lock": ProximityLockView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "automations": AutomationsView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "speaker": SpeakerView { tile: root.tile; peer-name: root.peer-name; }
+}

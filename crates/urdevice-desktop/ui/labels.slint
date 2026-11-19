@@ -1,0 +1,100 @@
+// Translated text the Rust side and the feature views need (R16.4).
+export global Labels {
+    pure public function cap-label(cap: string) -> string {
+        if (cap == "clipboard.v1") { return @tr("Clipboard"); }
+        if (cap == "files.v1") { return @tr("Receive files"); }
+        if (cap == "gallery.v1") { return @tr("Gallery"); }
+        if (cap == "input.v1") { return @tr("Remote control"); }
+        if (cap == "media.v1") { return @tr("Media"); }
+        if (cap == "screen.h264.v1") { return @tr("Screen sharing"); }
+        if (cap == "tunnel.v1") { return @tr("Localhost"); }
+        if (cap == "term.v1") { return @tr("Remote terminal"); }
+        if (cap == "fs.write.v1") { return @tr("File changes"); }
+        if (cap == "notify.v1") { return @tr("Notifications"); }
+        if (cap == "ring.v1") { return @tr("Find my device"); }
+        if (cap == "camera.v1") { return @tr("Webcam"); }
+        if (cap == "mic.v1") { return @tr("Microphone"); }
+        if (cap == "telephony.v1") { return @tr("SMS and calls"); }
+        if (cap == "kvm.v1") { return @tr("Shared mouse and keyboard"); }
+        if (cap == "display.v1") { return @tr("Second display"); }
+        if (cap == "audio.out.v1") { return @tr("Speaker"); }
+        if (cap == "cliphist.v1") { return @tr("Clipboard history"); }
+        if (cap == "lock.v1") { return @tr("Proximity lock"); }
+        if (cap == "adb.v1") { return @tr("DevTools and ADB"); }
+        if (cap == "fs.browse.v1") { return @tr("Browse files"); }
+        return cap;
+    }
+    pure public function tile-label(cap: string) -> string {
+        if (cap == "files.v1") { return @tr("Send files"); }
+        if (cap == "fs.write.v1") { return @tr("Change files"); }
+        if (cap == "term.v1") { return @tr("Terminal"); }
+        if (cap == "keyboard") { return @tr("Keyboard"); }
+        return cap-label(cap);
+    }
+    pure public function cap-desc(cap: string) -> string {
+        if (cap == "clipboard.v1") { return @tr("Copy on another device, paste here"); }
+        if (cap == "files.v1") { return @tr("Other devices send files to this device"); }
+        if (cap == "gallery.v1") { return @tr("Other devices browse photos and videos here"); }
+        if (cap == "input.v1") { return @tr("Mouse, keyboard, and presenter from other devices"); }
+        if (cap == "media.v1") { return @tr("Control music and video from other devices"); }
+        if (cap == "screen.h264.v1") { return @tr("Other devices view this screen"); }
+        if (cap == "tunnel.v1") { return @tr("Other devices open the ports you share"); }
+        if (cap == "term.v1") { return @tr("Other devices open a shell here. Only this device can change it."); }
+        if (cap == "fs.write.v1") { return @tr("Upload, rename, and delete. Only this device can change it."); }
+        if (cap == "notify.v1") { return @tr("Other devices show the notifications you pick"); }
+        if (cap == "ring.v1") { return @tr("Other devices make this device ring"); }
+        if (cap == "camera.v1") { return @tr("Other devices use this camera"); }
+        if (cap == "mic.v1") { return @tr("Other devices use this microphone"); }
+        if (cap == "telephony.v1") { return @tr("Other devices read and send SMS and answer calls"); }
+        if (cap == "kvm.v1") { return @tr("Another desktop's mouse and keyboard move over to this one"); }
+        if (cap == "display.v1") { return @tr("Other devices show an extra screen of this device"); }
+        if (cap == "audio.out.v1") { return @tr("Other devices play their sound here"); }
+        if (cap == "cliphist.v1") { return @tr("Other devices sync the clipboard history"); }
+        if (cap == "lock.v1") { return @tr("A desktop locks itself when this device leaves"); }
+        if (cap == "adb.v1") { return @tr("Other devices reach this device's ADB and DevTools"); }
+        if (cap == "fs.browse.v1") { return @tr("Other devices browse and search the folders you share"); }
+        return "";
+    }
+    pure public function disconnected-by(name: string) -> string { return @tr("Disconnected by {}", name); }
+    pure public function offline-since(when: string) -> string { return @tr("Offline · last seen {}", when); }
+    pure public function offline() -> string { return @tr("Offline"); }
+    pure public function valid-for(secs: int) -> string { return @tr("Valid for {} s. A new code appears after that.", secs); }
+    pure public function locked-for(secs: int) -> string { return @tr("Too many failed attempts. Pairing is locked for {} s.", secs); }
+    pure public function hidden-blocks() -> string { return @tr("Hidden mode is on. Turn it off in Settings to pair."); }
+    pure public function paired-with(name: string) -> string { return @tr("Paired with {}", name); }
+    pure public function pairing-failed(reason: string) -> string {
+        if (reason == "cancelled") { return @tr("Pairing was cancelled."); }
+        if (reason == "timeout") { return @tr("Pairing timed out."); }
+        if (reason == "expired") { return @tr("That QR code expired or was already used. Scan the new one."); }
+        if (reason == "locked") { return @tr("Pairing is locked on the other device after too many failures."); }
+        if (reason == "closed") { return @tr("Open Add Device on the other device first."); }
+        if (reason == "hidden") { return @tr("The other device is in hidden mode."); }
+        if (reason == "unreachable") { return @tr("Could not reach the other device, or its key did not match the QR code."); }
+        return @tr("Pairing failed.");
+    }
+    pure public function activity-result(device: string, feature: string, granted: bool, reason: string) -> string {
+        if (granted) { return @tr("{} allowed {}. The feature itself arrives in a later update.", device, feature); }
+        if (reason == "timeout") { return @tr("{} did not answer in time.", device); }
+        if (reason == "declined") { return @tr("{} declined {}.", device, feature); }
+        if (reason == "offline") { return @tr("{} is not connected.", device); }
+        if (reason == "unsupported") { return @tr("{} does not offer {}.", device, feature); }
+        return @tr("{} has {} turned off.", device, feature);
+    }
+    pure public function notice(code: string, device: string) -> string {
+        if (code == "unpaired_by") { return @tr("{} removed this pairing.", device); }
+        if (code == "disconnected_by") { return @tr("{} disconnected.", device); }
+        if (code == "update_required") { return @tr("Update UrDevice on {}.", device); }
+        if (code == "pairing_locked") { return @tr("Too many failed pairing attempts. Pairing is locked for 5 minutes."); }
+        if (code == "stopped_by") { return @tr("{} stopped the session.", device); }
+        return code;
+    }
+    pure public function exported(path: string) -> string { return @tr("Exported to {}", path); }
+    pure public function decision(d: string) -> string {
+        if (d == "allowed") { return @tr("Allowed"); }
+        if (d == "denied") { return @tr("Denied"); }
+        if (d == "timeout") { return @tr("No answer"); }
+        if (d == "declined") { return @tr("Declined"); }
+        if (d == "stopped") { return @tr("Stopped"); }
+        return d;
+    }
+}

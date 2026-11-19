@@ -60,6 +60,7 @@ import com.urdevice.app.ui.PairBody
 import com.urdevice.app.ui.SettingsScreen
 import com.urdevice.app.ui.ThisDeviceScreen
 import com.urdevice.app.ui.UrDeviceTheme
+import com.urdevice.app.ui.features.feature
 import com.urdevice.core.FfiEvent
 import com.urdevice.core.FfiException
 import com.urdevice.core.FfiLogEntry
@@ -75,6 +76,9 @@ sealed interface Page {
     data object Pair : Page
     data object Settings : Page
     data object Log : Page
+
+    /** A feature screen (ui/features/) for a paired device, opened from the tile with key [tile]. */
+    data class Feature(val device: String, val feature: String, val tile: String) : Page
 }
 
 class MainActivity : ComponentActivity() {
@@ -195,6 +199,7 @@ private fun App() {
                                 Page.Pair -> stringResource(R.string.add_device)
                                 Page.Settings -> stringResource(R.string.settings)
                                 Page.Log -> stringResource(R.string.set_log)
+                                is Page.Feature -> s.peers.firstOrNull { it.id == page.device }?.name ?: ""
                             },
                         )
                     },
@@ -245,6 +250,7 @@ private fun App() {
                                     onReconnect = { runCatching { node()?.reconnect(peer.id) } },
                                     onForget = { runCatching { node()?.forget(peer.id) } },
                                     onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
+                                    onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
                                     onSettings = { go(Page.ThisDevice) },
                                     onStop = { node()?.stopActivity(it) },
                                 )
@@ -281,6 +287,15 @@ private fun App() {
                             version = coreVersion(),
                         )
                         Page.Log -> LogScreen(log)
+                        is Page.Feature -> {
+                            val peer = s.peers.firstOrNull { it.id == page.device }
+                            val f = feature(page.feature)
+                            if (peer == null || f == null) {
+                                LaunchedEffect(page) { back() }
+                            } else {
+                                f.Screen(peer, page.tile)
+                            }
+                        }
                     }
                 }
             }
