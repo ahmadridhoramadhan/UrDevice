@@ -213,7 +213,11 @@ impl Gallery {
         for batch in items.chunks(MAX_FETCH) {
             let entries: Vec<(String, u64, u64)> = batch
                 .iter()
-                .map(|i| (i.name.clone(), i.size, i.id | RESUME_BIT))
+                .map(|i| {
+                    let fallback = format!("item_{}", i.id);
+                    let name = super::files::path::file_name_only(&i.name, &fallback);
+                    (name, i.size, i.id | RESUME_BIT)
+                })
                 .collect();
             let wanted: Vec<(u64, u64)> = batch.iter().map(|i| (i.id, i.size)).collect();
             let ctx2 = ctx.clone();

@@ -113,6 +113,18 @@ pub fn split_ext(name: &str) -> (&str, &str) {
     }
 }
 
+/// A single file name from an untrusted name that should not carry folders
+/// (gallery items): the last component, cleaned, or `fallback` when nothing
+/// usable is left.
+pub fn file_name_only(raw: &str, fallback: &str) -> String {
+    raw.split(['/', '\\'])
+        .rev()
+        .find(|p| !p.is_empty() && *p != "." && *p != "..")
+        .and_then(|p| p.get(p.find(':').map_or(0, |i| i + 1)..))
+        .and_then(|p| clean_name(p).ok())
+        .unwrap_or_else(|| fallback.to_owned())
+}
+
 /// Clean a peer's relative path into name components (R8.6).
 ///
 /// Both `/` and `\` separate folders. Refused: absolute paths, drive letters
@@ -292,6 +304,15 @@ mod tests {
         assert_eq!(clean_rel_path("./"), Err(PathError::Empty));
         assert_eq!(clean_rel_path("..."), Err(PathError::Empty));
         assert_eq!(clean_rel_path(&"a/".repeat(40)), Err(PathError::TooLong));
+    }
+
+    #[test]
+    fn single_names_drop_folders() {
+        assert_eq!(file_name_only("../../evil.jpg", "x"), "evil.jpg");
+        assert_eq!(file_name_only("C:\\a\\b.png", "x"), "b.png");
+        assert_eq!(file_name_only("C:b.png", "x"), "b.png");
+        assert_eq!(file_name_only("..", "item_1"), "item_1");
+        assert_eq!(file_name_only("a\0b", "item_1"), "item_1");
     }
 
     #[test]
