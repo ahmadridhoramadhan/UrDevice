@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="media_show">Show what is playing on %1$s</string>
+    <string name="media_off">The media player is off.</string>
+    <string name="media_offline">%1$s is offline.</string>
+    <string name="media_denied">Media control is turned off by %1$s.</string>
+    <string name="media_waiting">Waiting for %1$s…</string>
+    <string name="media_empty">Nothing is playing on %1$s.</string>
+    <string name="media_listener_off">Notification access is off on %1$s. Turn it on in the Android settings so other devices can see and control media.</string>
+    <string name="media_unsupported">%1$s cannot read its media apps.</string>
+    <string name="media_refused">%1$s did not allow that.</string>
+    <string name="media_unknown_title">Unknown title</string>
+    <string name="media_previous">Previous</string>
+    <string name="media_next">Next</string>
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_mute">Mute</string>
+    <string name="media_unmute">Unmute</string>
+    <string name="media_volume">Volume</string>
+    <string name="media_seek">Position</string>
+    <string name="media_why_title">Let other devices control media on this phone</string>
+    <string name="media_why_body">To show what is playing and let your other devices pause, skip, or seek, Android needs you to allow notification access for UrDevice. UrDevice does not read your notifications for this. You can turn it off again in the same settings page.</string>
+    <string name="media_grant">Open settings</string>
+</resources>
