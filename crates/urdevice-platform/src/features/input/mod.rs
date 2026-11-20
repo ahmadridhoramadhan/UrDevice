@@ -45,6 +45,7 @@ pub(crate) trait Backend: Send {
 
 /// Why a back-end did not open.
 #[derive(Debug)]
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub(crate) enum Fail {
     /// The OS needs a permission from the user.
     Missing(Missing),

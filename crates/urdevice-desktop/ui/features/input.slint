@@ -15,3 +15,34 @@ export component InputView inherits VerticalLayout {
     spacing: 10px;
     Muted { text: @tr("This feature is not available yet."); }
 }
+
+// The presenter's laser dot (design §9.3, R9b.3): a transparent window with no
+// frame that covers the primary display, stays above other windows, and lets
+// every click through (src/features/input.rs sets the click-through on the OS
+// window). The Rust side shows it, sizes it, and moves the dot.
+export component LaserWindow inherits Window {
+    // True while the phone shows the laser.
+    in property <bool> shown;
+    // Centre of the dot, in logical pixels of this window.
+    in property <length> dot-x;
+    in property <length> dot-y;
+    title: "UrDevice laser";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    preferred-width: 400px;
+    preferred-height: 300px;
+
+    if root.shown: Rectangle {
+        x: root.dot-x - self.width / 2;
+        y: root.dot-y - self.height / 2;
+        width: 26px;
+        height: 26px;
+        border-radius: 13px;
+        background: #ff2020;
+        border-width: 2px;
+        border-color: #ffffffcc;
+        drop-shadow-blur: 14px;
+        drop-shadow-color: #ff2020;
+    }
+}
