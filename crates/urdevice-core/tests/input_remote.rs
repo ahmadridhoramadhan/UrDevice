@@ -23,6 +23,13 @@ use urdevice_core::{Capability, Mode, Result};
 
 const SCREEN: (u32, u32) = (1080, 2400);
 
+/// Datagrams (positions) and the control stream (buttons) may overtake each
+/// other on a real path, and timers are coarse on Windows: let positions land
+/// before a button follows.
+fn settle() {
+    std::thread::sleep(std::time::Duration::from_millis(80));
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Did {
     Gesture(Gesture),
@@ -158,6 +165,7 @@ fn a_desktop_taps_swipes_and_uses_back_home_recents_on_android() {
 
     // A click is a tap at the place the pointer was.
     r.ctl.pointer_abs(id, 32768, 16384, 0).unwrap();
+    settle();
     r.ctl.button(id, button::LEFT, true).unwrap();
     r.ctl.button(id, button::LEFT, false).unwrap();
     wait_until("tap", WAIT, || {
@@ -169,11 +177,13 @@ fn a_desktop_taps_swipes_and_uses_back_home_recents_on_android() {
 
     // A drag is one swipe from where it began to where it ended.
     r.ctl.pointer_abs(id, 32768, 49152, 0).unwrap();
+    settle();
     r.ctl.button(id, button::LEFT, true).unwrap();
     for i in 1..=10u32 {
         r.ctl.pointer_abs(id, 32768, 49152 - i * 3000, 0).unwrap();
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        std::thread::sleep(std::time::Duration::from_millis(20));
     }
+    settle();
     r.ctl.button(id, button::LEFT, false).unwrap();
     wait_until("swipe", WAIT, || {
         phone.log().iter().any(|d| match d {
@@ -321,8 +331,10 @@ fn stop_on_the_phone_cancels_a_swipe_that_was_not_finished() {
     r.start();
     let id = r.id();
     r.ctl.pointer_abs(id, 1000, 1000, 0).unwrap();
+    settle();
     r.ctl.button(id, button::LEFT, true).unwrap();
     r.ctl.pointer_move(id, 0, 400).unwrap();
+    settle();
     r.ctl.key(id, usage::A, true, 0).unwrap();
     wait_until("key held", WAIT, || phone.has(&Did::Key(29, true, 0)));
 
@@ -403,12 +415,17 @@ fn a_desktop_controls_another_desktop_with_pointer_and_keys() {
     assert_eq!(cap.press("g", both), vec![KeyOut::Release]);
     r.ctl.tap_key(id, usage::ENTER, modifier::SHIFT).unwrap();
 
-    wait_until("keys", WAIT, || {
-        sink.log
-            .lock()
-            .unwrap()
-            .contains(&"key 0xe1 false".to_string())
-    });
+    // Positions and the wheel travel as datagrams; wait for each.
+    for what in [
+        "key 0xe1 false",
+        "Abs { x: 65535, y: 0",
+        "Scroll { dx: 0, dy: 120 }",
+        "text h",
+    ] {
+        wait_until(what, WAIT, || {
+            sink.log.lock().unwrap().iter().any(|l| l.contains(what))
+        });
+    }
     let log = sink.log.lock().unwrap().clone();
     assert!(log.iter().any(|l| l.contains("Abs { x: 65535, y: 0")));
     assert!(log.iter().any(|l| l == "text h"));
