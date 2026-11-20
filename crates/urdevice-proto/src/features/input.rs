@@ -127,6 +127,7 @@ pub struct Input {
 }
 
 /// Nested types for [`Input`]: `input::Msg` is the oneof.
+#[allow(clippy::module_inception)]
 pub mod input {
     /// One remote-control message.
     #[derive(Clone, PartialEq, prost::Oneof)]

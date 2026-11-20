@@ -938,10 +938,8 @@ impl Service for Input {
         let Some(inner) = m.msg else { return Ok(()) };
         match (msg.access, inner) {
             (Access::Host(grant), Msg::Batch(b)) => self.shared.host_batch(grant, &b),
-            (Access::Host(grant), Msg::Hello(_)) => {
-                if grant.activity() != 0 {
-                    self.shared.enqueue(Job::Hello { grant });
-                }
+            (Access::Host(grant), Msg::Hello(_)) if grant.activity() != 0 => {
+                self.shared.enqueue(Job::Hello { grant });
             }
             (Access::Controller { .. }, Msg::Status(s)) => self.on_status(msg.peer, s),
             // Status sent to a host, or events sent to a controller: never act.
