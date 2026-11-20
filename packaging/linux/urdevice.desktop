@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=UrDevice
+Comment=Pair your devices and share clipboard, files, screen and input on your local network
+Exec=urdevice
+Icon=urdevice
+Terminal=false
+Categories=Utility;Network;

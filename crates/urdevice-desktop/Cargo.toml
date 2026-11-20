@@ -40,3 +40,18 @@ slint-build.workspace = true
 
 [lints]
 workspace = true
+
+# Debian package, built with `cargo deb -p urdevice-desktop` (see .github/workflows/release.yml).
+[package.metadata.deb]
+name = "urdevice"
+maintainer = "UrDevice contributors <noreply@users.noreply.github.com>"
+section = "utils"
+priority = "optional"
+depends = "$auto"
+extended-description = "Pair your phone and computers and share the clipboard, files, screen and input over your local network."
+assets = [
+    ["target/release/urdevice", "usr/bin/urdevice", "755"],
+    ["../../packaging/linux/urdevice.desktop", "usr/share/applications/urdevice.desktop", "644"],
+    ["../../assets/urdevice-icon-512.png", "usr/share/icons/hicolor/512x512/apps/urdevice.png", "644"],
+    ["../../LICENSE", "usr/share/doc/urdevice/copyright", "644"],
+]
