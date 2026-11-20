@@ -392,22 +392,26 @@ The core sends `DeviceStatus` (§6.3) when the session starts and when the level
 
 ## 10. Screen sharing (R12)
 
-**Pipeline:** capture → color conversion (to NV12, on the GPU where possible) → H.264 encode (low-latency settings: no B-frames, a keyframe every 2 s or on request, CBR/VBV) → video stream → decode → render.
+**Pipeline:** capture → color conversion (to NV12 or I420) → H.264 encode (low-latency settings: no B-frames, a keyframe every 2 s or on request, CBR) → video stream → decode → render.
 
 | Host | Capture | Encode |
 |---|---|---|
-| Windows | Windows.Graphics.Capture | Media Foundation hardware encoder → `openh264` |
-| macOS | ScreenCaptureKit (needs Screen Recording permission) | VideoToolbox |
-| Linux | xdg-desktop-portal ScreenCast → PipeWire (X11: XShm fallback) | VA-API → `openh264` |
-| Android | MediaProjection (system consent every session) → `MediaCodec` input Surface | MediaCodec |
+| Windows | Windows.Graphics.Capture, free-threaded frame pool, staging-texture copy | Media Foundation hardware encoder MFT (async) → `openh264` |
+| macOS | ScreenCaptureKit (needs Screen Recording permission) | `openh264` (VideoToolbox later, see below) |
+| Linux | xdg-desktop-portal ScreenCast → PipeWire (libpipewire loaded at run time); X11: `GetImage` per RandR monitor | `openh264` (VA-API later, see below) |
+| Android | MediaProjection (system consent every session) in a `mediaProjection` foreground service → `MediaCodec` input Surface | MediaCodec |
 
-**Framing:** `VideoFrame { pts_us, keyframe, data }` on one QUIC unidirectional stream per session. This keeps the frames in order. To keep latency low, the **sender** drops frames when the stream's send buffer holds more than about 2 frames. When the receiver falls behind, it asks for a keyframe with `RequestKeyframe`.
+The encoder abstraction is `urdevice-media` (`VideoEncoder`, `AutoEncoder`): it tries the OS hardware encoder first and falls back to `openh264` (built from its bundled BSD-2-Clause source), also at run time when a hardware encoder fails mid-stream. Colour conversion and scaling run on the CPU in one pass. VA-API (Linux) and VideoToolbox (macOS) are not built yet: VA-API needs slice-level bitstream code per driver and VideoToolbox needs a Mac to test on; both slot in behind `VideoEncoder` later (T9 hardening).
 
-**Adaptation (R12.4):** the sender reads quinn's RTT and congestion window every 500 ms. It moves down a ladder of bitrate × resolution steps (1080p30 at 8 Mbps → 720p30 at 4 Mbps → 540p24 at 2 Mbps) and moves back up after 5 s of stable conditions.
+On Linux, the portal session asks for one monitor with the cursor embedded and `persist_mode` "while the app runs": the dialog shows once per app run, and the restore token stays in memory only. The PipeWire stream offers BGRx/BGRA/RGBx/RGBA without a DMA-BUF modifier, so the compositor sends shared-memory buffers. libpipewire is loaded with `dlopen` because building against it would need its headers and libclang on every build machine.
 
-**Viewing:** on Android, `MediaCodec` decodes straight to a `SurfaceView`. On desktop, `openh264` (or a platform hardware decoder later) produces frames that are uploaded into a Slint `Image` through a `SharedPixelBuffer`. The UI shows a display picker (R12.6). When the viewer has input permission, clicks and keys in the view window are mapped to `Abs` pointer events on the selected display (R12.5).
+**Framing:** a `Start` (with the activity) makes the host open one QUIC unidirectional stream (`Direction::ToController`, kind 1, meta `StreamInfo`). Each frame is a big-endian `u32` length (1 byte to 4 MiB) and a `VideoFrame { pts_us, keyframe, data, width, height }`; size is set on keyframes. A second `Start` in the same activity switches the display: the old stream ends and a new one opens. To keep latency low, the **sender** keeps at most 2 encoded frames waiting for the network. A frame that does not fit is dropped, the encoder is asked for a keyframe, and every frame up to that keyframe is dropped too, so the viewer never gets a broken reference chain. Capture also skips frames before copying them while the queue is full. When the receiver falls behind or a frame does not decode, it drops to the next keyframe and sends `RequestKeyframe`; the host honours at most one per 250 ms.
 
-**Privacy:** the host shows a visible "Screen is being shared with X" indicator and a Stop button (R5.4). On Android, the system's own MediaProjection indicator also appears.
+**Adaptation (R12.4):** every 500 ms the host session feeds its sent and dropped frame counts to a ladder of bitrate × resolution steps (1080p30 at 8 Mbps → 720p30 at 4 Mbps → 540p24 at 2 Mbps). When 10 % or more of a window's frames were dropped (the QUIC send window was full: congestion or a slow link) it moves down one step, at most once a second; it moves back up after 5 s without drops. The drop count is used instead of reading quinn's RTT and congestion window, because a full send queue is the direct effect of both and the service cannot reach the connection. The viewer's `Start` can cap width, height, and frame rate.
+
+**Viewing:** on Android, `MediaCodec` decodes straight to a `TextureView` surface (a TextureView rather than a SurfaceView, so pinch-to-zoom can scale it); a tap maps back through the zoom to a position on the host's display. On desktop, `openh264` produces frames that are uploaded into a Slint `Image` through a `SharedPixelBuffer`. The UI shows a display picker (R12.6). When the viewer has input permission, clicks in the view are mapped to `Abs` pointer events on the selected display (R12.5); this needs the input service (#18) and is wired once that is merged.
+
+**Privacy:** screen is a watched capability, so every session is an activity: the host shows its "X is using Screen" indicator with Stop (R5.4), and Stop, Deny, or a disconnect ends capture at once. On Android, the system's own MediaProjection indicator also appears; on Windows 11, the yellow capture border. Frames are never stored or logged.
 
 ## 11. Localhost sharing (R13)
 

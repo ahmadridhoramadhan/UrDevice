@@ -197,7 +197,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 3. The host SHALL encode video as H.264 using hardware encoding when available and a software fallback otherwise.
 4. On the LAN, the stream SHOULD reach 1080p at 30 fps with glass-to-glass latency under 150 ms. It SHALL lower resolution or bitrate when bandwidth drops.
 5. WHERE the viewer also has input permission THEN the viewer SHALL be able to control the host from the viewing window (combining Requirements 9 and 12).
-6. On multi-monitor hosts, the viewer SHALL be able to choose which display to watch.
+6. On multi-monitor hosts, the viewer SHALL be able to choose which display to watch. WHERE the host is a Linux Wayland session THEN the host's ScreenCast portal dialog SHALL choose the display instead, because Wayland does not let apps list or pick monitors without it.
 7. Android → desktop: the desktop SHALL show the phone screen in a resizable window.
 
 ## Requirement 13: Localhost sharing
