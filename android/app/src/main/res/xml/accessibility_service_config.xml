@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  input (#19, R9.3): the service only dispatches gestures and global actions. It does not read the
+  screen (canRetrieveWindowContent is false) and is not declared an accessibility tool
+  (docs/spikes/t0.4-accessibility-play.md).
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/input_a11y_description"
+    android:notificationTimeout="100" />

@@ -188,7 +188,9 @@ fn remote_control_is_always_ask_and_shows_the_indicator() {
         r.ctl_events.statuses.lock().unwrap()[0],
         HostStatus {
             status: PermStatus::Ready,
-            backend: "fake".into()
+            backend: "fake".into(),
+            text_missing: None,
+            display: None,
         }
     );
 }

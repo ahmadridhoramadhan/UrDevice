@@ -171,6 +171,35 @@
             android:name=".host.ScreenCaptureService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
+        <!-- input (#19, R9.3): taps, swipes, Back, Home and Recents for a paired device the user
+             approved. Gestures only; it does not read the screen and is not declared an
+             accessibility tool (docs/spikes/t0.4-accessibility-play.md). -->
+        <service
+            android:name=".host.UrDeviceAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- input (#19, R10.3): the optional UrDevice keyboard that types what a desktop sends. -->
+        <service
+            android:name=".host.UrDeviceIme"
+            android:exported="true"
+            android:label="@string/input_ime_label"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/input_method" />
+        </service>
     </application>
 
 </manifest>

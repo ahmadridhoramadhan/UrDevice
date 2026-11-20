@@ -58,8 +58,8 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 - [x] T4.4 Android Presenter screen: buttons, volume-key capture, laser (gyroscope and touch), and the timer with vibration alerts. _Req: R9b_
 - [x] T4.5 Desktop laser overlay window on each OS, with the cursor-move fallback. _Req: R9b.3_
 - [x] T4.6 Android Keyboard screen: Unicode text, special keys, and modifier shortcuts. _Req: R10.1, R10.4_
-- [ ] T4.7 Android host: AccessibilityService for gestures and global actions, and the UrDevice IME for text. _Req: R9.3, R10.3_
-- [ ] T4.8 Desktop → desktop: remote-control window that captures pointer and keyboard input. _Req: R9.1, R10.2_
+- [x] T4.7 Android host: AccessibilityService for gestures and global actions, and the UrDevice IME for text. _Req: R9.3, R10.3_
+- [x] T4.8 Desktop → desktop: remote-control window that captures pointer and keyboard input. _Req: R9.1, R10.2_
 - [ ] T4.9 Measure input latency (95th percentile, target under 50 ms). _Req: R9.5_
 
 ## Phase 5: Media control

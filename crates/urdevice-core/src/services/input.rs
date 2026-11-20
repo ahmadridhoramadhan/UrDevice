@@ -41,8 +41,17 @@ use crate::permission::Capability;
 use crate::{CoreError, Result};
 
 pub use urdevice_proto::features::input::{
-    COORD_MAX, MAX_DELTA, MAX_EVENTS, MAX_TEXT_BYTES, SCROLL_NOTCH, button, modifier, usage,
+    COORD_MAX, MAX_DELTA, MAX_EVENTS, MAX_TEXT_BYTES, SCROLL_NOTCH, button, modifier, nav, usage,
 };
+
+mod capture;
+mod touch;
+
+pub use capture::{
+    KeyOut, KeyboardCapture, Mods, RELEASE_HOTKEY, RelativePointer, host_moves_by_distance,
+    normalize, scroll_units,
+};
+pub use touch::{Gesture, TouchHost, TouchSink, android_keycode, meta};
 
 /// Release 2 capabilities this module ships. Remote control is a Release 1
 /// capability, which is always listed, so this stays empty.
@@ -82,6 +91,12 @@ pub enum Missing {
     Uinput,
     /// Wayland: the user did not approve the RemoteDesktop portal dialog.
     Portal,
+    /// Android: the UrDevice accessibility service, which taps, swipes and
+    /// runs Back, Home and Recents, is not turned on in Android settings.
+    AccessibilityService,
+    /// Android: the UrDevice keyboard, which types the text, is not turned on
+    /// or not the keyboard in use.
+    InputMethod,
 }
 
 impl Missing {
@@ -91,6 +106,8 @@ impl Missing {
             Self::Accessibility => "accessibility",
             Self::Uinput => "uinput",
             Self::Portal => "portal",
+            Self::AccessibilityService => "accessibility_service",
+            Self::InputMethod => "input_method",
         }
     }
 
@@ -100,6 +117,8 @@ impl Missing {
             "accessibility" => Some(Self::Accessibility),
             "uinput" => Some(Self::Uinput),
             "portal" => Some(Self::Portal),
+            "accessibility_service" => Some(Self::AccessibilityService),
+            "input_method" => Some(Self::InputMethod),
             _ => None,
         }
     }
@@ -158,6 +177,35 @@ pub trait InputSink: Send + Sync {
 
     /// Type Unicode text as text, not as key codes (R10.4).
     fn text(&self, grant: &Grant, text: &str) -> Result<()>;
+
+    /// Run a system navigation action: one of [`nav`](urdevice_proto::features::input::nav).
+    /// Only Android hosts have them; the default says so.
+    fn nav(&self, grant: &Grant, action: u32) -> Result<()> {
+        let _ = (grant, action);
+        Err(CoreError::Unsupported {
+            feature: "navigation actions",
+            platform: self.name(),
+        })
+    }
+
+    /// What typing needs, apart from the pointer. Android: the UrDevice
+    /// keyboard. A desktop types with the same permission as the pointer.
+    fn text_status(&self) -> PermStatus {
+        self.permission_status()
+    }
+
+    /// The primary display in pixels, when the host knows it. The controller
+    /// shapes its remote-control window like it.
+    fn display_size(&self) -> Option<(u32, u32)> {
+        None
+    }
+
+    /// Drop what the adapter is building for this activity, before the core
+    /// releases the held keys and buttons: Stop must not finish a swipe the
+    /// user had only started.
+    fn cancel(&self, grant: &Grant) {
+        let _ = grant;
+    }
 }
 
 /// The presenter's laser dot on the host (design §9.3). Desktop draws a
@@ -176,6 +224,11 @@ pub struct HostStatus {
     pub status: PermStatus,
     /// The host's back-end name, display only.
     pub backend: String,
+    /// What typing lacks while the pointer works, when the host says so
+    /// (Android: the UrDevice keyboard is off).
+    pub text_missing: Option<Missing>,
+    /// The host's primary display in pixels, when it reported it.
+    pub display: Option<(u32, u32)>,
 }
 
 /// What the UI listens to. Called from core threads: hand work to the UI
@@ -490,6 +543,16 @@ impl Input {
         Ok(())
     }
 
+    /// Run a system navigation action on the host: one of
+    /// [`nav`](urdevice_proto::features::input::nav) (Back, Home, Recents).
+    /// Android hosts only; a desktop host ignores it (R9.3).
+    pub fn nav(&self, host: DeviceId, action: u32) -> Result<()> {
+        if action >= wire::nav::COUNT {
+            return Err(CoreError::InvalidInput("unknown navigation action".into()));
+        }
+        self.queue(host, Kind::Nav(wire::Nav { action }))
+    }
+
     /// Show the presenter's laser at `x`, `y` (0.0 to 1.0 across and down the
     /// host's primary display), or hide it with `on = false`.
     pub fn laser(&self, host: DeviceId, x: f32, y: f32, on: bool) -> Result<()> {
@@ -519,11 +582,15 @@ impl Input {
             return Ok(());
         }
         let activity = session.activity;
-        let pending = std::mem::take(&mut session.pending);
-        // Keep the order: the moves before a click are sent before it, and
-        // the lock is held so a flush cannot slip in between.
-        send_events(ctx, host, activity, pending);
-        send_reliable(ctx, host, activity, vec![event]);
+        let mut batch = std::mem::take(&mut session.pending);
+        // Keep the order: the moves before a click go with it on the control
+        // stream. Datagrams and the stream do not keep their order between
+        // them, and a click must land where the user stopped. The lock is held
+        // so a flush cannot slip in between.
+        batch.push(event);
+        for chunk in batch.chunks(MAX_EVENTS) {
+            send_reliable(ctx, host, activity, chunk.to_vec());
+        }
         Ok(())
     }
 }
@@ -669,9 +736,19 @@ fn worker(shared: &Weak<Shared>, rx: &mpsc::Receiver<Job>) {
 
 fn hello(shared: &Shared, grant: &Grant) {
     let Some(ctx) = shared.ctx.get() else { return };
-    let (status, backend) = match shared.sink.get() {
-        Some(sink) => (sink.prepare(grant), sink.name()),
-        None => (PermStatus::Unavailable, ""),
+    let (status, backend, text, size) = match shared.sink.get() {
+        Some(sink) => (
+            sink.prepare(grant),
+            sink.name(),
+            sink.text_status(),
+            sink.display_size(),
+        ),
+        None => (PermStatus::Unavailable, "", PermStatus::Ready, None),
+    };
+    let text_missing = match (status, text) {
+        // A host that is not ready at all says so with `status`.
+        (PermStatus::Ready, PermStatus::Missing(m)) => Some(m),
+        _ => None,
     };
     let (state, permission) = match status {
         PermStatus::Ready => (wire::state::READY, ""),
@@ -682,12 +759,18 @@ fn hello(shared: &Shared, grant: &Grant) {
         state,
         permission: permission.into(),
         backend: backend.into(),
+        width: size.map_or(0, |s| s.0),
+        height: size.map_or(0, |s| s.1),
+        text_permission: text_missing.map_or("", Missing::as_str).into(),
     }));
     let _ = ctx.send(grant.peer(), Direction::ToController, grant.activity(), &m);
-    if let PermStatus::Missing(missing) = status
-        && let Some(e) = shared.events.get()
-    {
-        e.missing_permission(grant.peer(), missing);
+    if let Some(e) = shared.events.get() {
+        if let PermStatus::Missing(missing) = status {
+            e.missing_permission(grant.peer(), missing);
+        }
+        if let Some(missing) = text_missing {
+            e.missing_permission(grant.peer(), missing);
+        }
     }
 }
 
@@ -752,6 +835,13 @@ fn apply_events(shared: &Shared, grant: &Grant, events: Vec<Event>) {
                     && let Err(e) = s.text(grant, &t.text)
                 {
                     tracing::debug!(error = %e, len = t.text.len(), "text not injected");
+                }
+            }
+            Kind::Nav(n) => {
+                if let Some(s) = &sink
+                    && let Err(e) = s.nav(grant, n.action)
+                {
+                    tracing::debug!(error = %e, "navigation action not run");
                 }
             }
             Kind::Laser(l) => {
@@ -834,6 +924,7 @@ fn release(shared: &Shared, peer: DeviceId, activity: Option<u64>) {
     let sink = shared.sink.get();
     for h in taken {
         if let Some(s) = &sink {
+            s.cancel(&h.grant);
             for k in h.keys.iter().rev() {
                 let _ = s.key(
                     &h.grant,
@@ -1022,11 +1113,14 @@ impl Input {
             _ => PermStatus::Unavailable,
         };
         if let Some(e) = self.shared.events.get() {
+            let display = (s.width > 0 && s.height > 0).then_some((s.width, s.height));
             e.host_status(
                 peer,
                 &HostStatus {
                     status,
                     backend: s.backend,
+                    text_missing: Missing::parse(&s.text_permission),
+                    display,
                 },
             );
         }

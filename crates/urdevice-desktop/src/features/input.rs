@@ -12,7 +12,9 @@
 //!   needed and has a button for the settings screen (macOS Accessibility, the
 //!   Wayland approval) or for the one-time `uinput` rule.
 //!
-//! Controlling another device from this desktop is #19.
+//! Controlling another device from this desktop (#19) is the remote-control
+//! window in [`remote`]: it captures the pointer and keyboard, with
+//! Ctrl+Alt+G to release them.
 
 use std::cell::RefCell;
 use std::sync::Arc;
@@ -24,18 +26,25 @@ use urdevice_core::Capability;
 use urdevice_core::identity::DeviceId;
 use urdevice_core::services::Grant;
 use urdevice_core::services::input::{
-    Input as Service, InputEvents, InputSink, Missing, Overlay, PointerEvent,
+    HostStatus, Input as Service, InputEvents, InputSink, Missing, Overlay, PointerEvent,
 };
 use urdevice_platform::features::input::{
     DesktopInput, install_uinput_rule, open_permission_settings, sink,
 };
 
+use urdevice_core::node::PeerView;
+
 use super::{Feature, FeatureCtx, TileSpec};
-use crate::ui::LaserWindow;
+use crate::ui::{InputFeature, LaserWindow};
+
+mod remote;
 
 pub(crate) struct Input;
 
 thread_local! {
+    /// The name of the device the view was opened for, for the window title.
+    static LAST_NAME: RefCell<String> = const { RefCell::new(String::new()) };
+
     /// The laser window. Slint windows live on the UI thread.
     static LASER: RefCell<Option<LaserWindow>> = const { RefCell::new(None) };
 }
@@ -123,6 +132,20 @@ struct Events {
 }
 
 impl InputEvents for Events {
+    fn session(&self, peer: DeviceId, active: bool) {
+        let _ = slint::invoke_from_event_loop(move || remote::session(peer, active));
+    }
+
+    fn host_status(&self, peer: DeviceId, status: &HostStatus) {
+        let status = status.clone();
+        let _ = slint::invoke_from_event_loop(move || remote::host_status(peer, status));
+    }
+
+    fn refused(&self, peer: DeviceId, reason: &str) {
+        let reason = reason.to_owned();
+        let _ = slint::invoke_from_event_loop(move || remote::refused(peer, &reason));
+    }
+
     fn missing_permission(&self, _peer: DeviceId, missing: Missing) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -149,6 +172,11 @@ fn explain(missing: Missing) -> (&'static str, &'static str) {
         Missing::Portal => (
             "Another device wants to control this computer, but the desktop's remote-control approval was not given. Approve it when your desktop asks, or review the saved approval in your desktop's privacy settings, then start remote control again.",
             "Open privacy settings",
+        ),
+        // Android settings; a desktop host never reports them.
+        Missing::AccessibilityService | Missing::InputMethod => (
+            "Another device wants to control this computer, but the system needs a permission first.",
+            "Open settings",
         ),
     }
 }
@@ -198,10 +226,39 @@ impl Feature for Input {
         ]
     }
 
+    fn has_view(&self) -> bool {
+        true
+    }
+
+    fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
+        let (Some(w), Some(svc), Some(id)) = (
+            ctx.window.upgrade(),
+            ctx.node.service::<Service>(),
+            DeviceId::from_hex(&peer.id),
+        ) else {
+            return;
+        };
+        w.global::<InputFeature>()
+            .set_peer_id(peer.id.as_str().into());
+        LAST_NAME.with(|n| *n.borrow_mut() = peer.name.clone());
+        remote::open(svc, id, &peer.name);
+    }
+
     fn start(&self, ctx: &FeatureCtx) {
         let Some(svc) = ctx.node.service::<Service>() else {
             return;
         };
+        if let Some(w) = ctx.window.upgrade() {
+            let (window, svc) = (ctx.window.clone(), svc.clone());
+            w.global::<InputFeature>().on_open_window(move || {
+                let Some(w) = window.upgrade() else { return };
+                let Some(id) = DeviceId::from_hex(&w.global::<InputFeature>().get_peer_id()) else {
+                    return;
+                };
+                let name = LAST_NAME.with(|n| n.borrow().clone());
+                remote::open(svc.clone(), id, &name);
+            });
+        }
         let secrets = Arc::new(urdevice_platform::DesktopSecretStore::new(
             &urdevice_platform::data_dir(),
         ));

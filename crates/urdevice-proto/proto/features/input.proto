@@ -29,6 +29,7 @@ message Event {
     Key key = 5;
     Text text = 6;
     Laser laser = 7;
+    Nav nav = 8;
   }
 }
 
@@ -40,10 +41,15 @@ message Key    { uint32 usage = 1; bool down = 2; uint32 modifiers = 3; } // HID
 message Text   { string text = 1; }                                   // UTF-8, at most 4096 bytes, no control characters
 message Laser  { uint32 x = 1; uint32 y = 2; bool on = 3; }          // 0..65535
 
+message Nav    { uint32 action = 1; }                                 // 0 back, 1 home, 2 recents (Android hosts)
+
 message Hello {}
 
 message Status {
   uint32 state = 1;       // 0 ready, 1 missing permission, 2 unavailable
   string permission = 2;  // accessibility, uinput, portal
   string backend = 3;     // display only
+  uint32 width = 4;       // primary display in pixels, 0 unknown
+  uint32 height = 5;
+  string text_permission = 6; // empty when text works; input_method: the UrDevice keyboard is off
 }

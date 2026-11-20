@@ -50,4 +50,31 @@
     <string name="input_cut">Cut</string>
     <string name="input_undo">Undo</string>
     <string name="input_select_all">Select all</string>
+
+    <!-- Remote control of this phone (#19) -->
+    <string name="input_a11y_description">Lets a paired computer you approve send taps, swipes, Back, Home and Recents to this phone. It does not read your screen.</string>
+    <string name="input_ime_label">UrDevice keyboard</string>
+    <string name="input_ime_panel">UrDevice types what your paired computer sends here.</string>
+    <string name="input_ime_switch">Switch keyboard</string>
+    <string name="input_host_title">Let a paired computer control this phone</string>
+    <string name="input_host_service_on">Accessibility service: on</string>
+    <string name="input_host_service_off">Accessibility service: off. Taps, swipes and Back, Home, Recents need it.</string>
+    <string name="input_host_ime_on">UrDevice keyboard: in use</string>
+    <string name="input_host_ime_off">UrDevice keyboard: not in use. Typing from a computer needs it.</string>
+    <string name="input_host_enable_service">Turn on the service</string>
+    <string name="input_host_enable_keyboard">Turn on the keyboard</string>
+    <string name="input_host_pick_keyboard">Use the keyboard</string>
+    <string name="input_host_restricted">If Android says the setting is restricted, open UrDevice\'s app info, tap the three dots, choose Allow restricted settings, and try again.</string>
+    <string name="input_host_app_info">Open app info</string>
+    <string name="input_host_advanced_protection">Not available while Android Advanced Protection is on.</string>
+    <string name="input_host_sensitive">Android may ignore taps on login and payment screens.</string>
+    <string name="input_disclosure_title">Let your paired computer control this phone?</string>
+    <string name="input_disclosure_body">UrDevice uses Android\'s Accessibility service to send taps and swipes to this phone while a remote-control session is running. A session starts only when you approve it on this phone. UrDevice does not use this service to read, record, or send what is on your screen. Commands come only from your paired devices over your local network. While a session runs, this phone shows who is in control and a Stop button. You can turn the service off at any time in Android settings.</string>
+    <string name="input_disclosure_agree">Agree</string>
+    <string name="input_disclosure_not_now">Not now</string>
+    <string name="input_host_notif_title">A paired device wants to control this phone</string>
+    <string name="input_host_notif_service">Turn on the UrDevice accessibility service first.</string>
+    <string name="input_host_notif_keyboard">Turn on and select the UrDevice keyboard to let it type.</string>
+    <string name="input_missing_accessibility_service">%1$s needs the UrDevice accessibility service turned on in Android settings first.</string>
+    <string name="input_missing_input_method">%1$s needs the UrDevice keyboard turned on and in use before it can type. Taps and Back, Home, Recents work.</string>
 </resources>
