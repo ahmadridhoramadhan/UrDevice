@@ -32,6 +32,10 @@ interface Feature {
     @Composable
     fun Screen(peer: FfiPeer, tile: String) {}
 
+    /** Rows this feature adds to the "This device" screen, below the permissions. */
+    @Composable
+    fun ThisDevice() {}
+
     /** Settings rows this feature adds to the Settings screen (for example a global switch). */
     @Composable
     fun Settings() {}

@@ -156,6 +156,8 @@ fun ThisDeviceScreen(snap: FfiSnapshot, onSet: (String, FfiMode, Boolean) -> Uni
                 else onSet(p.capability, m, false)
             }
         }
+        // Feature sections for this device, for example shared localhost ports.
+        allFeatures.forEach { it.ThisDevice() }
     }
     confirm?.let { cap ->
         val term = cap == "term.v1"

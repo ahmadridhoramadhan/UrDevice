@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Localhost sharing and Expose on LAN (#22). -->
+<resources>
+    <string name="tunnel_channel">Open on the LAN</string>
+    <string name="tunnel_title">Localhost on %1$s</string>
+    <string name="tunnel_none">%1$s has not shared any ports.</string>
+    <string name="tunnel_no_label">No label</string>
+    <string name="tunnel_from"> · from %1$s:%2$d</string>
+    <string name="tunnel_waiting">Waiting for approval…</string>
+    <string name="tunnel_open_browser">Open in browser</string>
+    <string name="tunnel_hint">The local port is the same as on %1$s. If that port is taken, UrDevice uses the next free port.</string>
+    <plurals name="tunnel_connections">
+        <item quantity="one">%d connection</item>
+        <item quantity="other">%d connections</item>
+    </plurals>
+    <string name="tunnel_denied">Localhost is set to Deny on %1$s.</string>
+    <string name="tunnel_declined">%1$s declined.</string>
+    <string name="tunnel_timeout">%1$s did not answer.</string>
+    <string name="tunnel_offline">%1$s is not connected.</string>
+    <string name="tunnel_bind">No free local port.</string>
+    <string name="tunnel_refused_port">%1$s does not share this port any more.</string>
+    <string name="tunnel_failed">Could not open (%1$s).</string>
+
+    <string name="tunnel_shared_title">Shared localhost ports</string>
+    <string name="tunnel_shared_sub">Every connected device can open these ports, subject to the Localhost permission above.</string>
+    <string name="tunnel_shared_sub_deny">Every connected device can open these ports, subject to the Localhost permission above. It is set to Deny now, so no device can open them yet.</string>
+    <string name="tunnel_no_ports">No ports shared yet.</string>
+    <string name="tunnel_expose">Expose on LAN</string>
+    <string name="tunnel_lan_off">Off</string>
+    <string name="tunnel_lan_hour">1 hour</string>
+    <string name="tunnel_lan_always_on">Always on</string>
+    <string name="tunnel_lan_until">Open on LAN until %1$s</string>
+    <string name="tunnel_lan_always">Always open on LAN</string>
+    <string name="tunnel_lan_waiting">Waiting for a network to open it on the LAN</string>
+    <string name="tunnel_unshare">Stop sharing</string>
+    <string name="tunnel_port">Port</string>
+    <string name="tunnel_label">Label (optional)</string>
+    <string name="tunnel_share">Share port</string>
+    <string name="tunnel_bad_port">Enter a port from 1 to 65535.</string>
+    <string name="tunnel_in_use">In use now</string>
+    <string name="tunnel_incoming">%1$s uses localhost:%2$d · %3$s</string>
+    <string name="tunnel_lan_warn_title">Open localhost:%1$d on the LAN?</string>
+    <string name="tunnel_lan_warn_body">localhost:%1$d will be open to every device on this network, including unpaired ones, without UrDevice encryption.</string>
+    <string name="tunnel_lan_hour_note">Turns off by itself after 1 hour.</string>
+    <string name="tunnel_lan_ack">I understand. Keep it open until I turn it off, also after a restart.</string>
+    <string name="tunnel_keep_open">Keep open</string>
+    <string name="tunnel_open_hour">Open for 1 hour</string>
+    <string name="tunnel_lan_banner">Open on the LAN: localhost %1$s</string>
+    <string name="tunnel_lan_notif_body">Every device on this network can reach these ports. Tap to change.</string>
+</resources>

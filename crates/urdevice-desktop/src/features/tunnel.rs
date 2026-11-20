@@ -171,9 +171,10 @@ impl Tunnel {
                     Some(t) => match &t.status {
                         TunnelStatus::Opening => ("opening", SharedString::new()),
                         TunnelStatus::Open => ("open", stats(&g, t)),
-                        TunnelStatus::Failed(why) => {
-                            ("failed", g.invoke_reason_text(why.into(), host.clone().into()))
-                        }
+                        TunnelStatus::Failed(why) => (
+                            "failed",
+                            g.invoke_reason_text(why.into(), host.clone().into()),
+                        ),
                     },
                 };
                 if let Some(t) = t
