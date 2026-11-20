@@ -582,11 +582,15 @@ impl Input {
             return Ok(());
         }
         let activity = session.activity;
-        let pending = std::mem::take(&mut session.pending);
-        // Keep the order: the moves before a click are sent before it, and
-        // the lock is held so a flush cannot slip in between.
-        send_events(ctx, host, activity, pending);
-        send_reliable(ctx, host, activity, vec![event]);
+        let mut batch = std::mem::take(&mut session.pending);
+        // Keep the order: the moves before a click go with it on the control
+        // stream. Datagrams and the stream do not keep their order between
+        // them, and a click must land where the user stopped. The lock is held
+        // so a flush cannot slip in between.
+        batch.push(event);
+        for chunk in batch.chunks(MAX_EVENTS) {
+            send_reliable(ctx, host, activity, chunk.to_vec());
+        }
         Ok(())
     }
 }
