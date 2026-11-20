@@ -52,12 +52,12 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 4: Remote control and keyboard
 
-- [ ] T4.1 Input protocol (Pointer, Key, Text, Laser) over datagrams, with a fallback to the control stream. _Req: R9, R10_
-- [ ] T4.2 Desktop `InputSink`: Windows SendInput, macOS CGEvent (plus the Accessibility permission check and prompt), X11 XTest, the Wayland RemoteDesktop portal with a saved restore token, and the `uinput` fallback with its udev-rule setup. _Req: R9.2, R9.4_
-- [ ] T4.3 Android Mousepad screen: gestures, acceleration and sensitivity settings, keep-screen-on. _Req: R9a_
-- [ ] T4.4 Android Presenter screen: buttons, volume-key capture, laser (gyroscope and touch), and the timer with vibration alerts. _Req: R9b_
-- [ ] T4.5 Desktop laser overlay window on each OS, with the cursor-move fallback. _Req: R9b.3_
-- [ ] T4.6 Android Keyboard screen: Unicode text, special keys, and modifier shortcuts. _Req: R10.1, R10.4_
+- [x] T4.1 Input protocol (Pointer, Key, Text, Laser) over datagrams, with a fallback to the control stream. _Req: R9, R10_
+- [x] T4.2 Desktop `InputSink`: Windows SendInput, macOS CGEvent (plus the Accessibility permission check and prompt), X11 XTest, the Wayland RemoteDesktop portal with a saved restore token, and the `uinput` fallback with its udev-rule setup. _Req: R9.2, R9.4_
+- [x] T4.3 Android Mousepad screen: gestures, acceleration and sensitivity settings, keep-screen-on. _Req: R9a_
+- [x] T4.4 Android Presenter screen: buttons, volume-key capture, laser (gyroscope and touch), and the timer with vibration alerts. _Req: R9b_
+- [x] T4.5 Desktop laser overlay window on each OS, with the cursor-move fallback. _Req: R9b.3_
+- [x] T4.6 Android Keyboard screen: Unicode text, special keys, and modifier shortcuts. _Req: R10.1, R10.4_
 - [ ] T4.7 Android host: AccessibilityService for gestures and global actions, and the UrDevice IME for text. _Req: R9.3, R10.3_
 - [ ] T4.8 Desktop → desktop: remote-control window that captures pointer and keyboard input. _Req: R9.1, R10.2_
 - [ ] T4.9 Measure input latency (95th percentile, target under 50 ms). _Req: R9.5_

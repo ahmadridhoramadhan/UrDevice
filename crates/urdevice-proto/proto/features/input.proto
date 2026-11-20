@@ -1,0 +1,49 @@
+// Remote control (#18, #19, design §9.3): messages of ServiceId::INPUT.
+// Mirrors crates/urdevice-proto/src/features/input.rs. Never reuse or
+// renumber a field.
+syntax = "proto3";
+package urdevice.input;
+
+// Control message (reliable). Batches here carry events whose loss would leave
+// a button stuck or drop typed text: Button, Key, Text.
+message Input {
+  oneof msg {
+    Batch batch = 1;    // controller -> host (Direction ToHost)
+    Hello hello = 2;    // controller -> host
+    Status status = 3;  // host -> controller (Direction ToController)
+  }
+}
+
+// A datagram payload is a Batch directly: Move, Abs, Scroll, Laser.
+// At most 64 events; the host drops the rest.
+message Batch {
+  repeated Event events = 1;
+}
+
+message Event {
+  oneof kind {
+    Move move = 1;
+    Abs abs = 2;
+    Button button = 3;
+    Scroll scroll = 4;
+    Key key = 5;
+    Text text = 6;
+    Laser laser = 7;
+  }
+}
+
+message Move   { sint32 dx = 1; sint32 dy = 2; }                      // pixels, |v| <= 20000
+message Abs    { uint32 x = 1; uint32 y = 2; uint32 display = 3; }    // 0..65535, display 0 = primary
+message Button { uint32 button = 1; bool down = 2; }                  // 0 left, 1 right, 2 middle, 3 back, 4 forward
+message Scroll { sint32 dx = 1; sint32 dy = 2; }                      // 120 = one notch; down/right positive
+message Key    { uint32 usage = 1; bool down = 2; uint32 modifiers = 3; } // HID page 0x07; modifiers: 1 ctrl, 2 shift, 4 alt, 8 meta
+message Text   { string text = 1; }                                   // UTF-8, at most 4096 bytes, no control characters
+message Laser  { uint32 x = 1; uint32 y = 2; bool on = 3; }          // 0..65535
+
+message Hello {}
+
+message Status {
+  uint32 state = 1;       // 0 ready, 1 missing permission, 2 unavailable
+  string permission = 2;  // accessibility, uinput, portal
+  string backend = 3;     // display only
+}

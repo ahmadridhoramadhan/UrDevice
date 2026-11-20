@@ -825,6 +825,9 @@ impl Ui {
                 if let Err(e) = ui.node.reset_identity() {
                     ui.toast(e.to_string().into());
                 }
+                urdevice_platform::features::input::forget_saved_tokens(
+                    &urdevice_platform::DesktopSecretStore::new(&urdevice_platform::data_dir()),
+                );
             });
         }
         {
@@ -835,6 +838,10 @@ impl Ui {
                     ui.toast(e.to_string().into());
                     return;
                 }
+                // The saved remote-control approval is a secret too (#18).
+                urdevice_platform::features::input::forget_saved_tokens(
+                    &urdevice_platform::DesktopSecretStore::new(&urdevice_platform::data_dir()),
+                );
                 if let Some(w) = ui.window.upgrade() {
                     w.set_onboarding(true);
                     w.set_onboarding_step(1);
