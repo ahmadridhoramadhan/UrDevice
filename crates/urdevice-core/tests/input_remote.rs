@@ -185,15 +185,21 @@ fn a_desktop_taps_swipes_and_uses_back_home_recents_on_android() {
     }
     settle();
     r.ctl.button(id, button::LEFT, false).unwrap();
-    wait_until("swipe", WAIT, || {
-        phone.log().iter().any(|d| match d {
-            Did::Gesture(Gesture::Swipe { points, .. }) => {
-                points.first().is_some_and(|p| p.1 > 1700)
-                    && points.last().is_some_and(|p| p.1 < 1100)
-            }
-            _ => false,
-        })
-    });
+    let swiped = |d: &Did| match d {
+        Did::Gesture(Gesture::Swipe { points, .. }) => {
+            points.first().is_some_and(|p| p.1 > 1700) && points.last().is_some_and(|p| p.1 < 1100)
+        }
+        _ => false,
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(WAIT);
+    while !phone.log().iter().any(swiped) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "no swipe; the phone saw {:?}",
+            phone.log()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
 
     // Back, Home, Recents, then a right click is Back as well.
     for a in [nav::BACK, nav::HOME, nav::RECENTS] {
