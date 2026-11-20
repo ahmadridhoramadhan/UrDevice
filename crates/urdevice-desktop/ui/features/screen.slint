@@ -1,11 +1,36 @@
-// Screen sharing (#21): the desktop feature view.
+// Screen sharing (#21, design §10): the desktop viewer.
 // Rust side: src/features/screen.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Btn, Card, Muted } from "../widgets.slint";
+import { Theme } from "../theme.slint";
 
 // State and callbacks shared with src/features/screen.rs.
 export global ScreenFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    // 0 idle, 1 asking the other device, 2 waiting for the first frame,
+    // 3 showing the screen.
+    in property <int> state;
+    // Why the last attempt stopped (0 none, 1 declined, 2 denied, 3 offline,
+    // 4 the device cannot share its screen, 5 the OS dialog was refused,
+    // 6 capture failed, 7 ended, 8 timed out).
+    in property <int> message-kind;
+    // Display names for the picker (R12.6), and the one shown.
+    in property <[string]> displays;
+    in property <int> display-index;
+    // The newest decoded frame and its size in pixels.
+    in property <image> frame;
+    in property <int> frame-width;
+    in property <int> frame-height;
+    // The other device also allows remote control (R12.5).
+    in property <bool> input-allowed;
+
+    callback start();
+    callback stop();
+    callback pick-display(int);
+    // Pointer on the picture: position as a fraction of the picture (0..1),
+    // and the event: 0 move, 1 press, 2 release. Button: 0 left, 1 right,
+    // 2 middle.
+    callback pointer(float, float, int, int);
 }
 
 export component ScreenView inherits VerticalLayout {
@@ -13,5 +38,93 @@ export component ScreenView inherits VerticalLayout {
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        if ScreenFeature.state == 0: Btn {
+            text: @tr("View screen");
+            kind: 0;
+            clicked => { ScreenFeature.start(); }
+        }
+        if ScreenFeature.state != 0: Btn {
+            text: @tr("Stop");
+            kind: 2;
+            clicked => { ScreenFeature.stop(); }
+        }
+        if ScreenFeature.state >= 2 && ScreenFeature.displays.length > 1: HorizontalLayout {
+            spacing: 6px;
+            for name[i] in ScreenFeature.displays: Btn {
+                text: name;
+                kind: ScreenFeature.display-index == i ? 0 : 1;
+                clicked => { ScreenFeature.pick-display(i); }
+            }
+        }
+    }
+
+    if ScreenFeature.state == 1: Muted {
+        text: @tr("Waiting for {} to allow screen sharing…", root.peer-name);
+    }
+    if ScreenFeature.state == 2: Muted {
+        text: @tr("Starting the screen of {}…", root.peer-name);
+    }
+    if ScreenFeature.state == 0 && ScreenFeature.message-kind != 0: Muted {
+        text: [
+            "",
+            @tr("{} did not allow screen sharing.", root.peer-name),
+            @tr("Screen sharing is turned off on {}.", root.peer-name),
+            @tr("{} is offline.", root.peer-name),
+            @tr("{} cannot share its screen.", root.peer-name),
+            @tr("Screen sharing was not allowed in the system dialog on {}.", root.peer-name),
+            @tr("The screen of {} could not be captured.", root.peer-name),
+            @tr("Screen sharing ended."),
+            @tr("{} did not answer in time.", root.peer-name),
+        ][ScreenFeature.message-kind];
+    }
+    if ScreenFeature.state == 3 && !ScreenFeature.input-allowed: Muted {
+        text: @tr("View only. Remote control is not allowed by {}.", root.peer-name);
+    }
+
+    // The picture, scaled to fit and centred; the window is resizable (R12.7).
+    if ScreenFeature.state >= 2: Card {
+        vertical-stretch: 1;
+        min-height: 240px;
+        clip: true;
+        background: #000;
+        // Where the picture lands inside the card (image-fit: contain).
+        property <float> scale: ScreenFeature.frame-width <= 0 || ScreenFeature.frame-height <= 0 ? 1
+            : min(self.width / 1px / ScreenFeature.frame-width, self.height / 1px / ScreenFeature.frame-height);
+        property <length> pic-w: ScreenFeature.frame-width * self.scale * 1px;
+        property <length> pic-h: ScreenFeature.frame-height * self.scale * 1px;
+        property <length> pic-x: (self.width - self.pic-w) / 2;
+        property <length> pic-y: (self.height - self.pic-h) / 2;
+        Image {
+            x: parent.pic-x;
+            y: parent.pic-y;
+            width: parent.pic-w;
+            height: parent.pic-h;
+            source: ScreenFeature.frame;
+            image-fit: fill;
+        }
+        TouchArea {
+            x: parent.pic-x;
+            y: parent.pic-y;
+            width: parent.pic-w;
+            height: parent.pic-h;
+            enabled: ScreenFeature.input-allowed;
+            mouse-cursor: ScreenFeature.input-allowed ? MouseCursor.crosshair : MouseCursor.default;
+            moved => {
+                ScreenFeature.pointer(self.mouse-x / self.width, self.mouse-y / self.height, 0, 0);
+            }
+            pointer-event(e) => {
+                if e.kind == PointerEventKind.down || e.kind == PointerEventKind.up {
+                    ScreenFeature.pointer(
+                        self.mouse-x / self.width,
+                        self.mouse-y / self.height,
+                        e.kind == PointerEventKind.down ? 1 : 2,
+                        e.button == PointerEventButton.right ? 1 : e.button == PointerEventButton.middle ? 2 : 0);
+                }
+            }
+        }
+    }
 }

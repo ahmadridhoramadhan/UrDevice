@@ -70,12 +70,12 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 6: Screen sharing
 
-- [ ] T6.1 `urdevice-media`: encoder abstraction with low-latency H.264 settings, hardware back-ends, and the `openh264` fallback. _Req: R12.3_
-- [ ] T6.2 Desktop `ScreenSource`: Windows Graphics Capture, ScreenCaptureKit, the PipeWire portal, and the X11 fallback, plus the display list. _Req: R12.2, R12.6_
-- [ ] T6.3 Video streaming: frame format, sender-side frame dropping, keyframe requests, and the adaptive bitrate ladder. _Req: R12.4_
-- [ ] T6.4 Desktop viewer: decode into a Slint image, display picker, and input forwarding when allowed. _Req: R12.5–R12.7_
-- [ ] T6.5 Android host: MediaProjection with the foreground-service type, MediaCodec Surface encoding. _Req: R12.2, R12.3_
-- [ ] T6.6 Android viewer: MediaCodec to SurfaceView, plus pinch-to-zoom and touch-to-pointer mapping. _Req: R12.1, R12.5_
+- [x] T6.1 `urdevice-media`: encoder abstraction with low-latency H.264 settings, hardware back-ends, and the `openh264` fallback. _Req: R12.3_
+- [x] T6.2 Desktop `ScreenSource`: Windows Graphics Capture, ScreenCaptureKit, the PipeWire portal, and the X11 fallback, plus the display list. _Req: R12.2, R12.6_
+- [x] T6.3 Video streaming: frame format, sender-side frame dropping, keyframe requests, and the adaptive bitrate ladder. _Req: R12.4_
+- [x] T6.4 Desktop viewer: decode into a Slint image, display picker, and input forwarding when allowed (the hook is in place; it sends events once the input service, #18, is merged). _Req: R12.5–R12.7_
+- [x] T6.5 Android host: MediaProjection with the foreground-service type, MediaCodec Surface encoding. _Req: R12.2, R12.3_
+- [x] T6.6 Android viewer: MediaCodec to a TextureView surface (design §10), plus pinch-to-zoom and touch-to-pointer mapping (sent once #18 is merged). _Req: R12.1, R12.5_
 - [ ] T6.7 Measure screen latency (target under 150 ms at 1080p30). _Req: R12.4_
 
 ## Phase 7: Localhost sharing

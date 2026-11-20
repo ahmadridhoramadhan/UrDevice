@@ -90,6 +90,23 @@ windows = "0.62"
 proptest = { version = "1", default-features = false, features = ["std"] }
 rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
 
+# Screen sharing (#21): the software H.264 encoder and decoder, built from
+# the bundled OpenH264 source (BSD-2-Clause).
+openh264 = "0.9"
+# Linux capture: the ScreenCast portal, and libpipewire loaded at run time.
+# All three are already in the tree (rfd, x11rb, zbus).
+ashpd = { version = "0.11", default-features = false, features = ["tokio"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+libloading = "0.8"
+# macOS capture: ScreenCaptureKit and the CoreMedia/CoreVideo buffers it
+# hands over.
+block2 = "0.6"
+dispatch2 = { version = "0.3", default-features = false, features = ["std", "objc2"] }
+objc2-screen-capture-kit = { version = "0.3", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-media", "objc2-core-foundation", "objc2-core-graphics"] }
+objc2-core-media = { version = "0.3", default-features = false, features = ["std", "CMSampleBuffer", "CMTime", "objc2-core-video"] }
+objc2-core-video = { version = "0.3", default-features = false, features = ["std", "CVBase", "CVPixelBuffer", "CVImageBuffer", "CVBuffer", "CVReturn"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGDirectDisplay", "CGWindow"] }
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 

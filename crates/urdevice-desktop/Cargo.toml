@@ -24,6 +24,7 @@ tracing.workspace = true
 slint = { workspace = true, features = ["unstable-winit-030"] }
 rfd.workspace = true
 urdevice-core = { workspace = true, features = ["mdns"] }
+urdevice-media.workspace = true
 urdevice-platform.workspace = true
 urdevice-proto.workspace = true
 
