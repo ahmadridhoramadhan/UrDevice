@@ -150,6 +150,12 @@ impl Identity {
     pub fn private_key(&self) -> PrivateKeyDer<'static> {
         PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(self.key_pkcs8.clone()))
     }
+
+    /// The X25519 key for the Bluetooth LE channel, derived from this key
+    /// (design §4.1, §8.2).
+    pub fn ble_static(&self) -> Result<crate::services::bluetooth::noise::StaticKey> {
+        crate::services::bluetooth::noise::StaticKey::derive(&self.key_pkcs8)
+    }
 }
 
 #[cfg(test)]

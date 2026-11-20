@@ -88,10 +88,10 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 8: Bluetooth fallback
 
-- [ ] T8.1 Interface watcher and PAN path selection, with QUIC migration and reconnect. _Req: R6.1, R6.5_
-- [ ] T8.2 BLE channel: Android GATT server and `btleplug` central, Noise IK with the pairing-time static keys, MTU framing and reassembly. _Req: R6.2, R6.3_
-- [ ] T8.3 Routing of only the allowed features over BLE, the BLE banner and grey "Not available over Bluetooth" tiles in the device view, and the guide to Bluetooth tethering settings. _Req: R6.2, R6.4, R6.6_
-- [ ]* T8.4 Fuzz target for BLE reassembly.
+- [x] T8.1 Interface watcher and PAN path selection, with QUIC migration and reconnect. _Req: R6.1, R6.5_
+- [x] T8.2 BLE channel: Android GATT server and `btleplug` central, Noise IK with the pairing-time static keys, MTU framing and reassembly. _Req: R6.2, R6.3_
+- [x] T8.3 Routing of only the allowed features over BLE, the BLE banner and grey "Not available over Bluetooth" tiles in the device view, and the guide to Bluetooth tethering settings. _Req: R6.2, R6.4, R6.6_
+- [x]* T8.4 Fuzz target for BLE reassembly. Done as property tests that feed arbitrary packets to the reassembler on every CI run (`services/bluetooth/frame.rs`).
 
 ## Phase 9: Hardening and release
 

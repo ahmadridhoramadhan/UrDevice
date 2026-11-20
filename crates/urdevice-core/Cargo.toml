@@ -27,6 +27,7 @@ ring.workspace = true
 rusqlite.workspace = true
 rustls.workspace = true
 rustls-webpki.workspace = true
+snow.workspace = true
 socket2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

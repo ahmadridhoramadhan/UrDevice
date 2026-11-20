@@ -465,10 +465,11 @@ impl Ui {
                     status: status.into(),
                     status_text: status_text.into(),
                     address: p.address.clone().into(),
-                    path: if p.path == "wifi" {
-                        "Wi-Fi".into()
-                    } else {
-                        p.path.clone().into()
+                    path: match p.path.as_str() {
+                        "wifi" => "Wi-Fi".into(),
+                        "bt-pan" => "Bluetooth".into(),
+                        "ble" => "Bluetooth LE".into(),
+                        other => other.into(),
                     },
                     rtt: p
                         .rtt_ms
@@ -511,7 +512,14 @@ impl Ui {
                         view: f.has_view(),
                         label: l.invoke_tile_label(t.key.into()),
                         icon: icon(t.key),
-                        mode: mode_index(rp.mode),
+                        // On Bluetooth LE only a few features work (R6.4).
+                        mode: if sp.path == "ble"
+                            && !urdevice_core::services::bluetooth::allowed_capability(t.cap)
+                        {
+                            3
+                        } else {
+                            mode_index(rp.mode)
+                        },
                     });
                 }
             }

@@ -167,7 +167,7 @@ impl Inner {
         self.notify_ended(&list);
     }
 
-    fn refuse(&self, peer: DeviceId, service: u32, activity: u64, reason: &str) {
+    pub(super) fn refuse(&self, peer: DeviceId, service: u32, activity: u64, reason: &str) {
         let tx = lock(&self.state).sessions.get(&peer).map(|s| s.tx.clone());
         if let Some(tx) = tx {
             let _ = tx.send(control::Msg::FeatureRefused(
@@ -316,7 +316,7 @@ async fn incoming_stream(
     }
 }
 
-fn incoming_datagram(inner: &Arc<Inner>, peer: DeviceId, d: &[u8]) {
+pub(super) fn incoming_datagram(inner: &Arc<Inner>, peer: DeviceId, d: &[u8]) {
     let Ok((h, payload)) = urdevice_proto::decode_datagram(d) else {
         return;
     };
@@ -459,19 +459,50 @@ impl ServiceCtx {
                 "message of {len} bytes is over the control limit; use a stream"
             )));
         }
-        let tx = lock(&inner.state).sessions.get(&peer).map(|s| s.tx.clone());
-        let tx = tx.ok_or_else(|| CoreError::Network("not connected".into()))?;
+        let tx = {
+            let st = lock(&inner.state);
+            let s = st
+                .sessions
+                .get(&peer)
+                .ok_or_else(|| CoreError::Network("not connected".into()))?;
+            // The Bluetooth LE channel carries only small messages of a few
+            // features (R6.2, R6.4).
+            if s.link.is_ble() {
+                let control::Msg::Feature(f) = &msg else {
+                    return Err(CoreError::FallbackPath);
+                };
+                if !crate::services::bluetooth::allowed_message(self.service, &f.body) {
+                    return Err(CoreError::FallbackPath);
+                }
+            }
+            s.tx.clone()
+        };
         tx.send(msg)
             .map_err(|_| CoreError::Network("not connected".into()))
     }
 
-    fn conn(&self, peer: DeviceId) -> Result<quinn::Connection> {
+    fn link(&self, peer: DeviceId) -> Result<super::link::Link> {
         let inner = self.inner()?;
-        let conn = lock(&inner.state)
+        let link = lock(&inner.state)
             .sessions
             .get(&peer)
-            .map(|s| s.conn.clone());
-        conn.ok_or_else(|| CoreError::Network("not connected".into()))
+            .map(|s| s.link.clone());
+        link.ok_or_else(|| CoreError::Network("not connected".into()))
+    }
+
+    /// The QUIC connection to `peer`. Streams need one; on the Bluetooth LE
+    /// channel they are not available (R6.4).
+    fn conn(&self, peer: DeviceId) -> Result<quinn::Connection> {
+        match self.link(peer)? {
+            super::link::Link::Quic(c) => Ok(c),
+            super::link::Link::Ble(_) => Err(CoreError::FallbackPath),
+        }
+    }
+
+    /// True when the session with `peer` runs on the Bluetooth LE fallback,
+    /// where only input, media control, and clipboard text work (R6.2).
+    pub fn on_ble(&self, peer: DeviceId) -> bool {
+        self.link(peer).is_ok_and(|l| l.is_ble())
     }
 
     fn header(
@@ -540,15 +571,36 @@ impl ServiceCtx {
             },
             payload,
         );
-        self.conn(peer)?
-            .send_datagram(bytes::Bytes::from(d))
-            .map_err(|e| CoreError::Network(e.to_string()))
+        match self.link(peer)? {
+            super::link::Link::Quic(c) => c
+                .send_datagram(bytes::Bytes::from(d))
+                .map_err(|e| CoreError::Network(e.to_string())),
+            super::link::Link::Ble(b) => {
+                if !crate::services::bluetooth::allowed_service(self.service) {
+                    return Err(CoreError::FallbackPath);
+                }
+                if d.len() > crate::services::bluetooth::MAX_DATAGRAM {
+                    return Err(CoreError::InvalidInput("datagram too large".into()));
+                }
+                // Full queue: dropped, like a lost QUIC datagram.
+                let _ = b.datagrams.try_send(d);
+                Ok(())
+            }
+        }
     }
 
     /// Largest datagram payload the path to `peer` carries now, or `None`
     /// when the peer does not take datagrams (then use the control stream).
     pub fn max_datagram_payload(&self, peer: DeviceId) -> Option<usize> {
-        let size = self.conn(peer).ok()?.max_datagram_size()?;
+        let size = match self.link(peer).ok()? {
+            super::link::Link::Quic(c) => c.max_datagram_size()?,
+            super::link::Link::Ble(_) => {
+                if !crate::services::bluetooth::allowed_service(self.service) {
+                    return None;
+                }
+                crate::services::bluetooth::MAX_DATAGRAM
+            }
+        };
         size.checked_sub(urdevice_proto::DATAGRAM_HEADER)
     }
 

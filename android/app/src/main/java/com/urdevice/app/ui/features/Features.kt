@@ -32,6 +32,10 @@ interface Feature {
     @Composable
     fun Screen(peer: FfiPeer, tile: String) {}
 
+    /** Cards this feature shows on the device view under the header, for example a banner. */
+    @Composable
+    fun DeviceBanner(peer: FfiPeer) {}
+
     /** Rows this feature adds to the "This device" screen, below the permissions. */
     @Composable
     fun ThisDevice() {}

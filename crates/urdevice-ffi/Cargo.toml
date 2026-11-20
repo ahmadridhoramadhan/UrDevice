@@ -24,6 +24,7 @@ bindgen = ["uniffi/cli"]
 
 [dependencies]
 thiserror.workspace = true
+tokio.workspace = true
 tracing-subscriber.workspace = true
 uniffi.workspace = true
 urdevice-core.workspace = true

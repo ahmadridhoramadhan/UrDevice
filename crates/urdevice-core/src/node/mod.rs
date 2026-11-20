@@ -5,8 +5,11 @@
 //! runs on the node's own tokio runtime, and results come back as
 //! [`NodeEvent`]s plus a fresh [`Snapshot`].
 
+mod ble;
 mod feature;
+mod link;
 mod net;
+mod paths;
 mod types;
 
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -156,7 +159,15 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 struct Session {
-    conn: quinn::Connection,
+    link: link::Link,
+    /// When the session opened. A new connection from the peer replaces a
+    /// session older than [`net::REPLACE_AFTER`] (design §8.1).
+    opened: Instant,
+    /// The path label (R4.8), kept up to date by `paths`.
+    path: link::PathKind,
+    /// True while a QUIC session gets no answers (`paths::QUIET_DEAD`): the
+    /// Bluetooth LE channel may then replace it (design §8.2).
+    stalled: bool,
     tx: mpsc::UnboundedSender<control::Msg>,
     remote_perms: Vec<PermissionView>,
     battery: Option<(u8, bool)>,
@@ -301,6 +312,8 @@ pub(crate) struct Inner {
     invite_addrs: Option<Vec<IpAddr>>,
     ask_timeout: Duration,
     addr_cache: Mutex<Option<(Instant, Vec<IpAddr>)>>,
+    /// The Bluetooth LE radio adapters (design §8.2).
+    ble: ble::Radios,
 }
 
 /// A running UrDevice core.
@@ -378,6 +391,7 @@ impl Node {
             invite_addrs: cfg.invite_addrs,
             ask_timeout: cfg.ask_timeout,
             addr_cache: Mutex::new(None),
+            ble: ble::Radios::default(),
         });
         inner.restart_discovery()?;
         for s in inner.services.iter() {
@@ -388,6 +402,8 @@ impl Node {
         tokio::spawn(net::seen_loop(inner.clone(), seen_rx));
         tokio::spawn(net::connector_loop(inner.clone()));
         tokio::spawn(net::housekeeping_loop(inner.clone()));
+        tokio::spawn(paths::paths_loop(inner.clone()));
+        tokio::spawn(ble::ble_loop(inner.clone()));
 
         Ok(Self {
             inner,
@@ -1041,10 +1057,10 @@ impl Inner {
         let session = lock(&self.state).sessions.remove(&id);
         if let Some(s) = session {
             let _ = s.tx.send(msg);
-            let conn = s.conn;
+            let link = s.link;
             self.rt.spawn(async move {
                 tokio::time::sleep(Duration::from_millis(300)).await;
-                conn.close(close::USER.into(), b"user");
+                link.close(close::USER, b"user");
             });
         }
     }
@@ -1052,7 +1068,7 @@ impl Inner {
     fn close_all(&self, code: u32) {
         let sessions: Vec<_> = lock(&self.state).sessions.drain().collect();
         for (_, s) in sessions {
-            s.conn.close(code.into(), b"");
+            s.link.close(code, b"");
         }
         lock(&self.state).waiters.clear();
         self.end_grants(|_, _| true);
@@ -1141,7 +1157,8 @@ impl Inner {
                     (None, true) => PeerStatus::Offline,
                 };
                 let address = s
-                    .map(|s| s.conn.remote_address().ip().to_string())
+                    .and_then(|s| s.link.remote_address())
+                    .map(|a| a.ip().to_string())
                     .or_else(|| d.last_addrs.first().map(|a| a.ip().to_string()))
                     .unwrap_or_default();
                 PeerView {
@@ -1152,8 +1169,8 @@ impl Inner {
                     status,
                     last_seen: if s.is_some() { unix_now() } else { d.last_seen },
                     address,
-                    path: "wifi".into(),
-                    rtt_ms: s.map(|s| rtt_ms(&s.conn)),
+                    path: s.map_or(link::PathKind::Lan, |s| s.path).as_str().into(),
+                    rtt_ms: s.map(|s| s.link.rtt_ms()),
                     battery_pct: s.and_then(|s| s.battery.map(|b| b.0)),
                     charging: s.and_then(|s| s.battery).is_some_and(|b| b.1),
                     remote_permissions: s.map(|s| s.remote_perms.clone()).unwrap_or_default(),
@@ -1226,10 +1243,6 @@ impl Inner {
             activities,
         }
     }
-}
-
-fn rtt_ms(conn: &quinn::Connection) -> u32 {
-    u32::try_from(conn.rtt().as_millis()).unwrap_or(u32::MAX)
 }
 
 /// Non-loopback IPv4 addresses, skipping container and VM bridges.

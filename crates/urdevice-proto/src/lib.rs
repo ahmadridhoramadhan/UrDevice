@@ -135,6 +135,10 @@ pub struct Hello {
     /// Platform.
     #[prost(string, tag = "6")]
     pub platform: String,
+    /// Public X25519 key for the Bluetooth LE channel (32 bytes, design
+    /// §8.2). The receiver pins it; empty from older versions.
+    #[prost(bytes = "vec", tag = "7")]
+    pub ble_static: Vec<u8>,
 }
 
 /// Reply to [`Hello`].
@@ -155,6 +159,9 @@ pub struct Welcome {
     /// Platform.
     #[prost(string, tag = "5")]
     pub platform: String,
+    /// Public X25519 key for the Bluetooth LE channel, as in [`Hello`].
+    #[prost(bytes = "vec", tag = "6")]
+    pub ble_static: Vec<u8>,
 }
 
 /// QR flow: the scanner proves it knows the token (design §7.1 step 3).

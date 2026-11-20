@@ -36,6 +36,14 @@
     <!-- input (#18): the presenter's timer vibrates at its alerts (R9b.4). -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- bluetooth (#23): the GATT server for the Bluetooth LE fallback (design §8.2). "Nearby
+         devices" is asked from the device view; no location access is used or needed. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <application
         android:name=".UrDeviceApp"
         android:allowBackup="false"

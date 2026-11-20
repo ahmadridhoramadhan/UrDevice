@@ -71,7 +71,7 @@ UrDevice/
 - **Identity key:** Ed25519 key pair, created on first run.
 - **Certificate:** a self-signed X.509 certificate made with `rcgen` from the identity key. Its CN is the Device ID, and it is valid for 20 years. Trust comes from pinning, not from the certificate chain, so expiry doesn't matter.
 - **Device ID:** `SHA-256(SubjectPublicKeyInfo)`, shown in base32 as 8 groups of 4 characters. Discovery uses the first 8 bytes as a short ID.
-- **BLE static key:** an X25519 key pair, signed by the identity key, used for the Noise fallback channel (§8.2). It is exchanged during pairing.
+- **BLE static key:** an X25519 key pair used for the Noise fallback channel (§8.2). It is derived from the identity key (HKDF-SHA256, salt `urdevice-ble-static-v1`), so it needs no storage and changes when the identity is reset. Its public half travels in `Hello` and `Welcome` (`ble_static`) over the mutually authenticated, pinned QUIC session, so the identity key vouches for it through TLS and no separate signature is needed; the first session runs right after pairing. The receiver pins the first key it gets in `ble_static_pub` (key plus its own HMAC, so older rows keep their row MAC) and never replaces it; Forget deletes it with the row.
 
 ### 4.2 Trust store
 
@@ -117,6 +117,7 @@ Discovery data is unauthenticated by design. It only tells devices where to try 
   - `ServerCertVerifier` / `ClientCertVerifier` accept a certificate only if its fingerprint is in the trust store, **or** a pairing context is active and the fingerprint matches what that context expects (QR flow) or the context is in confirm-code mode.
   - TLS signatures are still checked with the certificate's key, so the peer must hold the private key.
 - When both sides find each other at the same moment and two connections open, the connection started by the device with the lower Device ID wins.
+- A new connection from a peer replaces a session that is older than 5 s, because the peer only dials when it lost its session or found a better path (§8.1). The replacement keeps the running activities. An IP connection always replaces a Bluetooth LE session, and a Bluetooth LE session replaces a QUIC session only while that one has stopped answering.
 
 ### 6.2 Streams
 
@@ -152,8 +153,8 @@ The table with owners is in [`docs/dev/adding-a-feature.md`](../../../docs/dev/a
 ### 6.3 Handshake
 
 ```
-Client → Server: Hello { proto_min, proto_max, app_version, capabilities[] }
-Server → Client: Welcome { proto, capabilities[], session_id }
+Client → Server: Hello { proto_min, proto_max, app_version, capabilities[], name, platform, ble_static }
+Server → Client: Welcome { proto, capabilities[], session_id, name, platform, ble_static }
 ```
 
 Capabilities are strings such as `clipboard.v1`, `files.v1`, `input.v1`, `screen.h264.v1`, `tunnel.v1`, `media.v1`, `ble.fallback.v1`. Each side lists the capabilities it offers as a host, so a host-only capability such as `gallery.v1` appears only in the Android side's list. A device accepts feature traffic for a capability only if it lists that capability itself, and accepts replies only for capabilities the peer listed. Local permissions (§7) are then checked for each request.
@@ -194,8 +195,8 @@ Flow:
 
 1. The host (A) creates a 16-byte token from the OS CSPRNG, opens a pairing context that expects *any* client certificate, and shows the QR code.
 2. The scanner (B) connects to `addrs`. B's verifier accepts A's certificate **only if** its fingerprint equals `device_id` from the QR code. This authenticates A.
-3. B computes `binding = TLS-Exporter("EXPORTER-urdevice-pair", 32)` and sends `PairProof { hmac = HMAC-SHA256(token, binding ‖ fp_A ‖ fp_B), name, platform, ble_static_pub, sig }`.
-4. A recomputes the HMAC and compares it in constant time. If it matches, A stores B and replies `PairAccept { name, platform, ble_static_pub, sig }`. B then stores A.
+3. B computes `binding = TLS-Exporter("EXPORTER-urdevice-pair", 32)` and sends `PairProof { hmac = HMAC-SHA256(token, binding ‖ fp_A ‖ fp_B), name, platform }`. The BLE static keys follow in the first session's `Hello` and `Welcome` (§4.1).
+4. A recomputes the HMAC and compares it in constant time. If it matches, A stores B and replies `PairAccept { name, platform }`. B then stores A.
 5. The token is destroyed after one attempt, successful or not (R3.2).
 
 The channel binding ties the proof to this specific TLS session, so a captured proof can't be replayed or relayed.
@@ -248,7 +249,12 @@ The UI shows the modes as **Allow**, **Always Ask**, and **Deny**.
 
 ### 8.1 Bluetooth PAN (IP path)
 
-Bluetooth PAN gives both devices an ordinary IP network, so no protocol changes are needed. The core watches network interfaces (`if-watch`) and tries a peer's PAN-side address when the LAN path fails. QUIC migration or a reconnect then moves the session over.
+Bluetooth PAN gives both devices an ordinary IP network, so no protocol changes are needed. Once a second the core reads its interfaces (`if-addrs`; no extra watcher dependency) and each session's traffic:
+
+- **Path label (R4.8, R6.4):** Bluetooth PAN when the session's local address is on a Bluetooth interface: kernel device type `bluetooth` on Linux (NetworkManager names the interface `enx<MAC>`, spike T0.5), `bnep*`, Android's `bt-pan`, or a Windows adapter named "Bluetooth Network Connection". Otherwise Wi-Fi/LAN.
+- **Loss (R6.1):** a session that received nothing for 1 s gets an empty probe datagram (service `BLUETOOTH`), which the peer drops but acknowledges. After 3.5 s without a packet, or at once when the session's local address disappears, the core dials the peer's other known addresses (discovery and last seen), for example its PAN address. QUIC migration does not help here because the server's address changes too, so the new connection replaces the session in place (§6.1) and the activities carry on. Before this, a dead path was noticed only by the 30 s idle timeout.
+- **Return (R6.5):** a session on PAN, or on the Bluetooth LE channel, dials the peer's LAN addresses as soon as discovery announces them again (every 5 s), at most every 4 s, so it moves back within 10 s.
+- The app never makes PAN the default route; the OS keeps routing as the user set it up (spike T0.5).
 
 Platform reality:
 
@@ -261,9 +267,11 @@ Platform reality:
 ### 8.2 BLE control channel
 
 - Android runs a GATT server with a UrDevice service UUID and one characteristic for each direction (write-without-response and notify). The desktop is the GATT central: `btleplug` on Windows, Linux, and macOS.
-- Security: **Noise IK** (`snow`, `Noise_IK_25519_ChaChaPoly_SHA256`) using the BLE static keys exchanged and signed during pairing (§4.1). It does not depend on Bluetooth-level pairing security.
-- Framing: Noise messages split to fit the negotiated MTU, with a 2-byte sequence number and reassembly.
-- Allowed messages: input, presenter, media, keyboard, and clipboard text up to 64 KB (R6.2). Everything else returns `Unavailable(FallbackPath)` to the UI (R6.4).
+- Security: **Noise IK** (`snow`, `Noise_IK_25519_ChaChaPoly_SHA256`, prologue `urdevice-ble-v1`) using the pinned BLE static keys (§4.1). The desktop is the initiator and knows the phone's key; the phone answers only when the initiator's static key is pinned for a paired device. It does not depend on Bluetooth-level pairing security, and there is no unencrypted mode.
+- GATT: service `6b1f0001-5d7a-4c1e-9b8a-2f6d1c3e8a10`, desktop-to-phone characteristic `…0002` (write without response), phone-to-desktop characteristic `…0003` (notify). The phone advertises only while a paired desktop has no working session (R15.4). Android asks for "Nearby devices" (`BLUETOOTH_CONNECT`, `BLUETOOTH_ADVERTISE`) from the device view.
+- When: the desktop tries the channel for a paired phone with auto-connect on when there is no session and no discovery announcement in the last 8 s, or when its QUIC session has stopped answering; retries back off from 4 s to 60 s.
+- Framing: Noise messages (≤ 65 535 bytes) split to fit the negotiated MTU. Each packet has a 2-byte sequence number and a flags byte (bit 0: last packet). The receiver accepts packets only in order and holds at most 65 535 bytes; anything else closes the link. Inside a Noise message, a type byte: control-message piece (control messages are cut into 1 KiB pieces, at most 80 KiB in all), datagram (≤ 256 bytes), ping, or pong. Pings go every 2 s and give the RTT; 8 s without a packet ends the link. On top runs the normal session: `Hello`, `Welcome`, permissions, activities, and feature messages.
+- Allowed messages: input, presenter, media, keyboard, and clipboard text up to 64 KB (R6.2). Everything else returns `CoreError::FallbackPath` to the UI (R6.4): other services' messages and datagrams, all streams, and clipboard images. A peer that sends them anyway gets `FeatureRefused { reason: "fallback_path" }`.
 - **UI on the BLE path (R6.4):** the device view shows a banner under the device header, for example "Connected over Bluetooth LE. Screen sharing, file transfers, and localhost are unavailable until Wi-Fi returns." The affected feature tiles turn grey with the reason "Not available over Bluetooth". The banner and the grey tiles go away when the session moves back to the LAN (R6.5). On the PAN path there is no banner, because every feature still works; only the connection chip changes to Bluetooth (R4.8).
 - When the LAN or PAN path comes back, the session is moved to it within 10 s (R6.5).
 

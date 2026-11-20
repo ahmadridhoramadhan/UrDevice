@@ -1,17 +1,49 @@
-// Bluetooth fallback (#23): the desktop feature view.
+// Bluetooth fallback (#23): the banner on the device view while a session
+// runs on the Bluetooth LE channel (design §8.2, R6.4).
 // Rust side: src/features/bluetooth.rs. See docs/dev/adding-a-feature.md.
+import { Theme } from "../theme.slint";
 import { Muted } from "../widgets.slint";
 
-// State and callbacks shared with src/features/bluetooth.rs.
+// State shared with src/features/bluetooth.rs.
 export global BluetoothFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    // True while the open device is connected over Bluetooth LE.
+    in property <bool> on-ble;
+    // The open device's name.
+    in property <string> peer-name;
+    // Features that are off until Wi-Fi returns, for example
+    // "Screen sharing, Send files, Localhost".
+    in property <string> unavailable;
 }
 
+// Under the device header. No banner on the PAN path: everything works
+// there, and only the connection chip says Bluetooth (R4.8).
+export component BleBanner inherits Rectangle {
+    height: BluetoothFeature.on-ble ? layout.preferred-height : 0px;
+    visible: BluetoothFeature.on-ble;
+    background: Theme.warn-bg;
+    border-radius: Theme.radius;
+    layout := VerticalLayout {
+        padding: 14px;
+        spacing: 4px;
+        Text {
+            text: @tr("Connected over Bluetooth LE. {} are unavailable until Wi-Fi returns.", BluetoothFeature.unavailable);
+            color: Theme.text;
+            font-weight: 600;
+            wrap: word-wrap;
+        }
+        Muted {
+            text: @tr("Remote control, presenter, media control, and clipboard text still work. To use every feature without Wi-Fi, turn on Bluetooth tethering on {}.", BluetoothFeature.peer-name);
+        }
+    }
+}
+
+// The feature has no view of its own: Bluetooth is an automatic fallback,
+// not a setting.
 export component BluetoothView inherits VerticalLayout {
-    // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    Muted { text: @tr("UrDevice switches to Bluetooth on its own when Wi-Fi is lost."); }
 }
