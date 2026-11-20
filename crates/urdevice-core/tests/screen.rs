@@ -110,6 +110,7 @@ impl ScreenHost for FakeHost {
 
 #[derive(Default)]
 struct Viewer {
+    opened: Mutex<Vec<u64>>,
     displays: Mutex<Vec<Display>>,
     started: Mutex<Vec<u32>>,
     frames: Mutex<Vec<VideoFrame>>,
@@ -118,6 +119,9 @@ struct Viewer {
 }
 
 impl ScreenEvents for Viewer {
+    fn opened(&self, _peer: DeviceId, activity: u64) {
+        self.opened.lock().unwrap().push(activity);
+    }
     fn displays(&self, _peer: DeviceId, _activity: u64, displays: Vec<Display>) {
         *self.displays.lock().unwrap() = displays;
     }
@@ -325,6 +329,23 @@ fn capture_errors_reach_the_viewer_and_end_the_session() {
         viewer.ended.lock().unwrap().contains(&activity)
     });
     wait_until("indicator gone", WAIT, || p.a.snap().activities.is_empty());
+}
+
+#[test]
+fn request_view_reports_through_events() {
+    let (p, _host, viewer) = setup();
+    let svc = p.b.node.service::<Screen>().unwrap();
+    svc.request_view(p.a.id()).unwrap();
+    p.a.answer_prompt(false);
+    wait_until("declined", WAIT, || {
+        viewer.errors.lock().unwrap().contains(&"declined".to_string())
+    });
+    svc.request_view(p.a.id()).unwrap();
+    p.a.answer_prompt(true);
+    wait_until("opened", WAIT, || viewer.opened.lock().unwrap().len() == 1);
+    let activity = viewer.opened.lock().unwrap()[0];
+    svc.list_displays(p.a.id(), activity).unwrap();
+    wait_until("displays", WAIT, || viewer.displays.lock().unwrap().len() == 2);
 }
 
 #[test]

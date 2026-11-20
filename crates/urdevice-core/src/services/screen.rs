@@ -279,6 +279,8 @@ pub trait ScreenHost: Send + Sync {
 /// What the viewer UI listens to. Called from core threads; hand work to
 /// the UI thread. Never act on the device because of these.
 pub trait ScreenEvents: Send + Sync {
+    /// [`Screen::request_view`] got an activity: the host allowed it.
+    fn opened(&self, peer: DeviceId, activity: u64);
     /// The host's display list.
     fn displays(&self, peer: DeviceId, activity: u64, displays: Vec<Display>);
     /// A new video stream began (first start or a display switch): reset the
@@ -402,6 +404,25 @@ impl Screen {
             .viewing
             .insert((peer, activity), Viewing::default());
         Ok(activity)
+    }
+
+    /// Like [`Screen::open`], for UIs without an async runtime: the result
+    /// arrives in [`ScreenEvents::opened`], or in [`ScreenEvents::error`]
+    /// with activity 0 and `denied`, `declined`, `timeout`, `unsupported`,
+    /// or `offline`.
+    pub fn request_view(self: &Arc<Self>, peer: DeviceId) -> Result<()> {
+        let ctx = self.ctx()?.clone();
+        let this = self.clone();
+        ctx.spawn(async move {
+            let r = this.open(peer).await;
+            let Some(e) = this.events() else { return };
+            match r {
+                Ok(activity) => e.opened(peer, activity),
+                Err(CoreError::Refused(reason)) => e.error(peer, 0, &reason),
+                Err(_) => e.error(peer, 0, "offline"),
+            }
+        });
+        Ok(())
     }
 
     /// Ask the host for its displays; the answer arrives in
