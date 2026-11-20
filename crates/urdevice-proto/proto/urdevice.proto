@@ -35,6 +35,7 @@ message Hello {
   repeated string capabilities = 4;
   string name = 5;
   string platform = 6;
+  bytes ble_static = 7;  // X25519 key for the BLE channel (design §8.2)
 }
 
 message Welcome {
@@ -43,6 +44,7 @@ message Welcome {
   bytes session_id = 3;
   string name = 4;
   string platform = 5;
+  bytes ble_static = 6;  // X25519 key for the BLE channel (design §8.2)
 }
 
 message PairProof { bytes hmac = 1; string name = 2; string platform = 3; }

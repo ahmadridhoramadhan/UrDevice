@@ -297,6 +297,42 @@ impl TrustStore {
         Ok(())
     }
 
+    /// Pin a paired device's BLE static key (design §4.1, §8.2). The column
+    /// holds the key followed by its own MAC, so the row MAC of older rows
+    /// stays valid. Does nothing for a device that is not paired.
+    pub fn set_ble_key(&self, id: DeviceId, key: &[u8; 32]) -> Result<()> {
+        let mac = hmac_sha256(&self.mac_key, &[&mac_input("ble_key", &[&id.0, key])]);
+        let mut blob = key.to_vec();
+        blob.extend_from_slice(&mac);
+        self.db.execute(
+            "UPDATE paired_device SET ble_static_pub = ?2 WHERE device_id = ?1",
+            params![&id.0[..], blob],
+        )?;
+        Ok(())
+    }
+
+    /// A paired device's pinned BLE static key, if stored and its MAC holds.
+    pub fn ble_key(&self, id: DeviceId) -> Result<Option<[u8; 32]>> {
+        let blob: Option<Vec<u8>> = self
+            .db
+            .query_row(
+                "SELECT ble_static_pub FROM paired_device WHERE device_id = ?1",
+                [&id.0[..]],
+                |r| r.get(0),
+            )
+            .optional()?
+            .flatten();
+        let Some(blob) = blob.filter(|b| b.len() == 64) else {
+            return Ok(None);
+        };
+        let (key, mac) = blob.split_at(32);
+        if !hmac_verify(&self.mac_key, &[&mac_input("ble_key", &[&id.0, key])], mac) {
+            tracing::warn!(peer = %id.short_hex(), "pinned BLE key failed its MAC; ignoring it");
+            return Ok(None);
+        }
+        Ok(<[u8; 32]>::try_from(key).ok())
+    }
+
     /// Delete a paired device (R3.9).
     pub fn remove_paired(&self, id: DeviceId) -> Result<bool> {
         let n = self.db.execute(
@@ -540,6 +576,33 @@ mod tests {
         assert_eq!(s.paired(d.id).unwrap().unwrap().last_seen, 500);
         assert!(s.remove_paired(d.id).unwrap());
         assert_eq!(s.paired(d.id).unwrap(), None);
+    }
+
+    #[test]
+    fn ble_key_is_pinned_with_its_own_mac() {
+        let s = TrustStore::open_in_memory(vec![1; 32]).unwrap();
+        let d = device(1);
+        // Not paired: nothing is stored.
+        s.set_ble_key(d.id, &[9; 32]).unwrap();
+        assert_eq!(s.ble_key(d.id).unwrap(), None);
+        s.upsert_paired(&d).unwrap();
+        assert_eq!(s.ble_key(d.id).unwrap(), None);
+        s.set_ble_key(d.id, &[9; 32]).unwrap();
+        assert_eq!(s.ble_key(d.id).unwrap(), Some([9; 32]));
+        // Updating the row keeps the key, and the row MAC still holds.
+        s.upsert_paired(&d).unwrap();
+        assert_eq!(s.ble_key(d.id).unwrap(), Some([9; 32]));
+        assert_eq!(s.paired_devices().unwrap().len(), 1);
+        // A key swapped in by another process is ignored.
+        let mut blob = vec![7u8; 32];
+        blob.extend_from_slice(&[0; 32]);
+        s.db.execute("UPDATE paired_device SET ble_static_pub = ?1", [blob])
+            .unwrap();
+        assert_eq!(s.ble_key(d.id).unwrap(), None);
+        // Forgetting the device drops the key with the row.
+        s.set_ble_key(d.id, &[9; 32]).unwrap();
+        s.remove_paired(d.id).unwrap();
+        assert_eq!(s.ble_key(d.id).unwrap(), None);
     }
 
     #[test]

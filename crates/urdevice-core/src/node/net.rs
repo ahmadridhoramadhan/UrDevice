@@ -13,6 +13,7 @@ use tokio::task::JoinSet;
 use tokio::time::timeout;
 use urdevice_proto::{PROTO_VERSION, control};
 
+use super::link::{Link, PathKind};
 use super::{
     Activity, Backoff, CodePairing, GrantEntry, Inner, MAX_BACKOFF, NodeEvent, PermissionView,
     Prompt, PromptView, Session, feature, lock, unix_now,
@@ -30,6 +31,10 @@ const MAX_CAPS: usize = 64;
 const MAX_CAP_LEN: usize = 32;
 const VIOLATION_LIMIT: usize = 3;
 const VIOLATION_WINDOW: Duration = Duration::from_secs(600);
+/// A new connection from a peer replaces a session older than this: the
+/// peer only dials when it lost its session or found a better path (design
+/// §8.1). Younger sessions keep the lower-Device-ID rule for dial races.
+pub(super) const REPLACE_AFTER: Duration = Duration::from_secs(5);
 
 type ReadFut = Pin<Box<dyn Future<Output = (quinn::RecvStream, Result<control::Msg>)> + Send>>;
 
@@ -98,7 +103,8 @@ fn close_code(e: &quinn::ConnectionError) -> Option<u32> {
     }
 }
 
-fn hello(inner: &Inner) -> control::Msg {
+pub(super) fn hello(inner: &Inner) -> control::Msg {
+    let ble_static = inner.ble_public();
     let st = lock(&inner.state);
     control::Msg::Hello(urdevice_proto::Hello {
         proto_min: PROTO_VERSION,
@@ -107,7 +113,21 @@ fn hello(inner: &Inner) -> control::Msg {
         capabilities: local_caps(&inner.platform),
         name: st.name.clone(),
         platform: inner.platform.clone(),
+        ble_static,
     })
+}
+
+pub(super) fn welcome(inner: &Inner) -> Result<control::Msg> {
+    let ble_static = inner.ble_public();
+    let st = lock(&inner.state);
+    Ok(control::Msg::Welcome(urdevice_proto::Welcome {
+        proto: PROTO_VERSION,
+        capabilities: local_caps(&inner.platform),
+        session_id: crate::crypto::random_bytes(16)?,
+        name: st.name.clone(),
+        platform: inner.platform.clone(),
+        ble_static,
+    }))
 }
 
 fn local_caps(platform: &str) -> Vec<String> {
@@ -117,7 +137,7 @@ fn local_caps(platform: &str) -> Vec<String> {
         .collect()
 }
 
-fn check_caps(caps: &[String]) -> Result<()> {
+pub(super) fn check_caps(caps: &[String]) -> Result<()> {
     if caps.len() > MAX_CAPS || caps.iter().any(|c| c.len() > MAX_CAP_LEN) {
         return Err(CoreError::Protocol("capability list too large".into()));
     }
@@ -216,18 +236,9 @@ async fn serve_session(
         return Err(CoreError::Protocol("unsupported version".into()));
     }
     check_caps(&h.capabilities)?;
-    let welcome = {
-        let st = lock(&inner.state);
-        urdevice_proto::Welcome {
-            proto: PROTO_VERSION,
-            capabilities: local_caps(&inner.platform),
-            session_id: crate::crypto::random_bytes(16)?,
-            name: st.name.clone(),
-            platform: inner.platform.clone(),
-        }
-    };
-    write_msg(&mut send, control::Msg::Welcome(welcome)).await?;
+    write_msg(&mut send, welcome(&inner)?).await?;
     inner.refresh_peer_info(peer, &h.name, &h.platform);
+    inner.pin_ble_key(peer, &h.ble_static);
     run_session(inner, conn, send, reader, peer, false, &h.capabilities).await
 }
 
@@ -268,6 +279,7 @@ async fn client_session(
     }
     check_caps(&w.capabilities)?;
     inner.refresh_peer_info(peer, &w.name, &w.platform);
+    inner.pin_ble_key(peer, &w.ble_static);
     run_session(inner, conn, send, reader, peer, true, &w.capabilities).await
 }
 
@@ -275,7 +287,7 @@ async fn client_session(
 // Session
 // ---------------------------------------------------------------------------
 
-enum Flow {
+pub(super) enum Flow {
     Continue,
     Close,
 }
@@ -290,46 +302,11 @@ async fn run_session(
     peer_caps: &[String],
 ) -> Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel::<control::Msg>();
-    let my_id = inner.id();
-    {
-        let mut st = lock(&inner.state);
-        if st.paired(peer).is_none() {
-            conn.close(close::USER.into(), b"not paired");
-            return Err(CoreError::NotFound);
-        }
-        if let Some(existing) = st.sessions.get(&peer) {
-            // The connection started by the lower Device ID wins (design §6.1).
-            let new_wins = initiated_here == (my_id < peer);
-            if !new_wins {
-                conn.close(close::DUPLICATE.into(), b"duplicate");
-                return Ok(());
-            }
-            existing.conn.close(close::DUPLICATE.into(), b"duplicate");
-        }
-        st.sessions.insert(
-            peer,
-            Session {
-                conn: conn.clone(),
-                tx: tx.clone(),
-                remote_perms: Vec::new(),
-                battery: None,
-                // Unknown strings come from newer versions; ignore them.
-                caps: peer_caps.iter().filter_map(|c| c.parse().ok()).collect(),
-            },
-        );
-        st.backoff.remove(&peer);
-        let _ = tx.send(st.permission_state(&inner.platform));
-        let _ = tx.send(st.device_status());
+    let link = Link::Quic(conn.clone());
+    let path = super::paths::classify(&conn);
+    if !open_session(&inner, &link, path, &tx, peer, initiated_here, peer_caps)? {
+        return Ok(());
     }
-    // The peer pressed Reconnect: resume automatic reconnection here too (design §6.5).
-    if !initiated_here {
-        let _ = inner.set_auto_connect(peer, true, None);
-    }
-    let _ = lock(&inner.store).touch(peer, unix_now(), &[conn.remote_address()]);
-    let _ = inner.reload_paired();
-    tracing::info!(peer = %peer.short_hex(), addr = %conn.remote_address(), "session open");
-    inner.notify_peer(peer, true);
-    inner.changed();
 
     // Streams and datagrams for the feature services (design §6.2).
     let traffic = tokio::spawn(feature::accept_traffic(inner.clone(), conn.clone(), peer));
@@ -346,7 +323,7 @@ async fn run_session(
     let result = loop {
         tokio::select! {
             msg = reader.next() => match msg {
-                Ok(m) => match handle_msg(&inner, &conn, peer, m) {
+                Ok(m) => match handle_msg(&inner, &link, peer, m) {
                     Ok(Flow::Continue) => {}
                     Ok(Flow::Close) => break Ok(()),
                     Err(e) => {
@@ -367,13 +344,92 @@ async fn run_session(
     };
     writer.abort();
     traffic.abort();
+    close_session(&inner, &link, peer);
+    conn.close(close::NORMAL.into(), b"");
+    result
+}
 
+/// Register a session that finished its handshake. Returns false when an
+/// existing session wins and this one was closed (design §6.1, §8.1).
+pub(super) fn open_session(
+    inner: &Arc<Inner>,
+    link: &Link,
+    path: PathKind,
+    tx: &mpsc::UnboundedSender<control::Msg>,
+    peer: DeviceId,
+    initiated_here: bool,
+    peer_caps: &[String],
+) -> Result<bool> {
+    let my_id = inner.id();
+    {
+        let mut st = lock(&inner.state);
+        if st.paired(peer).is_none() {
+            link.close(close::USER, b"not paired");
+            return Err(CoreError::NotFound);
+        }
+        if let Some(existing) = st.sessions.get(&peer) {
+            let new_wins = match (existing.link.is_ble(), link.is_ble()) {
+                // An IP path always beats Bluetooth LE (R6.5).
+                (true, false) => true,
+                // Bluetooth LE takes over only from a path that stopped answering.
+                (false, true) => existing.stalled,
+                // The peer dials only after it lost the session or found a
+                // better path, so an older session gives way.
+                _ if existing.opened.elapsed() >= REPLACE_AFTER => true,
+                // The connection started by the lower Device ID wins (design §6.1).
+                _ => initiated_here == (my_id < peer),
+            };
+            if !new_wins {
+                link.close(close::DUPLICATE, b"duplicate");
+                return Ok(false);
+            }
+            existing.link.close(close::DUPLICATE, b"duplicate");
+        }
+        let replaced = st.sessions.insert(
+            peer,
+            Session {
+                link: link.clone(),
+                opened: Instant::now(),
+                path,
+                stalled: false,
+                tx: tx.clone(),
+                remote_perms: Vec::new(),
+                battery: None,
+                // Unknown strings come from newer versions; ignore them.
+                caps: peer_caps.iter().filter_map(|c| c.parse().ok()).collect(),
+            },
+        );
+        if let Some(old) = replaced {
+            // Keep what the peer told the old session until it says again.
+            if let Some(s) = st.sessions.get_mut(&peer) {
+                s.remote_perms = old.remote_perms;
+                s.battery = old.battery;
+            }
+        }
+        st.backoff.remove(&peer);
+        let _ = tx.send(st.permission_state(&inner.platform));
+        let _ = tx.send(st.device_status());
+    }
+    // The peer pressed Reconnect: resume automatic reconnection here too (design §6.5).
+    if !initiated_here {
+        let _ = inner.set_auto_connect(peer, true, None);
+    }
+    if let Some(addr) = link.remote_address() {
+        let _ = lock(&inner.store).touch(peer, unix_now(), &[addr]);
+    }
+    let _ = inner.reload_paired();
+    tracing::info!(peer = %peer.short_hex(), path = path.as_str(), "session open");
+    inner.notify_peer(peer, true);
+    inner.changed();
+    Ok(true)
+}
+
+/// Clean up after a session ended. Does nothing when a newer connection
+/// already replaced it: its activities carry on there.
+pub(super) fn close_session(inner: &Arc<Inner>, link: &Link, peer: DeviceId) {
     let still_ours = {
         let mut st = lock(&inner.state);
-        let ours = st
-            .sessions
-            .get(&peer)
-            .is_some_and(|s| s.conn.stable_id() == conn.stable_id());
+        let ours = st.sessions.get(&peer).is_some_and(|s| s.link.same(link));
         if ours {
             st.sessions.remove(&peer);
             st.backoff.insert(
@@ -393,13 +449,13 @@ async fn run_session(
         inner.stop_activities(|a| a.peer == peer, "stopped");
         inner.end_grants(|(p, _), _| *p == peer);
         inner.notify_peer(peer, false);
-        let _ = lock(&inner.store).touch(peer, unix_now(), &[conn.remote_address()]);
+        if let Some(addr) = link.remote_address() {
+            let _ = lock(&inner.store).touch(peer, unix_now(), &[addr]);
+        }
         let _ = inner.reload_paired();
         tracing::info!(peer = %peer.short_hex(), "session closed");
         inner.changed();
     }
-    conn.close(close::NORMAL.into(), b"");
-    result
 }
 
 pub(super) fn record_violation(inner: &Inner, peer: DeviceId) {
@@ -415,9 +471,9 @@ pub(super) fn record_violation(inner: &Inner, peer: DeviceId) {
     }
 }
 
-fn handle_msg(
+pub(super) fn handle_msg(
     inner: &Arc<Inner>,
-    conn: &quinn::Connection,
+    conn: &Link,
     peer: DeviceId,
     msg: control::Msg,
 ) -> Result<Flow> {
@@ -460,7 +516,7 @@ fn handle_msg(
                 code: "disconnected_by".into(),
                 device_name: name,
             });
-            conn.close(close::USER.into(), b"disconnect");
+            conn.close(close::USER, b"disconnect");
             return Ok(Flow::Close);
         }
         control::Msg::Unpair(_) => {
@@ -470,7 +526,7 @@ fn handle_msg(
                 code: "unpaired_by".into(),
                 device_name: name,
             });
-            conn.close(close::USER.into(), b"unpair");
+            conn.close(close::USER, b"unpair");
             return Ok(Flow::Close);
         }
         control::Msg::ActivityRequest(r) => {
@@ -1106,7 +1162,11 @@ pub(super) async fn connector_loop(inner: Arc<Inner>) {
     }
 }
 
-async fn connect_paired(inner: &Arc<Inner>, id: DeviceId, addrs: &[SocketAddr]) -> Result<()> {
+pub(super) async fn connect_paired(
+    inner: &Arc<Inner>,
+    id: DeviceId,
+    addrs: &[SocketAddr],
+) -> Result<()> {
     let conn = dial(inner, addrs, Expect::Device(id)).await?;
     // Connected: the session task takes over, so stop counting it as a dial.
     lock(&inner.state).connecting.remove(&id);
@@ -1152,7 +1212,7 @@ pub(super) async fn housekeeping_loop(inner: Arc<Inner>) {
             // Latency on the device view (R4.8): redraw only when it moved.
             shown_rtt.retain(|id, _| st.sessions.contains_key(id));
             for (id, s) in &st.sessions {
-                let rtt = super::rtt_ms(&s.conn);
+                let rtt = s.link.rtt_ms();
                 let moved = shown_rtt
                     .get(id)
                     .is_none_or(|old| old.abs_diff(rtt) >= RTT_STEP_MS);

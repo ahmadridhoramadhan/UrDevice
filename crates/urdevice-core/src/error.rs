@@ -58,6 +58,10 @@ pub enum CoreError {
     /// The node has stopped.
     #[error("the node has stopped")]
     Stopped,
+    /// The session runs on the Bluetooth LE fallback, which carries only
+    /// low-bandwidth features (R6.2, R6.4).
+    #[error("not available over Bluetooth")]
+    FallbackPath,
 }
 
 impl CoreError {
