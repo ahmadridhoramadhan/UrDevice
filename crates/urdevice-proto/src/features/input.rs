@@ -162,7 +162,7 @@ pub struct Batch {
 #[derive(Clone, PartialEq, Message)]
 pub struct Event {
     /// What happened.
-    #[prost(oneof = "event::Kind", tags = "1, 2, 3, 4, 5, 6, 7")]
+    #[prost(oneof = "event::Kind", tags = "1, 2, 3, 4, 5, 6, 7, 8")]
     pub kind: Option<event::Kind>,
 }
 
@@ -192,6 +192,9 @@ pub mod event {
         /// Show, move, or hide the presenter's laser dot.
         #[prost(message, tag = "7")]
         Laser(super::Laser),
+        /// A system navigation action: Back, Home, or Recents (Android hosts).
+        #[prost(message, tag = "8")]
+        Nav(super::Nav),
     }
 }
 
@@ -285,6 +288,27 @@ pub struct Laser {
     pub on: bool,
 }
 
+/// System navigation actions for [`Nav::action`]. Only Android hosts act on
+/// them; a desktop host ignores them.
+pub mod nav {
+    /// The Back action.
+    pub const BACK: u32 = 0;
+    /// The Home action.
+    pub const HOME: u32 = 1;
+    /// The Recents (app switcher) action.
+    pub const RECENTS: u32 = 2;
+    /// Number of actions.
+    pub const COUNT: u32 = 3;
+}
+
+/// A system navigation action (R9.3).
+#[derive(Clone, PartialEq, Message)]
+pub struct Nav {
+    /// One of [`nav`].
+    #[prost(uint32, tag = "1")]
+    pub action: u32,
+}
+
 /// Controller to host: a remote-control session begins.
 #[derive(Clone, PartialEq, Message)]
 pub struct Hello {}
@@ -301,7 +325,22 @@ pub struct Status {
     /// Name of the host's back-end, for example `x11` or `windows`. Display only.
     #[prost(string, tag = "3")]
     pub backend: String,
+    /// Width of the host's primary display in pixels; 0 when unknown. The
+    /// controller shapes its remote-control window like it.
+    #[prost(uint32, tag = "4")]
+    pub width: u32,
+    /// Height of the host's primary display in pixels; 0 when unknown.
+    #[prost(uint32, tag = "5")]
+    pub height: u32,
+    /// Empty when the host can type text. Otherwise the permission it lacks
+    /// for typing (`input_method`: the UrDevice keyboard is not enabled).
+    /// Pointer input may work while this is set.
+    #[prost(string, tag = "6")]
+    pub text_permission: String,
 }
+
+/// Largest display side a [`Status`] may report, in pixels.
+pub const MAX_DISPLAY_SIDE: u32 = 65_535;
 
 /// Longest string a [`Status`] may carry.
 pub const MAX_STATUS_TEXT: usize = 64;
@@ -312,6 +351,9 @@ impl Status {
         self.state = self.state.min(state::UNAVAILABLE);
         self.permission = clip(self.permission);
         self.backend = clip(self.backend);
+        self.text_permission = clip(self.text_permission);
+        self.width = self.width.min(MAX_DISPLAY_SIDE);
+        self.height = self.height.min(MAX_DISPLAY_SIDE);
         self
     }
 }
@@ -371,6 +413,8 @@ impl Event {
                 y: l.y.min(COORD_MAX),
                 on: l.on,
             }),
+            Kind::Nav(n) if n.action < nav::COUNT => Kind::Nav(n.clone()),
+            Kind::Nav(_) => return None,
         };
         Some(Event { kind: Some(kind) })
     }
@@ -428,6 +472,9 @@ mod tests {
             state: state::MISSING_PERMISSION,
             permission: "accessibility".into(),
             backend: "macos".into(),
+            width: 1080,
+            height: 2400,
+            text_permission: "input_method".into(),
         }));
         assert_eq!(Input::decode(m.encode_to_vec().as_slice()).unwrap(), m);
     }
@@ -536,11 +583,34 @@ mod tests {
             state: 99,
             permission: "é".repeat(100),
             backend: "a\nb".into(),
+            width: u32::MAX,
+            height: 5,
+            text_permission: "x\u{7}y".into(),
         }
         .sanitize();
         assert_eq!(s.state, state::UNAVAILABLE);
         assert!(s.permission.len() <= MAX_STATUS_TEXT);
         assert_eq!(s.backend, "ab");
+        assert_eq!(s.text_permission, "xy");
+        assert_eq!((s.width, s.height), (MAX_DISPLAY_SIDE, 5));
+    }
+
+    #[test]
+    fn nav_actions_are_checked_and_reliable() {
+        for action in 0..nav::COUNT {
+            let e = ev(event::Kind::Nav(Nav { action }));
+            assert_eq!(e.sanitize().as_ref(), Some(&e));
+            assert!(!e.is_lossy(), "a lost Home must not be silent");
+        }
+        assert!(
+            ev(event::Kind::Nav(Nav { action: nav::COUNT }))
+                .sanitize()
+                .is_none()
+        );
+        let b = Batch {
+            events: vec![ev(event::Kind::Nav(Nav { action: nav::HOME }))],
+        };
+        assert_eq!(Batch::decode(b.encode_to_vec().as_slice()).unwrap(), b);
     }
 
     #[test]
