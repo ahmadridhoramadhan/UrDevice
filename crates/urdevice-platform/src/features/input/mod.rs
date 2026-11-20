@@ -239,6 +239,10 @@ pub fn open_permission_settings(missing: Missing) -> Result<()> {
             }
         }
         Missing::Uinput => Err(CoreError::unsupported("input", "uinput-settings")),
+        // Android settings; a desktop host never reports them.
+        Missing::AccessibilityService | Missing::InputMethod => {
+            Err(CoreError::unsupported("input", std::env::consts::OS))
+        }
     }
 }
 

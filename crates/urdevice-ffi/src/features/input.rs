@@ -4,11 +4,21 @@
 //! screens call the `input_*` methods, and [`InputListener`] reports the
 //! session, what the host can do, and refusals. Events are queued in the core
 //! and sent every 8 ms. Nothing here ever carries or logs typed text back.
+//!
+//! The phone is also a **host** (#19): [`InputHostFfi`] is the Kotlin side of
+//! the accessibility service (taps, swipes, Back, Home, Recents) and the
+//! UrDevice keyboard (text and keys). The core builds the gestures from the
+//! controller's pointer events and keeps the permission checks; Kotlin only
+//! runs what it is handed.
 
 use std::sync::Arc;
 
 use urdevice_core::identity::DeviceId;
-use urdevice_core::services::input::{HostStatus, Input, InputEvents, PermStatus};
+use urdevice_core::services::Grant;
+use urdevice_core::services::input::{
+    Gesture, HostStatus, Input, InputEvents, Missing, PermStatus, TouchHost, TouchSink,
+};
+use urdevice_core::{CoreError, Result};
 
 use crate::{FfiError, UrDeviceNode, device_id};
 
@@ -19,11 +29,94 @@ pub trait InputListener: Send + Sync {
     fn on_event(&self, event: FfiInputEvent);
 }
 
+/// The phone's accessibility service and keyboard, in Kotlin (#19, R9.3,
+/// R10.3). Called from the core's input worker, one call at a time. Each
+/// action method returns false when Android refused it. Never log the text.
+#[uniffi::export(with_foreign)]
+pub trait InputHostFfi: Send + Sync {
+    /// The UrDevice accessibility service is on and connected.
+    fn gestures_ready(&self) -> bool;
+    /// The UrDevice keyboard is on and is the keyboard in use.
+    fn text_ready(&self) -> bool;
+    /// Width of the display in pixels; 0 when unknown.
+    fn display_width(&self) -> u32;
+    /// Height of the display in pixels; 0 when unknown.
+    fn display_height(&self) -> u32;
+    /// Touch one point for `duration_ms`.
+    fn tap(&self, x: u32, y: u32, duration_ms: u32) -> bool;
+    /// Drag through the points `(xs[i], ys[i])` in `duration_ms`.
+    fn swipe(&self, xs: Vec<u32>, ys: Vec<u32>, duration_ms: u32) -> bool;
+    /// Global action: 0 Back, 1 Home, 2 Recents.
+    fn nav(&self, action: u32) -> bool;
+    /// Commit text in the focused field. No newlines.
+    fn text(&self, text: String) -> bool;
+    /// Send an Android key code to the focused field with `meta` state bits.
+    fn key(&self, code: u32, down: bool, meta: u32) -> bool;
+}
+
+struct HostAdapter(Arc<dyn InputHostFfi>);
+
+fn refused(what: &'static str) -> CoreError {
+    CoreError::Io(std::io::Error::other(what))
+}
+
+impl TouchHost for HostAdapter {
+    fn gestures_ready(&self) -> bool {
+        self.0.gestures_ready()
+    }
+
+    fn text_ready(&self) -> bool {
+        self.0.text_ready()
+    }
+
+    fn display_size(&self) -> (u32, u32) {
+        (self.0.display_width(), self.0.display_height())
+    }
+
+    fn gesture(&self, _grant: &Grant, gesture: &Gesture) -> Result<()> {
+        let ok = match gesture {
+            Gesture::Tap { x, y, duration_ms } => self.0.tap(*x, *y, *duration_ms),
+            Gesture::Swipe {
+                points,
+                duration_ms,
+            } => self.0.swipe(
+                points.iter().map(|p| p.0).collect(),
+                points.iter().map(|p| p.1).collect(),
+                *duration_ms,
+            ),
+        };
+        ok.then_some(()).ok_or_else(|| refused("gesture refused"))
+    }
+
+    fn nav(&self, _grant: &Grant, action: u32) -> Result<()> {
+        self.0
+            .nav(action)
+            .then_some(())
+            .ok_or_else(|| refused("navigation action refused"))
+    }
+
+    fn text(&self, _grant: &Grant, text: &str) -> Result<()> {
+        self.0
+            .text(text.to_owned())
+            .then_some(())
+            .ok_or_else(|| refused("text refused"))
+    }
+
+    fn key(&self, _grant: &Grant, code: u32, down: bool, meta: u32) -> Result<()> {
+        self.0
+            .key(code, down, meta)
+            .then_some(())
+            .ok_or_else(|| refused("key refused"))
+    }
+}
+
 /// What happened to a remote-control session.
 #[derive(Clone, Debug, uniffi::Record)]
 pub struct FfiInputEvent {
     /// `session` (the session started or ended), `status` (what the host can
-    /// do), or `refused`.
+    /// do), `refused`, or `host_missing` (this phone is being controlled but
+    /// needs `accessibility_service` or `input_method` turned on; see
+    /// `missing`).
     pub kind: String,
     /// The host (hex).
     pub device_id: String,
@@ -35,6 +128,13 @@ pub struct FfiInputEvent {
     pub missing: String,
     /// For `status`: the host's back-end name, display only.
     pub backend: String,
+    /// For `status`: the host's display width in pixels, 0 when unknown.
+    pub width: u32,
+    /// For `status`: the host's display height in pixels, 0 when unknown.
+    pub height: u32,
+    /// For `status` with `ready`: `input_method` when typing is not possible
+    /// on the host, otherwise empty.
+    pub text_missing: String,
 }
 
 struct Listener(Arc<dyn InputListener>);
@@ -47,6 +147,9 @@ impl Listener {
             detail: detail.into(),
             missing: missing.into(),
             backend: backend.into(),
+            width: 0,
+            height: 0,
+            text_missing: String::new(),
         });
     }
 }
@@ -68,7 +171,21 @@ impl InputEvents for Listener {
             PermStatus::Missing(m) => ("missing", m.as_str()),
             PermStatus::Unavailable => ("unavailable", ""),
         };
-        self.send("status", peer, detail, missing, &s.backend);
+        let (width, height) = s.display.unwrap_or((0, 0));
+        self.0.on_event(FfiInputEvent {
+            kind: "status".into(),
+            device_id: peer.hex(),
+            detail: detail.into(),
+            missing: missing.into(),
+            backend: s.backend.clone(),
+            width,
+            height,
+            text_missing: s.text_missing.map_or("", Missing::as_str).into(),
+        });
+    }
+
+    fn missing_permission(&self, peer: DeviceId, missing: Missing) {
+        self.send("host_missing", peer, "", missing.as_str(), "");
     }
 
     fn refused(&self, peer: DeviceId, reason: &str) {
@@ -89,6 +206,19 @@ impl UrDeviceNode {
         if let Ok(i) = self.input() {
             i.set_events(Arc::new(Listener(listener)));
         }
+    }
+
+    /// Give the core this phone's accessibility service and keyboard, so a
+    /// paired device can control it once the user approves (#19).
+    pub fn input_set_host(&self, host: Arc<dyn InputHostFfi>) {
+        if let Ok(i) = self.input() {
+            i.set_sink(Arc::new(TouchSink::new(Arc::new(HostAdapter(host)))));
+        }
+    }
+
+    /// Run Back (0), Home (1), or Recents (2) on `device`. Android hosts only.
+    pub fn input_nav(&self, device: String, action: u32) -> Result<(), FfiError> {
+        Ok(self.input()?.nav(device_id(&device)?, action)?)
     }
 
     /// Start a remote-control session with `device`. The host's user approves

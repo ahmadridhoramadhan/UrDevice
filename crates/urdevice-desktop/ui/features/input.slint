@@ -1,11 +1,14 @@
 // Remote control: pointer, keyboard, text, and presenter (#18, #19): the desktop feature view.
 // Rust side: src/features/input.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { Btn, Muted } from "../widgets.slint";
 
 // State and callbacks shared with src/features/input.rs.
 export global InputFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    // Open (or bring back) the remote-control window for that device.
+    callback open-window();
 }
 
 export component InputView inherits VerticalLayout {
@@ -13,7 +16,163 @@ export component InputView inherits VerticalLayout {
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    Muted {
+        text: @tr("Remote control of {} opens in its own window. Click inside it to capture your pointer and keyboard. Press Ctrl+Alt+G to release them.", root.peer-name);
+        wrap: word-wrap;
+    }
+    HorizontalLayout {
+        alignment: start;
+        Btn {
+            text: @tr("Open remote control");
+            kind: 0;
+            clicked => { InputFeature.open-window(); }
+        }
+    }
+}
+
+// The remote-control window (#19, T4.8, R9.1, R10.2). The pad below the bar stands for the other
+// device's screen: where the pointer is on it is where it goes there. Click the pad to capture the
+// pointer and keyboard; Ctrl+Alt+G releases them. src/features/input.rs turns the events into
+// input messages (the rules are in urdevice_core::services::input::capture).
+export component RemoteWindow inherits Window {
+    // Name of the device being controlled, and a one-line state for the bar.
+    in property <string> device-name;
+    in property <string> status;
+    // True while this window holds the pointer and keyboard.
+    in property <bool> captured;
+    // True while the session is running.
+    in property <bool> active;
+    // True for an Android host: shows Back, Home, and Recents.
+    in property <bool> show-nav;
+    // Width over height of the other device's display.
+    in property <float> aspect: 1.6;
+
+    // Pointer: position and the size of the pad (all in logical pixels).
+    callback pointer-move(length, length, length, length);
+    // Button (0 left, 1 right, 2 middle), pressed or not, then the same four numbers.
+    callback pointer-button(int, bool, length, length, length, length);
+    // Scroll deltas as the toolkit reports them.
+    callback pointer-scroll(float, float);
+    callback pointer-leave();
+    // Key text and the modifiers held: control, alt, shift, meta.
+    callback key-down(string, bool, bool, bool, bool);
+    callback key-up(string, bool, bool, bool, bool);
+    callback capture(bool);
+    // 0 Back, 1 Home, 2 Recents.
+    callback nav(int);
+    callback start();
+    callback stop();
+
+    title: @tr("UrDevice remote control: {}", root.device-name);
+    preferred-width: 900px;
+    preferred-height: 620px;
+    min-width: 360px;
+    min-height: 260px;
+    background: Theme.surface;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: root.status;
+                color: Theme.text;
+                font-size: Theme.font-body;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+            }
+            if root.active && root.show-nav: Btn { text: @tr("Back"); clicked => { root.nav(0); } }
+            if root.active && root.show-nav: Btn { text: @tr("Home"); clicked => { root.nav(1); } }
+            if root.active && root.show-nav: Btn { text: @tr("Recents"); clicked => { root.nav(2); } }
+            if !root.active: Btn { text: @tr("Start"); kind: 0; clicked => { root.start(); } }
+            if root.active: Btn { text: @tr("Stop"); kind: 2; clicked => { root.stop(); } }
+        }
+
+        area := Rectangle {
+            vertical-stretch: 1;
+            // The pad keeps the shape of the other display and is centred.
+            property <length> pad-w: min(self.width, self.height * root.aspect);
+            property <length> pad-h: self.pad-w / root.aspect;
+
+            pad := Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: parent.pad-w;
+                height: parent.pad-h;
+                background: Theme.surface-2;
+                border-radius: Theme.radius;
+                border-width: root.captured ? 2px : 1px;
+                border-color: root.captured ? Theme.accent : Theme.border;
+                clip: true;
+
+                Text {
+                    text: !root.active ? @tr("Start a session to control {}.", root.device-name)
+                        : root.captured ? @tr("Captured. Press Ctrl+Alt+G to release the pointer and keyboard.")
+                        : @tr("Click here to capture the pointer and keyboard.");
+                    color: Theme.text;
+                    opacity: 0.6;
+                    font-size: Theme.font-body;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                    width: parent.width - 24px;
+                    x: 12px;
+                }
+
+                fs := FocusScope {
+                    key-pressed(e) => {
+                        if (root.captured) {
+                            root.key-down(e.text, e.modifiers.control, e.modifiers.alt, e.modifiers.shift, e.modifiers.meta);
+                            return accept;
+                        }
+                        return reject;
+                    }
+                    key-released(e) => {
+                        if (root.captured) {
+                            root.key-up(e.text, e.modifiers.control, e.modifiers.alt, e.modifiers.shift, e.modifiers.meta);
+                            return accept;
+                        }
+                        return reject;
+                    }
+                }
+
+                TouchArea {
+                    enabled: root.active;
+                    mouse-cursor: root.captured ? MouseCursor.crosshair : MouseCursor.default;
+                    moved => {
+                        root.pointer-move(self.mouse-x, self.mouse-y, self.width, self.height);
+                    }
+                    pointer-event(e) => {
+                        if (e.kind == PointerEventKind.move) {
+                            root.pointer-move(self.mouse-x, self.mouse-y, self.width, self.height);
+                        } else if (e.kind == PointerEventKind.down || e.kind == PointerEventKind.up) {
+                            if (e.kind == PointerEventKind.down && !root.captured) {
+                                root.capture(true);
+                                fs.focus();
+                            } else {
+                                root.pointer-button(
+                                    e.button == PointerEventButton.right ? 1 : e.button == PointerEventButton.middle ? 2 : 0,
+                                    e.kind == PointerEventKind.down,
+                                    self.mouse-x, self.mouse-y, self.width, self.height);
+                            }
+                        }
+                    }
+                    scroll-event(e) => {
+                        if (root.captured) {
+                            root.pointer-scroll(e.delta-x / 1px, e.delta-y / 1px);
+                            return accept;
+                        }
+                        return reject;
+                    }
+                    changed has-hover => {
+                        if (!self.has-hover) { root.pointer-leave(); }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // The presenter's laser dot (design §9.3, R9b.3): a transparent window with no

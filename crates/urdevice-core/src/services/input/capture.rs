@@ -368,11 +368,17 @@ mod tests {
     fn special_keys_are_presses_and_releases() {
         let mut k = KeyboardCapture::default();
         assert_eq!(k.press("\n", NONE), vec![key(usage::ENTER, true, 0)]);
-        assert_eq!(k.press("\u{F702}", SHIFT), vec![key(usage::LEFT, true, modifier::SHIFT)]);
+        assert_eq!(
+            k.press("\u{F702}", SHIFT),
+            vec![key(usage::LEFT, true, modifier::SHIFT)]
+        );
         assert_eq!(k.press("\u{F704}", NONE), vec![key(usage::F1, true, 0)]);
         assert_eq!(k.press("\u{F70F}", NONE), vec![key(usage::F12, true, 0)]);
         assert_eq!(k.press("\u{F710}", NONE), vec![key(0x68, true, 0)]);
-        assert_eq!(k.press("\u{19}", NONE), vec![key(usage::TAB, true, modifier::SHIFT)]);
+        assert_eq!(
+            k.press("\u{19}", NONE),
+            vec![key(usage::TAB, true, modifier::SHIFT)]
+        );
         assert!(k.any_held());
         assert_eq!(k.release("\n", NONE), vec![key(usage::ENTER, false, 0)]);
         // The release carries the modifiers of the press, not of now.
@@ -385,9 +391,15 @@ mod tests {
     #[test]
     fn shortcuts_are_keys_with_modifiers() {
         let mut k = KeyboardCapture::default();
-        assert_eq!(k.press("c", CTRL), vec![key(usage::A + 2, true, modifier::CTRL)]);
+        assert_eq!(
+            k.press("c", CTRL),
+            vec![key(usage::A + 2, true, modifier::CTRL)]
+        );
         // Some systems send the control code.
-        assert_eq!(k.press("\u{1}", CTRL), vec![key(usage::A, true, modifier::CTRL)]);
+        assert_eq!(
+            k.press("\u{1}", CTRL),
+            vec![key(usage::A, true, modifier::CTRL)]
+        );
         assert_eq!(
             k.release("c", NONE),
             vec![key(usage::A + 2, false, modifier::CTRL)]
@@ -397,7 +409,10 @@ mod tests {
             vec![key(usage::A, false, modifier::CTRL)]
         );
         let meta = Mods { meta: true, ..NONE };
-        assert_eq!(k.press("d", meta), vec![key(usage::A + 3, true, modifier::META)]);
+        assert_eq!(
+            k.press("d", meta),
+            vec![key(usage::A + 3, true, modifier::META)]
+        );
         let cs = Mods {
             ctrl: true,
             shift: true,
@@ -424,7 +439,10 @@ mod tests {
     #[test]
     fn modifiers_alone_send_nothing() {
         let mut k = KeyboardCapture::default();
-        for m in ['\u{10}', '\u{11}', '\u{12}', '\u{13}', '\u{14}', '\u{15}', '\u{16}', '\u{17}', '\u{18}'] {
+        for m in [
+            '\u{10}', '\u{11}', '\u{12}', '\u{13}', '\u{14}', '\u{15}', '\u{16}', '\u{17}',
+            '\u{18}',
+        ] {
             assert!(k.press(&m.to_string(), NONE).is_empty());
             assert!(k.release(&m.to_string(), NONE).is_empty());
         }
@@ -451,7 +469,10 @@ mod tests {
         };
         assert_eq!(k.press("G", shifted), vec![KeyOut::Release]);
         assert_eq!(k.release("G", NONE), Vec::new());
-        assert_eq!(k.press("g", CTRL), vec![key(usage::A + 6, true, modifier::CTRL)]);
+        assert_eq!(
+            k.press("g", CTRL),
+            vec![key(usage::A + 6, true, modifier::CTRL)]
+        );
     }
 
     #[test]
@@ -461,7 +482,10 @@ mod tests {
         k.press("c", CTRL);
         let up = k.release_all();
         assert_eq!(up.len(), 2);
-        assert!(up.iter().all(|o| matches!(o, KeyOut::Key { down: false, .. })));
+        assert!(
+            up.iter()
+                .all(|o| matches!(o, KeyOut::Key { down: false, .. }))
+        );
         assert!(!k.any_held());
         assert!(k.release_all().is_empty());
     }

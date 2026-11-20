@@ -501,8 +501,8 @@ mod tests {
 
     use super::super::{InputSink, nav};
     use super::*;
-    use crate::permission::Capability;
     use crate::identity::DeviceId;
+    use crate::permission::Capability;
 
     const SIZE: (u32, u32) = (1000, 2000);
 
@@ -578,7 +578,13 @@ mod tests {
             s.apply(&abs(0.5, 0.8 - 0.05 * i as f32), i * 20, SIZE);
         }
         let acts = s.apply(&left(false), 220, SIZE);
-        let [Act::Gesture(Gesture::Swipe { points, duration_ms })] = acts.as_slice() else {
+        let [
+            Act::Gesture(Gesture::Swipe {
+                points,
+                duration_ms,
+            }),
+        ] = acts.as_slice()
+        else {
             panic!("{acts:?}")
         };
         assert_eq!(*duration_ms, 220);
@@ -640,14 +646,27 @@ mod tests {
         let mut s = State::new();
         s.apply(&abs(0.5, 0.5), 0, SIZE);
         let acts = s.apply(&PointerEvent::Scroll { dx: 0, dy: 120 }, 0, SIZE);
-        let [Act::Gesture(Gesture::Swipe { points, duration_ms })] = acts.as_slice() else {
+        let [
+            Act::Gesture(Gesture::Swipe {
+                points,
+                duration_ms,
+            }),
+        ] = acts.as_slice()
+        else {
             panic!("{acts:?}")
         };
         assert_eq!(*duration_ms, SCROLL_MS);
         assert!(points[1].1 < points[0].1, "wheel down moves the finger up");
         assert_eq!(points[1].0, points[0].0);
         // A huge wheel turn is bounded and stays on the display.
-        let acts = s.apply(&PointerEvent::Scroll { dx: -20_000, dy: 20_000 }, 0, SIZE);
+        let acts = s.apply(
+            &PointerEvent::Scroll {
+                dx: -20_000,
+                dy: 20_000,
+            },
+            0,
+            SIZE,
+        );
         let [Act::Gesture(Gesture::Swipe { points, .. })] = acts.as_slice() else {
             panic!("{acts:?}")
         };
@@ -815,7 +834,8 @@ mod tests {
         let sink = TouchSink::new(h.clone());
         let g = grant();
         sink.pointer(&g, &left(true)).unwrap();
-        sink.pointer(&g, &PointerEvent::Move { dx: 300, dy: 0 }).unwrap();
+        sink.pointer(&g, &PointerEvent::Move { dx: 300, dy: 0 })
+            .unwrap();
         sink.cancel(&g);
         // The core then releases the held button; nothing runs.
         sink.pointer(&g, &left(false)).unwrap();
