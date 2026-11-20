@@ -53,7 +53,14 @@ fn reason(e: &ashpd::Error) -> &'static str {
     }
 }
 
-async fn open() -> std::result::Result<(Screencast<'static>, ashpd::desktop::Session<'static, Screencast<'static>>, Started), &'static str> {
+async fn open() -> std::result::Result<
+    (
+        Screencast<'static>,
+        ashpd::desktop::Session<'static, Screencast<'static>>,
+        Started,
+    ),
+    &'static str,
+> {
     let proxy = Screencast::new().await.map_err(|e| reason(&e))?;
     let session = proxy.create_session().await.map_err(|e| reason(&e))?;
     let token = restore_token();
@@ -87,7 +94,8 @@ async fn open() -> std::result::Result<(Screencast<'static>, ashpd::desktop::Ses
 }
 
 pub(super) fn start(fps: u32, handler: Arc<dyn FrameHandler>) -> Result<CaptureHandle> {
-    let (ready_tx, ready_rx) = std::sync::mpsc::channel::<std::result::Result<Started, &'static str>>();
+    let (ready_tx, ready_rx) =
+        std::sync::mpsc::channel::<std::result::Result<Started, &'static str>>();
     let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
     let ended = handler.clone();
     std::thread::Builder::new()

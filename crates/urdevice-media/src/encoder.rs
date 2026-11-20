@@ -92,7 +92,10 @@ pub enum Backend {
 
 /// Open an encoder: the OS hardware encoder when `backend` allows it and one
 /// is present (Windows: Media Foundation), otherwise `openh264`.
-pub fn open(settings: EncoderSettings, backend: Backend) -> Result<Box<dyn VideoEncoder>, MediaError> {
+pub fn open(
+    settings: EncoderSettings,
+    backend: Backend,
+) -> Result<Box<dyn VideoEncoder>, MediaError> {
     settings.validate()?;
     if backend == Backend::Auto {
         #[cfg(target_os = "windows")]

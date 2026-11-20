@@ -146,9 +146,7 @@ pub(crate) fn copy_rows(
     if width == 0 || height == 0 || stride < row {
         return None;
     }
-    let need = stride
-        .checked_mul(height as usize - 1)?
-        .checked_add(row)?;
+    let need = stride.checked_mul(height as usize - 1)?.checked_add(row)?;
     if src.len() < need {
         return None;
     }

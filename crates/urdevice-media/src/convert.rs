@@ -31,7 +31,12 @@ impl BgraFrame {
             .checked_mul(self.height.saturating_sub(1) as usize)
             .and_then(|n| n.checked_add(row));
         match need {
-            Some(n) if self.width > 0 && self.height > 0 && self.stride >= row && self.data.len() >= n => {
+            Some(n)
+                if self.width > 0
+                    && self.height > 0
+                    && self.stride >= row
+                    && self.data.len() >= n =>
+            {
                 Ok(())
             }
             _ => Err(MediaError::BadFrame),
@@ -55,7 +60,9 @@ fn chroma(b: i32, g: i32, r: i32) -> (u8, u8) {
 /// Source column for each destination column (nearest sample).
 fn map(dst: u32, src: u32) -> Vec<usize> {
     (0..dst as usize)
-        .map(|x| ((x as u64 * src as u64 + src as u64 / 2) / dst as u64).min(src as u64 - 1) as usize)
+        .map(|x| {
+            ((x as u64 * src as u64 + src as u64 / 2) / dst as u64).min(src as u64 - 1) as usize
+        })
         .collect()
 }
 
@@ -168,7 +175,13 @@ mod tests {
     #[test]
     fn scales_down_and_checks_sizes() {
         let mut out = Vec::new();
-        bgra_to_i420(&solid(1920, 1080, [10, 20, 30, 255], 64), 1280, 720, &mut out).unwrap();
+        bgra_to_i420(
+            &solid(1920, 1080, [10, 20, 30, 255], 64),
+            1280,
+            720,
+            &mut out,
+        )
+        .unwrap();
         assert_eq!(out.len(), 1280 * 720 * 3 / 2);
         assert!(bgra_to_i420(&solid(4, 4, [0; 4], 0), 3, 4, &mut out).is_err());
         let mut short = solid(4, 4, [0; 4], 0);

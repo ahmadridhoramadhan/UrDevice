@@ -43,13 +43,15 @@ unsafe impl Send for Shareable {}
 fn shareable() -> Option<Retained<SCShareableContent>> {
     let (tx, rx) = mpsc::channel::<Option<Shareable>>();
     let tx = Mutex::new(Some(tx));
-    let block = RcBlock::new(move |content: *mut SCShareableContent, _err: *mut NSError| {
-        // SAFETY: the content pointer is valid for the call and retained here.
-        let c = unsafe { Retained::retain(content) }.map(Shareable);
-        if let Some(tx) = tx.lock().ok().and_then(|mut g| g.take()) {
-            let _ = tx.send(c);
-        }
-    });
+    let block = RcBlock::new(
+        move |content: *mut SCShareableContent, _err: *mut NSError| {
+            // SAFETY: the content pointer is valid for the call and retained here.
+            let c = unsafe { Retained::retain(content) }.map(Shareable);
+            if let Some(tx) = tx.lock().ok().and_then(|mut g| g.take()) {
+                let _ = tx.send(c);
+            }
+        },
+    );
     // SAFETY: the block lives until the handler ran (it is retained by SCK).
     unsafe { SCShareableContent::getShareableContentWithCompletionHandler(&block) };
     rx.recv_timeout(WAIT).ok().flatten().map(|s| s.0)
@@ -110,7 +112,12 @@ define_class!(
 
     unsafe impl SCStreamOutput for Output {
         #[unsafe(method(stream:didOutputSampleBuffer:ofType:))]
-        fn did_output(&self, _stream: &SCStream, sample: &CMSampleBuffer, kind: SCStreamOutputType) {
+        fn did_output(
+            &self,
+            _stream: &SCStream,
+            sample: &CMSampleBuffer,
+            kind: SCStreamOutputType,
+        ) {
             if kind != SCStreamOutputType::Screen {
                 return;
             }
@@ -121,7 +128,9 @@ define_class!(
             // SAFETY: the sample buffer is valid for the call; the pixel
             // buffer is locked read-only while its memory is copied.
             unsafe {
-                let Some(pb) = sample.image_buffer() else { return };
+                let Some(pb) = sample.image_buffer() else {
+                    return;
+                };
                 if CVPixelBufferLockBaseAddress(&pb, CVPixelBufferLockFlags::ReadOnly) != 0 {
                     return;
                 }
@@ -190,8 +199,12 @@ pub(super) fn start(id: u32, fps: u32, handler: Arc<dyn FrameHandler>) -> Result
             flags: CMTimeFlags::Valid,
             epoch: 0,
         });
-        let stream =
-            SCStream::initWithFilter_configuration_delegate(SCStream::alloc(), &filter, &config, None);
+        let stream = SCStream::initWithFilter_configuration_delegate(
+            SCStream::alloc(),
+            &filter,
+            &config,
+            None,
+        );
         let output = Output::new(handler);
         let queue = DispatchQueue::new("urdevice.screen", None);
         stream

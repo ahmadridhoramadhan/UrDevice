@@ -185,7 +185,12 @@ unsafe extern "C" fn on_param(data: Ptr, id: u32, param: *const c_void) {
         let size = *(param as *const u32) as usize + 8;
         let bytes = std::slice::from_raw_parts(param as *const u8, size.min(64 * 1024));
         if let Some(f) = pod::parse_format(bytes) {
-            tracing::info!(format = f.format, width = f.width, height = f.height, "pipewire format");
+            tracing::info!(
+                format = f.format,
+                width = f.width,
+                height = f.height,
+                "pipewire format"
+            );
             s.format = f;
         }
     }
@@ -248,7 +253,11 @@ impl Capture {
             if tloop.is_null() {
                 return Err(refused("capture_failed"));
             }
-            let context = (api.pw_context_new)((api.pw_thread_loop_get_loop)(tloop), std::ptr::null_mut(), 0);
+            let context = (api.pw_context_new)(
+                (api.pw_thread_loop_get_loop)(tloop),
+                std::ptr::null_mut(),
+                0,
+            );
             if context.is_null() {
                 (api.pw_thread_loop_destroy)(tloop);
                 return Err(refused("capture_failed"));
@@ -350,4 +359,3 @@ impl Drop for Capture {
         }
     }
 }
-

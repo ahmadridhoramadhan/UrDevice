@@ -179,7 +179,9 @@ fn view_after_approval_streams_frames_with_indicator() {
     });
 
     svc.list_displays(a, activity).unwrap();
-    wait_until("displays", WAIT, || viewer.displays.lock().unwrap().len() == 2);
+    wait_until("displays", WAIT, || {
+        viewer.displays.lock().unwrap().len() == 2
+    });
 
     svc.start(a, activity, 2, 1280, 720, 0).unwrap();
     wait_until("frames", WAIT, || viewer.frames.lock().unwrap().len() >= 5);
@@ -338,14 +340,20 @@ fn request_view_reports_through_events() {
     svc.request_view(p.a.id()).unwrap();
     p.a.answer_prompt(false);
     wait_until("declined", WAIT, || {
-        viewer.errors.lock().unwrap().contains(&"declined".to_string())
+        viewer
+            .errors
+            .lock()
+            .unwrap()
+            .contains(&"declined".to_string())
     });
     svc.request_view(p.a.id()).unwrap();
     p.a.answer_prompt(true);
     wait_until("opened", WAIT, || viewer.opened.lock().unwrap().len() == 1);
     let activity = viewer.opened.lock().unwrap()[0];
     svc.list_displays(p.a.id(), activity).unwrap();
-    wait_until("displays", WAIT, || viewer.displays.lock().unwrap().len() == 2);
+    wait_until("displays", WAIT, || {
+        viewer.displays.lock().unwrap().len() == 2
+    });
 }
 
 #[test]

@@ -155,7 +155,11 @@ impl Copier {
 pub(super) fn start(id: u32, fps: u32, handler: Arc<dyn FrameHandler>) -> Result<CaptureHandle> {
     let monitor = monitors()
         .into_iter()
-        .nth((id as usize).checked_sub(1).ok_or_else(|| refused("no_display"))?)
+        .nth(
+            (id as usize)
+                .checked_sub(1)
+                .ok_or_else(|| refused("no_display"))?,
+        )
         .ok_or_else(|| refused("no_display"))?;
     let fail = |e: windows::core::Error| {
         tracing::warn!(error = %e, "Windows.Graphics.Capture failed");
@@ -184,9 +188,8 @@ pub(super) fn start(id: u32, fps: u32, handler: Arc<dyn FrameHandler>) -> Result
         let winrt_device: IDirect3DDevice = CreateDirect3D11DeviceFromDXGIDevice(&dxgi)
             .and_then(|i| i.cast())
             .map_err(fail)?;
-        let interop =
-            windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()
-                .map_err(fail)?;
+        let interop = windows::core::factory::<GraphicsCaptureItem, IGraphicsCaptureItemInterop>()
+            .map_err(fail)?;
         let item: GraphicsCaptureItem = interop.CreateForMonitor(monitor.handle).map_err(fail)?;
         let size = item.Size().map_err(fail)?;
         let pool = Direct3D11CaptureFramePool::CreateFreeThreaded(

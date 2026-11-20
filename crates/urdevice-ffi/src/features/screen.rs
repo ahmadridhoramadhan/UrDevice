@@ -326,9 +326,9 @@ impl UrDeviceNode {
         max_fps: u32,
     ) -> Result<(), FfiError> {
         let peer = device_id(&device)?;
-        Ok(self.screen_service()?.start(
-            peer, activity, display_id, max_width, max_height, max_fps,
-        )?)
+        Ok(self
+            .screen_service()?
+            .start(peer, activity, display_id, max_width, max_height, max_fps)?)
     }
 
     /// The decoder lost sync.

@@ -75,7 +75,10 @@ pub(super) fn start(id: u32, fps: u32, handler: Arc<dyn FrameHandler>) -> Result
     let index = (id as usize)
         .checked_sub(1)
         .ok_or_else(|| refused("no_display"))?;
-    let rect = rects.into_iter().nth(index).ok_or_else(|| refused("no_display"))?;
+    let rect = rects
+        .into_iter()
+        .nth(index)
+        .ok_or_else(|| refused("no_display"))?;
     let (conn, screen) = x11rb::connect(None).map_err(|_| refused("capture_failed"))?;
     let root = conn
         .setup()
@@ -127,5 +130,7 @@ pub(super) fn start(id: u32, fps: u32, handler: Arc<dyn FrameHandler>) -> Result
             }
         })
         .map_err(|_| refused("capture_failed"))?;
-    Ok(CaptureHandle::new(move || stop.store(true, Ordering::Relaxed)))
+    Ok(CaptureHandle::new(move || {
+        stop.store(true, Ordering::Relaxed)
+    }))
 }

@@ -201,7 +201,9 @@ mod tests {
             ..settings
         })
         .unwrap();
-        let u = enc.encode(&gradient(640, 360, 0), 1_000_000, false).unwrap();
+        let u = enc
+            .encode(&gradient(640, 360, 0), 1_000_000, false)
+            .unwrap();
         assert!(u[0].keyframe);
         assert!(dec.decode(&u[0].data, &mut pic).unwrap());
         assert_eq!((pic.width, pic.height), (160, 90));

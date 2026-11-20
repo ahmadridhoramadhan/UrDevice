@@ -22,7 +22,9 @@ use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
-use slint::{ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel};
+use slint::{
+    ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel,
+};
 use urdevice_core::identity::DeviceId;
 use urdevice_core::node::{PeerView, Snapshot};
 use urdevice_core::services::Grant;
@@ -72,7 +74,11 @@ impl ScreenHost for DesktopHost {
         target: VideoTarget,
         sink: Arc<dyn FrameSink>,
     ) -> urdevice_core::Result<Arc<dyn Capture>> {
-        tracing::info!(activity = grant.activity(), display = display_id, "sharing this screen");
+        tracing::info!(
+            activity = grant.activity(),
+            display = display_id,
+            "sharing this screen"
+        );
         let shared = Arc::new(Pipe {
             sink,
             mailbox: Mutex::new(None),
@@ -161,7 +167,12 @@ fn encode_loop(p: &Pipe) {
             Some(e) => e.reconfigure(settings).is_ok(),
             None => match AutoEncoder::open(settings, Backend::Auto) {
                 Ok(e) => {
-                    tracing::info!(encoder = e.name(), width = w, height = h, "screen encoder open");
+                    tracing::info!(
+                        encoder = e.name(),
+                        width = w,
+                        height = h,
+                        "screen encoder open"
+                    );
                     encoder = Some(e);
                     true
                 }
@@ -284,7 +295,8 @@ impl Decode {
     }
 
     fn publish(self: &Arc<Self>, pic: &RgbaFrame) {
-        let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&pic.data, pic.width, pic.height);
+        let buf =
+            SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&pic.data, pic.width, pic.height);
         *lock(&self.pending) = Some(buf);
         if self.posted.swap(true, Ordering::AcqRel) {
             return;
@@ -292,7 +304,9 @@ impl Decode {
         let me = self.clone();
         let _ = self.window.upgrade_in_event_loop(move |w| {
             me.posted.store(false, Ordering::Release);
-            let Some(buf) = lock(&me.pending).take() else { return };
+            let Some(buf) = lock(&me.pending).take() else {
+                return;
+            };
             let g = w.global::<ScreenFeature>();
             g.set_frame_width(buf.width() as i32);
             g.set_frame_height(buf.height() as i32);
@@ -322,7 +336,9 @@ fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
                     continue;
                 }
                 waiting_key = false;
-                let Some(decoder) = dec.as_mut() else { continue };
+                let Some(decoder) = dec.as_mut() else {
+                    continue;
+                };
                 match decoder.decode(&f.data, &mut pic) {
                     Ok(true) => d.publish(&pic),
                     Ok(false) => {}
@@ -459,7 +475,9 @@ fn on_displays(w: &MainWindow, peer: DeviceId, activity: u64, displays: Vec<Disp
         let index = displays.iter().position(|d| d.primary).unwrap_or(0);
         Some((first, index, u.svc.clone()))
     });
-    let Some((first, index, svc)) = start else { return };
+    let Some((first, index, svc)) = start else {
+        return;
+    };
     let g = w.global::<ScreenFeature>();
     let names: Vec<SharedString> = displays
         .iter()
@@ -554,7 +572,9 @@ fn wire(w: &MainWindow) {
             let d = u.displays.get(usize::try_from(i).ok()?)?.id;
             Some((u.peer?, u.activity?, d, u.svc.clone()?))
         });
-        let Some((peer, act, display, svc)) = pick else { return };
+        let Some((peer, act, display, svc)) = pick else {
+            return;
+        };
         let g = w.global::<ScreenFeature>();
         g.set_display_index(i);
         g.set_state(2);
@@ -617,7 +637,9 @@ impl Feature for Screen {
     }
 
     fn refresh(&self, ctx: &FeatureCtx, snap: &Snapshot) {
-        let Some(w) = ctx.window.upgrade() else { return };
+        let Some(w) = ctx.window.upgrade() else {
+            return;
+        };
         // The view's peer went offline: the session is gone.
         let peer = UI.with(|u| u.borrow().peer);
         if let Some(p) = peer
@@ -637,8 +659,12 @@ impl Feature for Screen {
     }
 
     fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
-        let Some(w) = ctx.window.upgrade() else { return };
-        let Some(id) = DeviceId::from_hex(&peer.id) else { return };
+        let Some(w) = ctx.window.upgrade() else {
+            return;
+        };
+        let Some(id) = DeviceId::from_hex(&peer.id) else {
+            return;
+        };
         let (old_peer, old_act, svc) = UI.with(|u| {
             let u = u.borrow();
             (u.peer, u.activity, u.svc.clone())
@@ -651,6 +677,7 @@ impl Feature for Screen {
             reset(&w, kind::NONE);
             UI.with(|u| u.borrow_mut().peer = Some(id));
         }
-        w.global::<ScreenFeature>().set_peer_id(peer.id.clone().into());
+        w.global::<ScreenFeature>()
+            .set_peer_id(peer.id.clone().into());
     }
 }

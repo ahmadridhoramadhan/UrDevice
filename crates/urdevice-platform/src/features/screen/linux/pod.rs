@@ -163,7 +163,9 @@ pub(super) fn parse_format(pod: &[u8]) -> Option<VideoFormat> {
         let v = at + 16;
         if let Some((vty, vat)) = value(pod, v, size, ty) {
             match (key, vty) {
-                (FORMAT_VIDEO_FORMAT, T_ID) | (FORMAT_VIDEO_FORMAT, T_INT) => out.format = rd(pod, vat)?,
+                (FORMAT_VIDEO_FORMAT, T_ID) | (FORMAT_VIDEO_FORMAT, T_INT) => {
+                    out.format = rd(pod, vat)?
+                }
                 (FORMAT_VIDEO_SIZE, T_RECTANGLE) => {
                     out.width = rd(pod, vat)?;
                     out.height = rd(pod, vat + 4)?;
@@ -196,7 +198,14 @@ mod tests {
         assert_eq!(rd(&p, 4), Some(T_OBJECT));
         // The parser walks it to the end and reads the defaults.
         let f = parse_format(&p).unwrap();
-        assert_eq!(f, VideoFormat { format: VIDEO_BGRX, width: 1920, height: 1080 });
+        assert_eq!(
+            f,
+            VideoFormat {
+                format: VIDEO_BGRX,
+                width: 1920,
+                height: 1080
+            }
+        );
     }
 
     #[test]
@@ -218,7 +227,11 @@ mod tests {
         b.0[..4].copy_from_slice(&body.to_ne_bytes());
         assert_eq!(
             parse_format(&b.0),
-            Some(VideoFormat { format: VIDEO_RGBA, width: 2560, height: 1440 })
+            Some(VideoFormat {
+                format: VIDEO_RGBA,
+                width: 2560,
+                height: 1440
+            })
         );
     }
 

@@ -9,6 +9,7 @@
 
 use std::time::{Duration, Instant};
 
+use windows::Win32::Foundation::VARIANT_TRUE;
 use windows::Win32::Media::MediaFoundation::{
     CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonRateControlMode,
     CODECAPI_AVEncMPVDefaultBPictureCount, CODECAPI_AVEncMPVGOPSize,
@@ -18,16 +19,15 @@ use windows::Win32::Media::MediaFoundation::{
     MF_EVENT_FLAG_NO_WAIT, MF_LOW_LATENCY, MF_MT_AVG_BITRATE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE,
     MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_MPEG2_PROFILE, MF_MT_PIXEL_ASPECT_RATIO,
     MF_MT_SUBTYPE, MF_TRANSFORM_ASYNC_UNLOCK, MF_VERSION, MFCreateMediaType, MFCreateMemoryBuffer,
-    MFCreateSample, MFMediaType_Video, MFShutdown, MFSTARTUP_NOSOCKET, MFSampleExtension_CleanPoint,
-    MFStartup, MFT_CATEGORY_VIDEO_ENCODER, MFT_ENUM_FLAG_HARDWARE, MFT_ENUM_FLAG_SORTANDFILTER,
-    MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
+    MFCreateSample, MFMediaType_Video, MFSTARTUP_NOSOCKET, MFSampleExtension_CleanPoint,
+    MFShutdown, MFStartup, MFT_CATEGORY_VIDEO_ENCODER, MFT_ENUM_FLAG_HARDWARE,
+    MFT_ENUM_FLAG_SORTANDFILTER, MFT_MESSAGE_COMMAND_FLUSH, MFT_MESSAGE_NOTIFY_BEGIN_STREAMING,
     MFT_MESSAGE_NOTIFY_END_OF_STREAM, MFT_MESSAGE_NOTIFY_END_STREAMING,
-    MFT_MESSAGE_NOTIFY_START_OF_STREAM, MFT_OUTPUT_DATA_BUFFER, MFT_REGISTER_TYPE_INFO,
-    MFTEnumEx, MFVideoFormat_H264, MFVideoFormat_NV12, MFVideoInterlace_Progressive,
+    MFT_MESSAGE_NOTIFY_START_OF_STREAM, MFT_OUTPUT_DATA_BUFFER, MFT_REGISTER_TYPE_INFO, MFTEnumEx,
+    MFVideoFormat_H264, MFVideoFormat_NV12, MFVideoInterlace_Progressive,
     eAVEncCommonRateControlMode_CBR, eAVEncH264VProfile_Main,
 };
 use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoTaskMemFree};
-use windows::Win32::Foundation::VARIANT_TRUE;
 use windows::Win32::System::Variant::{VARIANT, VT_BOOL, VT_UI4};
 use windows::core::Interface;
 
@@ -132,9 +132,7 @@ impl MfEncoder {
             out_type
                 .SetUINT32(&MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Main.0 as u32)
                 .map_err(err)?;
-            transform
-                .SetOutputType(out_id, &out_type, 0)
-                .map_err(err)?;
+            transform.SetOutputType(out_id, &out_type, 0).map_err(err)?;
 
             let in_type = MFCreateMediaType().map_err(err)?;
             in_type

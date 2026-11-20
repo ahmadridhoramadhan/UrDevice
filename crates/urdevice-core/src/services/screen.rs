@@ -548,7 +548,11 @@ impl Screen {
             .get(&(peer, activity))
             .map(|s| s.stop.clone());
         let Some(stop) = stop else { return };
-        tracing::info!(activity, display = start.display_id, "screen session starting");
+        tracing::info!(
+            activity,
+            display = start.display_id,
+            "screen session starting"
+        );
         let state = self.state.clone();
         let ctx2 = ctx.clone();
         ctx.spawn(run_host_session(
@@ -562,8 +566,7 @@ impl Screen {
             return;
         };
         let now = Instant::now();
-        if s
-            .last_keyframe
+        if s.last_keyframe
             .is_some_and(|t| now.duration_since(t) < KEYFRAME_MIN_GAP)
         {
             return;
