@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.urdevice.app.Labels
 import com.urdevice.app.R
+import com.urdevice.app.ui.features.BluetoothFeature
 import com.urdevice.app.ui.features.allFeatures
 import com.urdevice.core.FfiActivity
 import com.urdevice.core.FfiLogEntry
@@ -55,7 +56,7 @@ private fun lastSeen(ts: ULong): String =
 
 @Composable
 fun peerLine(p: FfiPeer): String = when (p.status) {
-    "connected" -> stringResource(R.string.status_connected_line, platformName(p.platform), (p.rttMs ?: 0u).toInt())
+    "connected" -> stringResource(R.string.status_connected_line, platformName(p.platform), BluetoothFeature.pathLabel(p.path), (p.rttMs ?: 0u).toInt())
     "disconnected" -> stringResource(R.string.status_disconnected_by, p.disconnectedBy)
     else -> if (p.lastSeen > 0u) stringResource(R.string.status_last_seen, lastSeen(p.lastSeen)) else stringResource(R.string.status_offline)
 }
@@ -219,6 +220,8 @@ fun DeviceScreen(
                 }
             }
         }
+        // Feature cards under the header, for example the Bluetooth LE banner (R6.4).
+        allFeatures.forEach { it.DeviceBanner(peer) }
         if (peer.status != "connected") {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(14.dp)) {
@@ -252,6 +255,7 @@ fun DeviceScreen(
                             label = stringResource(t.label ?: Labels.cap(t.cap)),
                             icon = t.key,
                             mode = mode,
+                            available = BluetoothFeature.available(peer, t.cap),
                             host = peer.name,
                             onClick = { if (f.hasScreen) onOpenFeature(f.id, t.key) else onRequest(t.cap) },
                             onGear = onSettings,
@@ -280,19 +284,23 @@ fun DeviceScreen(
     }
 }
 
-/** A feature tile: normal for Allow, "Needs approval" for Always Ask, grey for Deny. */
+/**
+ * A feature tile: normal for Allow, "Needs approval" for Always Ask, grey for Deny, and grey with
+ * "Not available over Bluetooth" when the session runs on Bluetooth LE (R6.4).
+ */
 @Composable
 private fun FeatureTile(
     label: String,
     icon: String,
     mode: FfiMode,
+    available: Boolean,
     host: String,
     onClick: () -> Unit,
     onGear: () -> Unit,
     modifier: Modifier,
 ) {
     val c = LocalModes.current
-    val off = mode == FfiMode.DENY
+    val off = mode == FfiMode.DENY || !available
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (off) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
@@ -309,13 +317,13 @@ private fun FeatureTile(
             }
             Text(label, fontWeight = FontWeight.SemiBold, color = if (off) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
             Text(
-                when (mode) {
+                if (!available) stringResource(R.string.bt_tile_unavailable) else when (mode) {
                     FfiMode.ALLOW -> stringResource(R.string.tile_ready)
                     FfiMode.ASK -> stringResource(R.string.tile_needs_approval)
                     FfiMode.DENY -> stringResource(R.string.tile_turned_off_by, host)
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = when (mode) {
+                color = if (!available) MaterialTheme.colorScheme.onSurfaceVariant else when (mode) {
                     FfiMode.ALLOW -> c.allowFg
                     FfiMode.ASK -> c.askFg
                     FfiMode.DENY -> MaterialTheme.colorScheme.onSurfaceVariant

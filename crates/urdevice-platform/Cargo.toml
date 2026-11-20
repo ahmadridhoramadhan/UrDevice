@@ -19,6 +19,11 @@ tracing.workspace = true
 urdevice-core.workspace = true
 urdevice-proto.workspace = true
 zune-jpeg.workspace = true
+# Bluetooth fallback (#23): the GATT central.
+btleplug.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+uuid.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { workspace = true, features = ["async-secret-service", "tokio", "crypto-rust"] }

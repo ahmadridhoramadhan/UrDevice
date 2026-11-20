@@ -9,6 +9,8 @@ import { ClipboardFeature } from "features/clipboard.slint";
 import { FilesSettings } from "features/files.slint";
 // Localhost sharing (#22): this device's shared ports and the LAN indicator.
 import { TunnelHostSection, TunnelLanBanner } from "features/tunnel.slint";
+// Bluetooth fallback (#23): the banner while on Bluetooth LE.
+import { BleBanner } from "features/bluetooth.slint";
 
 export { Labels } from "labels.slint";
 // The feature globals, for src/features/*.rs.
@@ -47,7 +49,7 @@ export struct TileItem {
     view: bool,
     label: string,
     icon: image,
-    // 0 allow, 1 ask, 2 deny
+    // 0 allow, 1 ask, 2 deny, 3 not available over Bluetooth LE (R6.4)
     mode: int,
 }
 
@@ -769,6 +771,7 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
+                        BleBanner { }
                         if root.peer.status != "connected": Card {
                             height: 70px;
                             VerticalLayout {
@@ -795,11 +798,11 @@ export component MainWindow inherits Window {
                                 border-radius: Theme.radius;
                                 border-width: 1px;
                                 border-color: Theme.border;
-                                background: t.mode == 2 ? Theme.surface-2 : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
-                                opacity: t.mode == 2 ? 0.6 : 1;
+                                background: t.mode >= 2 ? Theme.surface-2 : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
+                                opacity: t.mode >= 2 ? 0.6 : 1;
                                 tile-ta := TouchArea {
-                                    enabled: t.mode != 2;
-                                    mouse-cursor: t.mode == 2 ? default : pointer;
+                                    enabled: t.mode < 2;
+                                    mouse-cursor: t.mode >= 2 ? default : pointer;
                                     clicked => {
                                         if (t.view) {
                                             root.feature = t.feature;
@@ -826,7 +829,7 @@ export component MainWindow inherits Window {
                                     }
                                     Text { text: t.label; font-weight: 600; color: Theme.text; }
                                     Text {
-                                        text: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : @tr("Turned off by {}", root.peer.name);
+                                        text: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : t.mode == 3 ? @tr("Not available over Bluetooth") : @tr("Turned off by {}", root.peer.name);
                                         font-size: Theme.font-small;
                                         color: t.mode == 0 ? Theme.allow-fg : t.mode == 1 ? Theme.ask-fg : Theme.muted;
                                     }

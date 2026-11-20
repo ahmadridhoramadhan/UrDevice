@@ -193,10 +193,10 @@ fn wanted(inner: &Inner, now: Instant) -> Vec<DeviceId> {
         .filter(|d| st.paused.get(&d.id).is_none_or(|t| *t <= now))
         .filter(|d| match st.sessions.get(&d.id) {
             Some(s) => !s.link.is_ble() && s.stalled,
-            None => !st
+            None => st
                 .nearby
                 .get(&d.id.short())
-                .is_some_and(|n| now.duration_since(n.last_seen) < super::paths::FRESH),
+                .is_none_or(|n| now.duration_since(n.last_seen) >= super::paths::FRESH),
         })
         .map(|d| d.id)
         .collect()

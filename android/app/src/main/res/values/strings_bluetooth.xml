@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bluetooth fallback (#23, design §8). -->
+<resources>
+    <string name="bt_path_wifi">Wi-Fi</string>
+    <string name="bt_path_pan">Bluetooth</string>
+    <string name="bt_path_ble">Bluetooth LE</string>
+    <string name="bt_banner_title">Connected over Bluetooth LE. %1$s are unavailable until Wi-Fi returns.</string>
+    <string name="bt_banner_body">Remote control, presenter, media control, and clipboard text still work.</string>
+    <string name="bt_tile_unavailable">Not available over Bluetooth</string>
+    <string name="bt_permission_title">Stay connected without Wi-Fi</string>
+    <string name="bt_permission_body">Allow Nearby devices so %1$s can reach this phone over Bluetooth when Wi-Fi drops.</string>
+    <string name="bt_permission_allow">Allow</string>
+    <string name="bt_tether_title">Use every feature without Wi-Fi</string>
+    <string name="bt_tether_body">Turn on Bluetooth tethering, and %1$s keeps all features over Bluetooth. Android does not let apps turn it on. On some phones it is under Hotspot, Other hotspot settings.</string>
+    <string name="bt_tether_open">Open tethering settings</string>
+</resources>
