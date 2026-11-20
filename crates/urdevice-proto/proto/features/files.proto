@@ -1,0 +1,22 @@
+// File transfer (#17, design §9.2). Mirrors src/features/files.rs.
+syntax = "proto3";
+package urdevice.files;
+
+// Stream kind 1 (data): meta = transfer id, 8 bytes big-endian. Frames are
+// described in crates/urdevice-core/src/services/files/wire.rs.
+
+message FileEntry { string rel_path = 1; uint64 size = 2; }
+message Offer { uint64 transfer_id = 1; repeated FileEntry files = 2; uint64 total_size = 3; }
+message ResumeAt { uint32 index = 1; uint64 offset = 2; }
+message Accept { uint64 transfer_id = 1; repeated ResumeAt resume = 2; }
+message Decline { uint64 transfer_id = 1; string reason = 2; }
+message Cancel { uint64 transfer_id = 1; }
+
+message FilesMsg {
+  oneof msg {
+    Offer offer = 1;
+    Accept accept = 2;
+    Decline decline = 3;
+    Cancel cancel = 4;
+  }
+}

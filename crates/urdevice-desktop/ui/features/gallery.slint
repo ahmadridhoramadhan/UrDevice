@@ -1,11 +1,76 @@
 // Android gallery (#17): the desktop feature view.
 // Rust side: src/features/gallery.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Btn, Card, Muted } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+
+export struct GalleryTile {
+    index: int,
+    thumb: image,
+    has-thumb: bool,
+    name: string,
+    size-text: string,
+    // Video length, empty for photos.
+    duration: string,
+    selected: bool,
+}
 
 // State and callbacks shared with src/features/gallery.rs.
 export global GalleryFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    in property <[GalleryTile]> items;
+    in property <bool> loading;
+    in property <bool> more;
+    // Empty, or `permission`, `denied`, `declined`, `timeout`, `failed`, ...
+    in property <string> error;
+    in property <int> selected;
+    // Items just sent to the download list.
+    in property <int> queued;
+    callback reload();
+    callback load-more();
+    callback toggle(int);
+    callback select-all(bool);
+    callback download();
+    callback open-folder();
+}
+
+component Tile inherits Rectangle {
+    in property <GalleryTile> t;
+    width: 132px;
+    height: 160px;
+    border-radius: 8px;
+    background: t.selected ? Theme.accent.with-alpha(0.25) : Theme.surface-2;
+    border-width: t.selected ? 2px : 0px;
+    border-color: Theme.accent;
+    ta := TouchArea { clicked => { GalleryFeature.toggle(t.index); } }
+    VerticalLayout {
+        padding: 6px;
+        spacing: 4px;
+        Rectangle {
+            height: 120px;
+            clip: true;
+            border-radius: 6px;
+            background: Theme.surface;
+            if t.has-thumb: Image { source: t.thumb; width: parent.width; height: parent.height; image-fit: cover; }
+            if !t.has-thumb: Muted { text: @tr("No preview"); horizontal-alignment: center; vertical-alignment: center; }
+            if t.duration != "": Rectangle {
+                x: parent.width - self.width - 4px;
+                y: parent.height - self.height - 4px;
+                width: dur.preferred-width + 8px;
+                height: 18px;
+                border-radius: 4px;
+                background: #000000a0;
+                dur := Text { text: t.duration; color: white; font-size: 11px; }
+            }
+            if t.selected: Rectangle {
+                x: 4px; y: 4px; width: 20px; height: 20px; border-radius: 10px;
+                background: Theme.accent;
+                Text { text: "✓"; color: Theme.on-accent; font-size: 12px; }
+            }
+        }
+        Text { text: t.name; font-size: 11px; color: Theme.text; overflow: elide; }
+        Text { text: t.size-text; font-size: 10px; color: Theme.muted; }
+    }
 }
 
 export component GalleryView inherits VerticalLayout {
@@ -13,5 +78,47 @@ export component GalleryView inherits VerticalLayout {
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Btn { text: GalleryFeature.selected > 0 ? @tr("Download {}", GalleryFeature.selected) : @tr("Download"); kind: 0; enabled: GalleryFeature.selected > 0; clicked => { if (GalleryFeature.selected > 0) { GalleryFeature.download(); } } }
+        Btn { text: @tr("Select all"); clicked => { GalleryFeature.select-all(true); } }
+        if GalleryFeature.selected > 0: Btn { text: @tr("Clear selection"); kind: 3; clicked => { GalleryFeature.select-all(false); } }
+        Btn { text: @tr("Reload"); kind: 3; clicked => { GalleryFeature.reload(); } }
+        Btn { text: @tr("Open download folder"); kind: 3; clicked => { GalleryFeature.open-folder(); } }
+    }
+    if GalleryFeature.queued > 0: Muted { text: @tr("Downloading {} items to the download folder. Progress shows in Send files.", GalleryFeature.queued); color: Theme.allow-fg; }
+    if GalleryFeature.error != "": Card {
+        VerticalLayout {
+            padding: 14px;
+            Text {
+                wrap: word-wrap;
+                color: Theme.deny-fg;
+                text: GalleryFeature.error == "permission" ? @tr("Allow UrDevice to read photos and videos on {}, then reload.", root.peer-name)
+                    : GalleryFeature.error == "denied" ? @tr("{} has Gallery turned off.", root.peer-name)
+                    : GalleryFeature.error == "declined" ? @tr("{} declined the request.", root.peer-name)
+                    : GalleryFeature.error == "timeout" ? @tr("{} did not answer in time.", root.peer-name)
+                    : GalleryFeature.error == "offline" ? @tr("{} is not connected.", root.peer-name)
+                    : GalleryFeature.error == "unsupported" ? @tr("{} has no gallery.", root.peer-name)
+                    : @tr("Could not load the gallery.");
+            }
+        }
+    }
+    if GalleryFeature.loading && GalleryFeature.items.length == 0: Muted { text: @tr("Waiting for {}…", root.peer-name); }
+    if !GalleryFeature.loading && GalleryFeature.error == "" && GalleryFeature.items.length == 0: Muted { text: @tr("No photos or videos."); }
+    // A simple wrapping grid: rows of tiles.
+    grid := Rectangle {
+        property <int> cols: max(1, floor((self.width + 8px) / 140px));
+        property <int> rows: ceil(GalleryFeature.items.length / cols);
+        height: rows * 168px;
+        for t[i] in GalleryFeature.items: Tile {
+            t: t;
+            x: mod(i, grid.cols) * 140px;
+            y: floor(i / grid.cols) * 168px;
+        }
+    }
+    if GalleryFeature.more: HorizontalLayout {
+        alignment: center;
+        Btn { text: GalleryFeature.loading ? @tr("Loading…") : @tr("Load more"); enabled: !GalleryFeature.loading; clicked => { GalleryFeature.load-more(); } }
+    }
 }

@@ -42,13 +42,13 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 - [x] T3.1 Clipboard service in the core: the Clip message, echo prevention, the size limit, and large images over bulk streams. _Req: R7.1, R7.2, R7.4_
 - [x] T3.2 Desktop clipboard adapters with change events and sensitive-flag detection on each OS, and the "Pause clipboard on all devices" setting in desktop Settings. _Req: R7.3, R7.6_
 - [x] T3.3 Android clipboard: write incoming content; send through the notification action, Quick Settings tile, and share sheet; detect `EXTRA_IS_SENSITIVE`; add per-device and global toggles. _Req: R7.3, R7.5, R7.6_
-- [ ] T3.4 File transfer service: Offer/Accept/Data/Done, `.urdevice-part` files with streaming SHA-256, resume sidecars, cancel, and progress events. _Req: R8.2–R8.5_
-- [ ] T3.5 Path cleaning and collision renaming. _Req: R8.6_
-- [ ]* T3.6 Property tests for path cleaning and fuzzing for transfer framing.
-- [ ] T3.7 Desktop transfers UI: file picker, drag-and-drop, progress list, and the download folder setting in Settings. _Req: R8.1, R8.3, R8.6_
-- [ ] T3.8 Android transfers: share-sheet target, picker, progress notifications, and saving through MediaStore Downloads. _Req: R8.1, R8.3, R15.3_
-- [ ] T3.9 Gallery: Android MediaStore provider with thumbnails and paging, and a desktop gallery browser with download. _Req: R8.7_
-- [ ] T3.10 Measure transfer throughput and tune chunk size and QUIC window settings. _Req: R8.8_
+- [x] T3.4 File transfer service: Offer/Accept/Data/Done, `.urdevice-part` files with streaming SHA-256, resume sidecars, cancel, and progress events. _Req: R8.2–R8.5_
+- [x] T3.5 Path cleaning and collision renaming. _Req: R8.6_
+- [x]* T3.6 Property tests for path cleaning and fuzzing for transfer framing.
+- [x] T3.7 Desktop transfers UI: file picker, drag-and-drop, progress list, and the download folder setting in Settings. _Req: R8.1, R8.3, R8.6_
+- [x] T3.8 Android transfers: share-sheet target, picker, progress notifications, and saving through MediaStore Downloads. _Req: R8.1, R8.3, R15.3_
+- [x] T3.9 Gallery: Android MediaStore provider with thumbnails and paging, and a desktop gallery browser with download. _Req: R8.7_
+- [x] T3.10 Measure transfer throughput and tune chunk size and QUIC window settings. _Req: R8.8_
 
 ## Phase 4: Remote control and keyboard
 

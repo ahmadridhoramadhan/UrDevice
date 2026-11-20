@@ -34,5 +34,8 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 urdevice-proto.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true

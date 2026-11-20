@@ -25,6 +25,12 @@
         </intent>
     </queries>
 
+    <!-- gallery (#17): paired desktops browse photos and videos (R8.7), asked when first needed. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+
     <application
         android:name=".UrDeviceApp"
         android:allowBackup="false"
@@ -111,6 +117,35 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/clipboard_paths" />
         </provider>
+
+        <!-- files (#17): share-sheet target (R8.1) and Cancel on transfer notifications. -->
+        <activity
+            android:name=".ui.features.ShareActivity"
+            android:exported="true"
+            android:label="@string/files_share_label"
+            android:theme="@style/Theme.UrDevice"
+            android:excludeFromRecents="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:name=".ui.features.CancelReceiver"
+            android:exported="false" />
+
+        <!-- gallery (#17): asks for photo and video access when a desktop first browses. -->
+        <activity
+            android:name=".ui.features.GalleryAccessActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 
 </manifest>

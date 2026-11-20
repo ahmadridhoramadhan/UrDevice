@@ -21,9 +21,11 @@ png.workspace = true
 rqrr.workspace = true
 zune-jpeg.workspace = true
 tracing.workspace = true
-slint.workspace = true
+slint = { workspace = true, features = ["unstable-winit-030"] }
+rfd.workspace = true
 urdevice-core = { workspace = true, features = ["mdns"] }
 urdevice-platform.workspace = true
+urdevice-proto.workspace = true
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon.workspace = true

@@ -309,17 +309,27 @@ The service receives a `Grant` that only the node can create. Services ask for a
 ### 9.2 File transfer (R8)
 
 ```
-Offer   { transfer_id, files[{rel_path, size, sha256?}], total_size }
-Accept  { transfer_id, resume[{index, offset}] } | Decline { reason }
-Data    on bulk stream: [index u32][offset u64][len u32][bytes]   (chunk = 1 MiB)
-Done    { transfer_id, per-file sha256 }
+Offer   { transfer_id, files[{rel_path, size}], total_size }           ToHost, after an activity
+Accept  { transfer_id, resume[{index, offset}] } | Decline { reason }  ToController
+Cancel  { transfer_id }                                                either way
+Data stream (one per transfer, meta = transfer_id):
+  sender → receiver   1 [index u32][offset u64][len u32][bytes]   (chunk = 1 MiB)
+                      2 [index u32][sha256 32 bytes]              end of a file
+  receiver → sender   1 [index u32][offset u64]                   bytes written (progress)
+                      2 [index u32][status u8]                    1 verified, 0 hash failed (sent once more), 2 failed
 ```
+
+The per-file SHA-256 travels at the end of each file on the data stream instead of a separate `Done` message, so the sender hashes while it reads and never reads a file twice. The receiver's verdicts on the same stream end the transfer.
 
 - **Path safety (R8.6):** each `rel_path` is split into components. The receiver rejects `..`, absolute paths, drive letters, NUL bytes, and Windows reserved names (`CON`, `NUL`, …). It joins the clean path under the incoming folder, then canonicalizes and checks that the result is still inside that folder. Name collisions become `name (1).ext`.
 - Data is written to `*.urdevice-part`, hashed while streaming, and renamed only after the hash matches (R8.4).
-- **Resume (R8.5):** the receiver keeps a sidecar file with the verified offset for each file and sends it back in `Accept.resume`.
+- **Resume (R8.5):** the receiver keeps a sidecar file (`*.urdevice-part.resume`: sender, transfer id, size, offset; synced every 16 MiB) and sends the offset back in `Accept.resume`. The sender hashes the bytes before the offset again, so the final check covers the whole file. When the session returns, or every 5 s while it is up, the sender offers the unverified files again under the same `transfer_id` (at most 20 times). The earlier activity has ended by then, so under Always Ask the receiver approves the resumed transfer again.
+- **Limits:** at most 10 000 files and 1 TiB per file per offer, 8 incoming transfers at once, 32 folder levels and 200-byte names; an offer that breaks a limit is declined with `invalid`.
+- **Download folder:** desktop `Downloads/UrDevice`, changeable in Settings (stored in the app data folder). Android receives into app-private storage and then publishes each verified file to `Download/UrDevice/<folder>` through MediaStore, which needs no storage permission and picks `name (1).ext` on a collision (R15.3).
+- **Pickers:** desktop file and folder pickers use `rfd` (the XDG portal on Linux). Drag-and-drop uses winit's dropped-file events; winit has no drop support on Wayland, so there the pickers are the way.
 - Progress is calculated from acknowledged bytes and passed to the UI about every 100 ms.
-- **Gallery (R8.7):** the Android `Gallery` uses MediaStore (`READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` on API 33+, `READ_EXTERNAL_STORAGE` on older versions). Messages are `GalleryList { cursor, page }` → items with 256-px JPEG thumbnails, then `GalleryFetch { id }`, which reuses the file-transfer path.
+- **Throughput (R8.8, T3.10), measured 2026-11-20** on 5 GHz Wi-Fi between the Linux laptop (debug build of the core) and the vivo I2505 (Android 16): Linux → Android 26.0 MB/s (200 MB) and 24.7 MB/s (600 MB); Android → Linux 28.9 MB/s (433 MB video, share sheet), round trip 12–50 ms. That is above the 20 MB/s target with 1 MiB chunks and quinn's default flow-control windows, so neither was changed.
+- **Gallery (R8.7):** the Android `Gallery` uses MediaStore (`READ_MEDIA_IMAGES` / `READ_MEDIA_VIDEO` on API 33+, `READ_EXTERNAL_STORAGE` on older versions; asked through a notification the first time a desktop browses). One activity covers one browsing session. Messages are `GalleryList { cursor, limit ≤ 60 }` → `GalleryPage { items[{id, name, mime, size, taken_ms, duration_ms, thumb}], next_cursor, error }` with 256-px JPEG thumbnails (≤ 64 KiB each, page under 1 MiB), then a download stream whose `meta` is `GalleryFetch { items[{id, offset, size}] }` (≤ 200 items). The phone answers on that stream with the file-transfer framing, so downloads get the same part files, SHA-256 check, resume, and transfer list. Item names keep only their last component.
 
 ### 9.3 Remote input (R9, R10)
 
