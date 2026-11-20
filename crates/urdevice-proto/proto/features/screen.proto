@@ -1,0 +1,56 @@
+// Screen sharing (#21, design §10). Reference copy of
+// `src/features/screen.rs`, which is the source of truth. Never reuse or
+// renumber a field. Carried as the body of a `Feature` envelope for service 6.
+
+syntax = "proto3";
+package urdevice.v1.screen;
+
+message Screen {
+  oneof msg {
+    ListDisplays list_displays = 1;       // viewer -> host
+    Displays displays = 2;                // host -> viewer
+    Start start = 3;                      // viewer -> host
+    RequestKeyframe request_keyframe = 4; // viewer -> host
+    ScreenError error = 5;                // host -> viewer
+  }
+}
+
+message ListDisplays {}
+
+message Display {
+  uint32 id = 1;
+  string name = 2;     // <= 128 bytes
+  uint32 width = 3;    // 0 when unknown until capture starts
+  uint32 height = 4;
+  bool primary = 5;
+}
+
+message Displays { repeated Display displays = 1; } // <= 16
+
+message Start {
+  uint32 display_id = 1;
+  uint32 max_width = 2;   // 0 = no limit
+  uint32 max_height = 3;
+  uint32 max_fps = 4;     // 0 = host default, <= 60
+}
+
+message RequestKeyframe {}
+
+// no_host, no_display, capture_failed, consent_declined, stopped
+message ScreenError { string reason = 1; }
+
+// Header meta of a video stream (stream kind 1, host -> viewer, unidirectional).
+message StreamInfo {
+  uint32 display_id = 1;
+  string codec = 2;       // "h264"
+}
+
+// On the video stream, each frame is a big-endian u32 length (1..=4 MiB)
+// followed by one encoded VideoFrame.
+message VideoFrame {
+  uint64 pts_us = 1;
+  bool keyframe = 2;
+  bytes data = 3;         // H.264 Annex B
+  uint32 width = 4;       // set on keyframes
+  uint32 height = 5;
+}
