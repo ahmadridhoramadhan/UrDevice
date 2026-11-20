@@ -90,6 +90,10 @@ windows = "0.62"
 proptest = { version = "1", default-features = false, features = ["std"] }
 rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "tokio"] }
 
+# Screen sharing (#21): the software H.264 encoder and decoder, built from
+# the bundled OpenH264 source (BSD-2-Clause).
+openh264 = "0.9"
+
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
 
