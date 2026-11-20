@@ -553,7 +553,7 @@ The camera service runs in the foreground service with the `camera` and `microph
 
 | Desktop | How notifications are read | Notes |
 |---|---|---|
-| Windows 10 1709+ | `UserNotificationListener` (WinRT) | Needs package identity (MSIX or a sparse package) and the user's consent. Checked in spike T10.5 |
+| Windows 10 1709+ | `UserNotificationListener` (WinRT), polled about once a second | Works from an unpackaged exe on Windows 11 build 26200, with the user's notification access setting. The change event needs package identity, so UrDevice polls and diffs by id. Checked in spike T10.5 |
 | Linux | D-Bus monitor (`BecomeMonitor`) on `org.freedesktop.Notifications.Notify` with `zbus` | Works on desktops that use the standard notification service. Checked in spike T10.5 |
 | macOS | Not supported | No public API. The UI says so (R18.1) |
 
@@ -619,7 +619,7 @@ The tunnel targets the phone's own loopback only, as in §11. UrDevice uses the 
 ### 18.9 Find my device (R25)
 
 - **Messages:** `Ring { start | stop }`.
-- **Android:** a full-screen notification and `MediaPlayer` with `USAGE_ALARM`. The alarm volume is raised for the duration of the ring and then restored. Do Not Disturb bypass needs notification-policy access. Android 14 limits full-screen intents, so the app falls back to a high-priority notification when it isn't allowed.
+- **Android:** a full-screen notification and `MediaPlayer` with `USAGE_ALARM`. The alarm volume is raised for the duration of the ring and then restored. Do Not Disturb bypass needs notification-policy access. Android 14 limits full-screen intents: `USE_FULL_SCREEN_INTENT` is not granted by default to an app that is not an alarm or calling app (Google Play policy, spike T10.4). The app checks `canUseFullScreenIntent()`, offers the system settings screen once, and falls back to a high-priority notification when it isn't allowed. The alarm-stream ring does not depend on it.
 - **Desktop:** plays a sound at a raised volume and shows a window on top of other windows.
 - `last_seen` and the network name come from the trust store.
 

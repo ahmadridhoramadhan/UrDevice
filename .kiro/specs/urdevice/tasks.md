@@ -109,11 +109,11 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 
 ## Phase 10: Release 2 risk spikes
 
-- [ ] T10.1 Spike: Wayland InputCapture portal on GNOME and KDE. List which desktops can share their mouse. _Req: R19.3_
-- [ ] T10.2 Spike: virtual cameras: a macOS Camera Extension, `MFCreateVirtualCamera` on Windows 11, and `v4l2loopback` on Linux, each showing a test pattern in a video-call app. _Req: R17.2_
-- [ ] T10.3 Spike: virtual displays: the ScreenCast virtual source on GNOME and KDE, a sample IddCx driver on Windows (including the signing steps and cost), and `CGVirtualDisplay` on the current macOS. _Req: R20.2_
-- [ ] T10.4 Spike: Google Play policy for full-screen intents, SMS, and call permissions. Confirm the `play`/`full` build split. _Req: R25.1, R29.3_
-- [ ] T10.5 Spike: read notifications on desktop hosts: Windows `UserNotificationListener` (including the package identity it needs) and the Linux D-Bus monitor on GNOME and KDE. _Req: R18.1_
+- [x] T10.1 Spike: Wayland InputCapture portal on GNOME and KDE. List which desktops can share their mouse. _Req: R19.3_
+- [x] T10.2 Spike: virtual cameras: a macOS Camera Extension, `MFCreateVirtualCamera` on Windows 11, and `v4l2loopback` on Linux, each showing a test pattern in a video-call app. _Req: R17.2_
+- [x] T10.3 Spike: virtual displays: the ScreenCast virtual source on GNOME and KDE, a sample IddCx driver on Windows (including the signing steps and cost), and `CGVirtualDisplay` on the current macOS. _Req: R20.2_
+- [x] T10.4 Spike: Google Play policy for full-screen intents, SMS, and call permissions. Confirm the `play`/`full` build split. _Req: R25.1, R29.3_
+- [x] T10.5 Spike: read notifications on desktop hosts: Windows `UserNotificationListener` (including the package identity it needs) and the Linux D-Bus monitor on GNOME and KDE. _Req: R18.1_
 
 ## Phase 11: Phone-centered features
 
@@ -162,7 +162,7 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 
 ## Phase 16: Speaker
 
-- [ ] T16.1 Spike: capture system audio on each OS (WASAPI loopback, PipeWire/PulseAudio monitor, macOS ScreenCaptureKit or a loopback driver, Android `AudioPlaybackCapture`). Record which OS and version works. _Req: R31.1, R31.7_
+- [x] T16.1 Spike: capture system audio on each OS (WASAPI loopback, PipeWire/PulseAudio monitor, macOS ScreenCaptureKit or a loopback driver, Android `AudioPlaybackCapture`). Record which OS and version works. _Req: R31.1, R31.7_
 - [ ] T16.2 Audio protocol: Opus stream over a QUIC stream or datagrams, with a small jitter buffer and `audio.out.v1` capability negotiation. _Req: R31.1, R31.2_
 - [ ] T16.3 Target playback on each OS, with volume, mute, and the "playing from X" indicator and Stop button. _Req: R31.5, R31.6_
 - [ ] T16.4 `audio.out.v1` follows the permission settings (R5): a default chosen when the feature is built and added to onboarding, the setting on the "This device" view, and activity-log entries. _Req: R31.3, R31.4, R31.8_
