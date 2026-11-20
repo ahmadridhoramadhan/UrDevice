@@ -553,7 +553,7 @@ The camera service runs in the foreground service with the `camera` and `microph
 
 | Desktop | How notifications are read | Notes |
 |---|---|---|
-| Windows 10 1709+ | `UserNotificationListener` (WinRT) | Needs package identity (MSIX or a sparse package) and the user's consent. Checked in spike T10.5 |
+| Windows 10 1709+ | `UserNotificationListener` (WinRT), polled about once a second | Works from an unpackaged exe on Windows 11 build 26200, with the user's notification access setting. The change event needs package identity, so UrDevice polls and diffs by id. Checked in spike T10.5 |
 | Linux | D-Bus monitor (`BecomeMonitor`) on `org.freedesktop.Notifications.Notify` with `zbus` | Works on desktops that use the standard notification service. Checked in spike T10.5 |
 | macOS | Not supported | No public API. The UI says so (R18.1) |
 
