@@ -123,6 +123,15 @@ impl UrDeviceNode {
         Ok(self.input()?.pointer_move(device_id(&device)?, dx, dy)?)
     }
 
+    /// Put the host's pointer at `x`, `y` (0.0 to 1.0 across and down its primary
+    /// display). Not available on Wayland and `uinput` hosts.
+    pub fn input_abs(&self, device: String, x: f32, y: f32) -> Result<(), FfiError> {
+        let to = |v: f32| (v.clamp(0.0, 1.0) * 65535.0).round() as u32;
+        Ok(self
+            .input()?
+            .pointer_abs(device_id(&device)?, to(x), to(y), 0)?)
+    }
+
     /// Turn the host's wheel: 120 is one notch, down and right are positive.
     pub fn input_scroll(&self, device: String, dx: i32, dy: i32) -> Result<(), FfiError> {
         Ok(self.input()?.scroll(device_id(&device)?, dx, dy)?)

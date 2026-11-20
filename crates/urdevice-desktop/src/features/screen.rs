@@ -41,10 +41,10 @@ use crate::ui::{MainWindow, ScreenFeature};
 
 pub(crate) struct Screen;
 
-/// Remote control from the viewing window (R12.5) needs the input service
-/// (#18, feature `input`), which is not on `main` yet. Until it is, the view
-/// is view-only and [`pointer`] is the hook to fill in.
-const INPUT_FORWARDING: bool = false;
+/// Remote control from the viewing window (R12.5): clicks and movement on the
+/// picture go to the host's input service (#18). The host asks its own user
+/// (Always Ask) the first time; until it is allowed, nothing is sent.
+const INPUT_FORWARDING: bool = true;
 
 /// Frames waiting for the decoder before the viewer starts dropping.
 const DECODE_QUEUE: usize = 4;
@@ -410,6 +410,8 @@ impl ScreenEvents for Events {
 #[derive(Default)]
 struct Ui {
     svc: Option<Arc<ScreenService>>,
+    /// Remote control from the picture (#18).
+    input: Option<Arc<urdevice_core::services::input::Input>>,
     dec: Option<Arc<Decode>>,
     peer: Option<DeviceId>,
     activity: Option<u64>,
@@ -422,6 +424,14 @@ thread_local! {
 }
 
 fn reset(w: &MainWindow, message: i32) {
+    // The picture is gone, so remote control from it ends too.
+    let (input, peer) = UI.with(|u| {
+        let u = u.borrow();
+        (u.input.clone(), u.peer)
+    });
+    if let (Some(input), Some(peer)) = (input, peer) {
+        let _ = input.end(peer);
+    }
     UI.with(|u| {
         let mut u = u.borrow_mut();
         u.activity = None;
@@ -523,11 +533,37 @@ fn on_error(w: &MainWindow, peer: DeviceId, activity: u64, message: i32) {
 }
 
 /// Pointer on the picture (R12.5). `x`, `y` are fractions of the host's
-/// display. Remote control needs the input service (#18): when it is on
-/// `main`, request an `input.v1` activity for the peer and send `Abs`
-/// pointer events with these coordinates here.
-fn pointer(_x: f32, _y: f32, _event: i32, _button: i32) {
-    // TODO(#18): forward to the input service once it exists.
+/// display; `event` is 0 for movement, 1 for a button down, 2 for a button up;
+/// `button` is 0 left, 1 right, 2 middle. The first press asks the host for an
+/// `input.v1` activity (the host's user approves it and sees the indicator
+/// with Stop); movement before that is dropped. The host sees `Abs` events,
+/// which a Wayland or `uinput` host cannot place (it ignores them).
+fn pointer(x: f32, y: f32, event: i32, button: i32) {
+    let (input, peer) = UI.with(|u| {
+        let u = u.borrow();
+        (u.input.clone(), u.peer)
+    });
+    let (Some(input), Some(peer)) = (input, peer) else {
+        return;
+    };
+    if !input.is_active(peer) {
+        if event == 1 && !input.is_connecting(peer) {
+            let _ = input.connect(peer);
+        }
+        return;
+    }
+    let to = |v: f32| (v.clamp(0.0, 1.0) * 65535.0).round() as u32;
+    let _ = input.pointer_abs(peer, to(x), to(y), 0);
+    let b = u32::try_from(button).unwrap_or(0);
+    match event {
+        1 => {
+            let _ = input.button(peer, b, true);
+        }
+        2 => {
+            let _ = input.button(peer, b, false);
+        }
+        _ => {}
+    }
 }
 
 fn wire(w: &MainWindow) {
@@ -631,6 +667,7 @@ impl Feature for Screen {
         UI.with(|u| {
             let mut u = u.borrow_mut();
             u.svc = Some(svc);
+            u.input = ctx.node.service::<urdevice_core::services::input::Input>();
             u.dec = Some(dec);
         });
         wire(&w);

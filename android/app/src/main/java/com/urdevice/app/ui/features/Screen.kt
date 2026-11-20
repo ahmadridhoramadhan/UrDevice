@@ -85,16 +85,26 @@ object ScreenFeature : Feature {
     }
 }
 
-/** Remote control from the picture needs the input service (#18), not on `main` yet. */
-private const val INPUT_FORWARDING = false
+/** A tap on the picture clicks on the host through the input service (#18, R12.5). */
+private const val INPUT_FORWARDING = true
 
 /**
- * A tap at [x], [y] (fractions of the host's display). Hook for remote control (R12.5): once the
- * input service (#18) is on `main`, request an `input.v1` activity and send an `Abs` pointer event.
+ * A tap at [x], [y] (fractions of the host's display) clicks there (R12.5). The first tap asks the
+ * host for a remote-control session (its user approves it and sees the indicator with Stop); taps
+ * before it is allowed are dropped.
  */
-@Suppress("UNUSED_PARAMETER")
 private fun pointer(peer: String, x: Float, y: Float) {
-    // TODO(#18): forward to the input service once it exists.
+    val node = Core.node() ?: return
+    val s = InputFeature.sessions.value[peer]
+    if (s?.active != true) {
+        if (s?.connecting != true) InputFeature.connect(node, peer)
+        return
+    }
+    runCatching {
+        node.inputAbs(peer, x, y)
+        node.inputButton(peer, 0u, true)
+        node.inputButton(peer, 0u, false)
+    }
 }
 
 /** Viewer state and events from the core. Callbacks run on core threads; StateFlow is thread-safe. */
@@ -336,7 +346,11 @@ private fun ScreenScreen(peer: FfiPeer) {
 
     // Leaving the screen ends the session.
     DisposableEffect(peer.id) {
-        onDispose { if (ScreenViewer.peer == peer.id) ScreenViewer.stop(null) }
+        onDispose {
+            if (ScreenViewer.peer == peer.id) ScreenViewer.stop(null)
+            // Remote control from the picture ends with the screen (#18).
+            Core.node()?.let { InputFeature.end(it, peer.id) }
+        }
     }
 
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
