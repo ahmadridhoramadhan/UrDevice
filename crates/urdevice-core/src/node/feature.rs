@@ -661,6 +661,22 @@ impl ServiceCtx {
             inner.rt.spawn(fut);
         }
     }
+
+    /// The ports this device shares for localhost sharing (R13), from the
+    /// trust store. Rows whose MAC does not verify are left out.
+    pub fn shared_ports(&self) -> Result<Vec<crate::store::SharedPort>> {
+        lock(&self.inner()?.store).shared_ports()
+    }
+
+    /// Add or replace a shared port in the trust store.
+    pub fn save_shared_port(&self, port: &crate::store::SharedPort) -> Result<()> {
+        lock(&self.inner()?.store).upsert_shared_port(port)
+    }
+
+    /// Remove a shared port from the trust store.
+    pub fn remove_shared_port(&self, port: u16) -> Result<()> {
+        lock(&self.inner()?.store).remove_shared_port(port)
+    }
 }
 
 /// Record an approval without an indicator, keeping at most

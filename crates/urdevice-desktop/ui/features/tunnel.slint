@@ -1,11 +1,103 @@
-// Localhost sharing and Expose on LAN (#22): the desktop feature view.
+// Localhost sharing and Expose on LAN (#22, R13): the desktop feature view.
 // Rust side: src/features/tunnel.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+//
+// - TunnelView: a paired device's shared ports, opened here on localhost.
+// - TunnelHostSection: this device's shared ports, on the "This device" page.
+// - TunnelLanBanner: the persistent "open on the LAN" indicator (R13.6).
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Btn, Card, Chip, Muted, SectionTitle, Toggle } from "../widgets.slint";
+
+// A port the open paired device shares, with this device's tunnel to it.
+export struct TunnelPortItem {
+    port: int,
+    label: string,
+    // "", "opening", "open", or "failed".
+    status: string,
+    local-port: int,
+    // "2 connections · 1.2 MB", or the reason it failed.
+    detail: string,
+    tunnel-id: int,
+}
+
+// A port this device shares.
+export struct SharedPortItem {
+    port: int,
+    label: string,
+    // 0 off, 1 one hour, 2 always on.
+    lan: int,
+    // "Open on LAN until 14:05", "Always open on LAN", or "".
+    lan-text: string,
+}
+
+// A paired device using one of this device's ports.
+export struct IncomingTunnelItem {
+    tunnel-id: int,
+    text: string,
+}
 
 // State and callbacks shared with src/features/tunnel.rs.
 export global TunnelFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    in property <[TunnelPortItem]> remote-ports;
+    // The open device's Localhost setting: 0 allow, 1 ask, 2 deny.
+    in property <int> remote-mode;
+    in property <[SharedPortItem]> shared;
+    in property <[IncomingTunnelItem]> incoming;
+    // This device's Localhost setting: 0 allow, 1 ask, 2 deny.
+    in property <int> local-mode;
+    // Ports open on the LAN, "3000, 8080", or "" when none.
+    in property <string> lan-ports;
+    in property <string> error;
+
+    // Translated text for src/features/tunnel.rs.
+    public pure function stats-text(conns: int, size: string) -> string {
+        @tr("{n} connection" | "{n} connections" % conns) + " · " + size
+    }
+    public pure function lan-until(time: string) -> string { @tr("Open on LAN until {}", time) }
+    public pure function lan-always() -> string { @tr("Always open on LAN") }
+    public pure function lan-waiting() -> string { @tr("Waiting for a network to open it on the LAN") }
+    public pure function incoming-text(device: string, port: int, stats: string) -> string {
+        @tr("{} uses localhost:{} · {}", device, port, stats)
+    }
+    // reason: denied, declined, timeout, offline, bind, refused_port, or other.
+    public pure function reason-text(reason: string, device: string) -> string {
+        reason == "denied" ? @tr("Localhost is set to Deny on {}.", device)
+            : reason == "declined" ? @tr("{} declined.", device)
+            : reason == "timeout" ? @tr("{} did not answer.", device)
+            : reason == "offline" ? @tr("{} is not connected.", device)
+            : reason == "bind" ? @tr("No free local port.")
+            : reason == "refused_port" ? @tr("{} does not share this port any more.", device)
+            : @tr("Could not open ({}).", reason)
+    }
+    public pure function bad-port() -> string { @tr("Enter a port from 1 to 65535.") }
+    public pure function no-browser(e: string) -> string { @tr("Could not open the browser: {}", e) }
+
+    callback open(int);
+    callback open-browser(int);
+    callback stop(int);
+    callback share(string, string);
+    callback unshare(int);
+    // Port, mode (0 off, 1 one hour, 2 always on), confirmed.
+    callback set-lan(int, int, bool);
+}
+
+component PortRow inherits Card {
+    in property <string> title;
+    in property <string> sub;
+    min-height: 56px;
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text { text: root.title; font-family: "monospace"; font-weight: 600; color: Theme.text; }
+            Text { text: root.sub; font-size: Theme.font-small; color: Theme.muted; wrap: word-wrap; }
+        }
+        @children
+    }
 }
 
 export component TunnelView inherits VerticalLayout {
@@ -13,5 +105,183 @@ export component TunnelView inherits VerticalLayout {
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    SectionTitle { text: @tr("Localhost on {}", root.peer-name); }
+    if TunnelFeature.remote-mode == 2: Muted { text: @tr("Localhost is set to Deny on {}.", root.peer-name); }
+    if TunnelFeature.remote-mode != 2 && TunnelFeature.remote-ports.length == 0: Muted { text: @tr("{} has not shared any ports.", root.peer-name); }
+    for p in TunnelFeature.remote-ports: PortRow {
+        title: p.status == "open" ? @tr("localhost:{}", p.local-port) : @tr("localhost:{}", p.port);
+        sub: (p.label != "" ? p.label : @tr("No label"))
+            + @tr(" · from {}:{}", root.peer-name, p.port)
+            + (p.detail != "" ? " · " + p.detail : "");
+        if p.status == "opening": Muted { text: @tr("Waiting for approval…"); vertical-alignment: center; }
+        if p.status != "opening": Btn {
+            text: @tr("Open in browser");
+            kind: 0;
+            y: (parent.height - self.height) / 2;
+            clicked => { TunnelFeature.open-browser(p.port); }
+        }
+        if p.status == "" || p.status == "failed": Btn {
+            text: @tr("Start");
+            y: (parent.height - self.height) / 2;
+            clicked => { TunnelFeature.open(p.port); }
+        }
+        if p.status == "open" || p.status == "opening": Btn {
+            text: @tr("Stop");
+            kind: 2;
+            y: (parent.height - self.height) / 2;
+            clicked => { TunnelFeature.stop(p.tunnel-id); }
+        }
+    }
+    Muted { text: @tr("The local port is the same as on {}. If that port is taken, UrDevice uses the next free port.", root.peer-name); }
+    if TunnelFeature.error != "": Text { text: TunnelFeature.error; color: Theme.deny-fg; wrap: word-wrap; }
+}
+
+// Off / 1 hour / Always on.
+component LanSwitch inherits Rectangle {
+    in property <int> mode;
+    callback picked(int);
+    width: 230px;
+    height: 30px;
+    border-radius: 15px;
+    border-width: 1px;
+    border-color: Theme.border;
+    clip: true;
+    HorizontalLayout {
+        for label[i] in [@tr("Off"), @tr("1 hour"), @tr("Always on")]: Rectangle {
+            width: i == 2 ? 90px : 70px;
+            background: root.mode == i ? (i == 0 ? Theme.surface-2 : Theme.warn-bg) : (seg.has-hover ? Theme.surface-2 : transparent);
+            Text {
+                text: label;
+                font-size: Theme.font-small + 1px;
+                font-weight: root.mode == i ? 700 : 500;
+                color: root.mode == i ? Theme.text : Theme.muted;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            seg := TouchArea {
+                mouse-cursor: pointer;
+                clicked => { root.picked(i); }
+            }
+        }
+    }
+}
+
+export component TunnelHostSection inherits VerticalLayout {
+    // Waiting for the LAN warning to be confirmed: port and mode.
+    property <int> pending-port: 0;
+    property <int> pending-mode: 0;
+    property <bool> ack: false;
+    spacing: 10px;
+    HorizontalLayout {
+        spacing: 8px;
+        SectionTitle { text: @tr("Shared localhost ports"); }
+        if TunnelFeature.local-mode == 2: Chip { text: @tr("Localhost: Deny"); bg: Theme.deny-bg; fg: Theme.deny-fg; y: (parent.height - self.height) / 2; }
+    }
+    Muted {
+        text: TunnelFeature.local-mode == 2
+            ? @tr("Every connected device can open these ports, subject to the Localhost permission above. It is set to Deny now, so no device can open them yet.")
+            : @tr("Every connected device can open these ports, subject to the Localhost permission above.");
+    }
+    if TunnelFeature.shared.length == 0: Muted { text: @tr("No ports shared yet."); }
+    for p in TunnelFeature.shared: VerticalLayout {
+        spacing: 6px;
+        PortRow {
+            title: @tr("localhost:{}", p.port);
+            sub: (p.label != "" ? p.label : @tr("No label")) + (p.lan-text != "" ? " · " + p.lan-text : "");
+            Text { text: @tr("Expose on LAN"); color: Theme.muted; font-size: Theme.font-small; vertical-alignment: center; }
+            LanSwitch {
+                y: (parent.height - self.height) / 2;
+                mode: root.pending-port == p.port ? root.pending-mode : p.lan;
+                picked(m) => {
+                    if (m == 0) {
+                        root.pending-port = 0;
+                        TunnelFeature.set-lan(p.port, 0, false);
+                    } else if (m != p.lan) {
+                        root.pending-port = p.port;
+                        root.pending-mode = m;
+                        root.ack = false;
+                    }
+                }
+            }
+            Btn {
+                text: @tr("Stop sharing");
+                kind: 2;
+                y: (parent.height - self.height) / 2;
+                clicked => { TunnelFeature.unshare(p.port); }
+            }
+        }
+        // The warning before a port opens on the LAN (R13.6).
+        if root.pending-port == p.port: Rectangle {
+            background: Theme.warn-bg;
+            border-radius: Theme.radius;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                Text {
+                    text: @tr("localhost:{} will be open to every device on this network, including unpaired ones, without UrDevice encryption.", p.port);
+                    font-weight: 600;
+                    color: Theme.text;
+                    wrap: word-wrap;
+                }
+                if root.pending-mode == 1: Muted { text: @tr("Turns off by itself after 1 hour."); }
+                if root.pending-mode == 2: HorizontalLayout {
+                    spacing: 8px;
+                    Toggle { checked <=> root.ack; y: (parent.height - self.height) / 2; }
+                    Muted { text: @tr("I understand. Keep it open until I turn it off, also after a restart."); vertical-alignment: center; }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Btn {
+                        text: root.pending-mode == 2 ? @tr("Keep open") : @tr("Open for 1 hour");
+                        kind: 0;
+                        enabled: root.pending-mode == 1 || root.ack;
+                        clicked => {
+                            TunnelFeature.set-lan(p.port, root.pending-mode, root.pending-mode == 2 && root.ack);
+                            root.pending-port = 0;
+                        }
+                    }
+                    Btn { text: @tr("Cancel"); clicked => { root.pending-port = 0; } }
+                }
+            }
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        port-edit := LineEdit { placeholder-text: @tr("Port"); width: 110px; input-type: number; }
+        label-edit := LineEdit { placeholder-text: @tr("Label (optional)"); horizontal-stretch: 1; }
+        Btn {
+            text: @tr("Share port");
+            y: (parent.height - self.height) / 2;
+            clicked => {
+                TunnelFeature.share(port-edit.text, label-edit.text);
+                port-edit.text = "";
+                label-edit.text = "";
+            }
+        }
+    }
+    if TunnelFeature.error != "": Text { text: TunnelFeature.error; color: Theme.deny-fg; wrap: word-wrap; }
+    if TunnelFeature.incoming.length > 0: SectionTitle { text: @tr("In use now"); }
+    for t in TunnelFeature.incoming: PortRow {
+        title: t.text;
+        sub: "";
+        Btn { text: @tr("Stop"); kind: 2; y: (parent.height - self.height) / 2; clicked => { TunnelFeature.stop(t.tunnel-id); } }
+    }
+}
+
+// Shown on every page while any port is open on the LAN (R13.6).
+export component TunnelLanBanner inherits Rectangle {
+    height: TunnelFeature.lan-ports != "" ? 40px : 0px;
+    visible: TunnelFeature.lan-ports != "";
+    background: Theme.warn-bg;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        Text {
+            text: @tr("Open on the LAN to every device on this network: localhost {}", TunnelFeature.lan-ports);
+            color: Theme.text;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+    }
 }

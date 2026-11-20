@@ -80,11 +80,11 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 
 ## Phase 7: Localhost sharing
 
-- [ ] T7.1 Host side: shared ports offered to every paired device, TunnelOpen checks against `shared_port` and the Localhost setting, connections to loopback only. _Req: R13.1, R13.5_
-- [ ] T7.2 Viewer side: loopback listener, choosing a free port when P is taken, bidirectional copying over QUIC streams, connection and traffic stats. _Req: R13.2–R13.4, R13.7_
-- [ ] T7.3 Optional per-port LAN exposure on the host, with a warning, a choice of "1 hour" or "Always on" (extra confirmation, kept after restart), and a persistent indicator. _Req: R13.6_
-- [ ] T7.4 Localhost UI on both platforms: shared ports on the "This device" view (add, label, remove, Expose on LAN) and the viewer's Localhost view with the local port and "Open in browser". _Req: R13.1, R13.6, R13.7_
-- [ ]* T7.5 Integration tests: refusal of ports that aren't shared, WebSocket and HTTP/2 traffic, and hot reload with a Vite dev server.
+- [x] T7.1 Host side: shared ports offered to every paired device, TunnelOpen checks against `shared_port` and the Localhost setting, connections to loopback only. _Req: R13.1, R13.5_
+- [x] T7.2 Viewer side: loopback listener, choosing a free port when P is taken, bidirectional copying over QUIC streams, connection and traffic stats. _Req: R13.2–R13.4, R13.7_
+- [x] T7.3 Optional per-port LAN exposure on the host, with a warning, a choice of "1 hour" or "Always on" (extra confirmation, kept after restart), and a persistent indicator. _Req: R13.6_
+- [x] T7.4 Localhost UI on both platforms: shared ports on the "This device" view (add, label, remove, Expose on LAN) and the viewer's Localhost view with the local port and "Open in browser". _Req: R13.1, R13.6, R13.7_
+- [x]* T7.5 Integration tests: refusal of ports that aren't shared, WebSocket and HTTP/2 traffic, and hot reload with a Vite dev server.
 
 ## Phase 8: Bluetooth fallback
 

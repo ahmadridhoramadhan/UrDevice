@@ -1,0 +1,24 @@
+// Localhost sharing and Expose on LAN (#22, design §11): ServiceId::TUNNEL (7).
+// Reference schema; the Rust structs are in src/features/tunnel.rs.
+syntax = "proto3";
+
+package urdevice.tunnel;
+
+// Control message, host to viewer (ToController): the ports this host
+// shares. Sent when a session opens and whenever the list or the Localhost
+// setting changes; empty while the setting is Deny. At most 64 entries.
+message SharedPorts {
+  repeated PortInfo ports = 1;
+}
+
+message PortInfo {
+  uint32 port = 1;   // 1-65535, on the host's loopback
+  string label = 2;  // at most 64 characters
+}
+
+// Stream kind 1 (one TCP connection), viewer to host (ToHost), under the
+// tunnel's granted activity. StreamOpen.meta is this message; the TCP bytes
+// follow in both directions. The host refuses ports it did not share.
+message TunnelOpen {
+  uint32 port = 1;
+}
