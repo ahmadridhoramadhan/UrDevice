@@ -7333,17 +7333,21 @@ dependencies = [
 name = "urdevice-platform"
 version = "0.1.0"
 dependencies = [
+ "ashpd",
  "clipboard-win",
  "directories",
  "futures-core",
+ "futures-util",
  "gethostname",
  "keyring",
+ "libloading 0.8.9",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
  "png",
  "ring",
  "starship-battery",
+ "tokio",
  "tracing",
  "urdevice-core",
  "urdevice-proto",

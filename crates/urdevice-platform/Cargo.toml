@@ -22,8 +22,13 @@ zune-jpeg.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { workspace = true, features = ["async-secret-service", "tokio", "crypto-rust"] }
-x11rb.workspace = true
+x11rb = { workspace = true, features = ["randr"] }
 zbus.workspace = true
+# Screen sharing (#21): the ScreenCast portal and libpipewire at run time.
+ashpd.workspace = true
+futures-util.workspace = true
+libloading.workspace = true
+tokio.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { workspace = true, features = ["apple-native"] }

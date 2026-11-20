@@ -93,6 +93,11 @@ rfd = { version = "0.15", default-features = false, features = ["xdg-portal", "t
 # Screen sharing (#21): the software H.264 encoder and decoder, built from
 # the bundled OpenH264 source (BSD-2-Clause).
 openh264 = "0.9"
+# Linux capture: the ScreenCast portal, and libpipewire loaded at run time.
+# All three are already in the tree (rfd, x11rb, zbus).
+ashpd = { version = "0.11", default-features = false, features = ["tokio"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+libloading = "0.8"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
