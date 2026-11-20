@@ -185,9 +185,11 @@ fn a_desktop_taps_swipes_and_uses_back_home_recents_on_android() {
     }
     settle();
     r.ctl.button(id, button::LEFT, false).unwrap();
+    // Positions travel as datagrams and the button on the stream, so the path
+    // may start a step or two after the first position: check the direction.
     let swiped = |d: &Did| match d {
         Did::Gesture(Gesture::Swipe { points, .. }) => {
-            points.first().is_some_and(|p| p.1 > 1700) && points.last().is_some_and(|p| p.1 < 1100)
+            points.first().is_some_and(|p| p.1 > 1400) && points.last().is_some_and(|p| p.1 < 1100)
         }
         _ => false,
     };
