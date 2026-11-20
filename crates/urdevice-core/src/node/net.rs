@@ -819,7 +819,8 @@ pub(super) async fn qr_scan(inner: Arc<Inner>, invite: ScannedInvite) {
 }
 
 async fn qr_scan_inner(inner: Arc<Inner>, invite: ScannedInvite) -> Result<()> {
-    let conn = dial(&inner, &invite.addrs, Expect::Device(invite.device_id)).await?;
+    let addrs = pairing::order_invite_addrs(&invite.addrs, &super::local_ipv4_nets());
+    let conn = dial(&inner, &addrs, Expect::Device(invite.device_id)).await?;
     let (mut send, recv) = conn.open_bi().await?;
     let mut reader = Reader::new(recv);
     let binding = transport::exporter(&conn, EXPORTER_PAIR, 32)?;

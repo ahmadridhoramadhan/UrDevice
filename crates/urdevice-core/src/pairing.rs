@@ -5,7 +5,7 @@
 //! 6-digit code, the lockout counter, and the checks on peer-supplied text.
 
 use std::collections::VecDeque;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::{Duration, Instant};
 
 use urdevice_proto::{PROTO_VERSION, PairInvite};
@@ -207,9 +207,67 @@ pub fn clean_platform(s: &str) -> String {
     }
 }
 
+/// Orders an invite's addresses for dialing. Addresses on a subnet this device
+/// is directly attached to come first, then other private addresses, then the
+/// rest. Every address is kept, so a peer's unreachable address does not hide
+/// a reachable one. `local` holds this device's `(address, netmask)` pairs.
+pub fn order_invite_addrs(addrs: &[SocketAddr], local: &[(Ipv4Addr, Ipv4Addr)]) -> Vec<SocketAddr> {
+    let on_link = |ip: IpAddr| match ip {
+        IpAddr::V4(v4) => local
+            .iter()
+            .any(|(a, m)| (u32::from(*a) & u32::from(*m)) == (u32::from(v4) & u32::from(*m))),
+        IpAddr::V6(_) => false,
+    };
+    let rank = |s: &SocketAddr| match s.ip() {
+        ip if on_link(ip) => 0,
+        IpAddr::V4(v4) if v4.is_private() => 1,
+        _ => 2,
+    };
+    let mut out = addrs.to_vec();
+    out.sort_by_key(rank);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sa(s: &str) -> SocketAddr {
+        s.parse().unwrap()
+    }
+
+    #[test]
+    fn order_puts_attached_subnet_first_and_keeps_all() {
+        let addrs = vec![
+            sa("172.28.16.1:47811"),
+            sa("8.8.8.8:47811"),
+            sa("10.5.0.2:47811"),
+            sa("192.168.18.9:47811"),
+        ];
+        let local = [(
+            "192.168.18.20".parse::<Ipv4Addr>().unwrap(),
+            "255.255.255.0".parse::<Ipv4Addr>().unwrap(),
+        )];
+        let got = order_invite_addrs(&addrs, &local);
+        assert_eq!(
+            got,
+            vec![
+                sa("192.168.18.9:47811"),
+                sa("172.28.16.1:47811"),
+                sa("10.5.0.2:47811"),
+                sa("8.8.8.8:47811"),
+            ]
+        );
+    }
+
+    #[test]
+    fn order_without_local_interfaces_keeps_private_first() {
+        let addrs = vec![sa("8.8.8.8:1"), sa("192.168.1.2:1")];
+        assert_eq!(
+            order_invite_addrs(&addrs, &[]),
+            vec![sa("192.168.1.2:1"), sa("8.8.8.8:1")]
+        );
+    }
 
     fn invite(expires_at: u64) -> PairInvite {
         PairInvite {

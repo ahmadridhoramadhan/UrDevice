@@ -1245,31 +1245,135 @@ impl Inner {
     }
 }
 
-/// Non-loopback IPv4 addresses, skipping container and VM bridges.
-pub fn local_ipv4_addrs() -> Vec<IpAddr> {
-    let mut out: Vec<IpAddr> = if_addrs::get_if_addrs()
+/// Maximum number of addresses advertised in an invite or announce.
+const MAX_LOCAL_ADDRS: usize = 6;
+
+/// Name fragments (lower case) of virtual adapters: Hyper-V and WSL switches,
+/// VMware, VirtualBox, VPN and tunnel adapters. A LAN peer cannot reach these
+/// addresses, so they are never advertised.
+const VIRTUAL_IFACE_HINTS: &[&str] = &[
+    "vethernet",
+    "hyper-v",
+    "wsl",
+    "vmware",
+    "virtualbox",
+    "loopback",
+    "wireguard",
+    "openvpn",
+    "tailscale",
+    "zerotier",
+    "vpn",
+];
+
+/// Name prefixes (lower case) of tunnel and VPN interfaces on Linux and macOS.
+const VIRTUAL_IFACE_PREFIXES: &[&str] = &["tun", "tap", "utun", "wg", "zt", "ppp"];
+
+/// True for virtual, tunnel and VPN adapters.
+fn is_virtual_interface(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    VIRTUAL_IFACE_HINTS.iter().any(|h| lower.contains(h))
+        || VIRTUAL_IFACE_PREFIXES.iter().any(|p| lower.starts_with(p))
+}
+
+/// Picks the advertisable IPv4 addresses from `(interface name, address)`
+/// pairs. Drops container and VM bridges, virtual adapters, loopback,
+/// link-local and other non-unicast addresses. Private LAN addresses come
+/// first, and the list is capped at [`MAX_LOCAL_ADDRS`].
+fn rank_local_ipv4<'a>(candidates: impl IntoIterator<Item = (&'a str, Ipv4Addr)>) -> Vec<IpAddr> {
+    let mut out: Vec<Ipv4Addr> = Vec::new();
+    for (name, ip) in candidates {
+        let unicast = !ip.is_loopback()
+            && !ip.is_link_local()
+            && !ip.is_unspecified()
+            && !ip.is_multicast()
+            && !ip.is_broadcast();
+        if !unicast
+            || crate::discovery::skip_interface(name)
+            || is_virtual_interface(name)
+            || out.contains(&ip)
+        {
+            continue;
+        }
+        out.push(ip);
+    }
+    out.sort_by_key(|ip| if ip.is_private() { 0 } else { 1 });
+    out.truncate(MAX_LOCAL_ADDRS);
+    out.into_iter().map(IpAddr::V4).collect()
+}
+
+/// Interfaces as `(name, address, netmask)` for every IPv4 address.
+fn ipv4_ifaces() -> Vec<(String, Ipv4Addr, Ipv4Addr)> {
+    if_addrs::get_if_addrs()
         .unwrap_or_default()
         .into_iter()
-        .filter(|i| !crate::discovery::skip_interface(&i.name))
         .filter_map(|i| match i.addr {
-            if_addrs::IfAddr::V4(v4) if !v4.ip.is_loopback() && !v4.ip.is_link_local() => {
-                Some(IpAddr::V4(v4.ip))
-            }
+            if_addrs::IfAddr::V4(v4) => Some((i.name, v4.ip, v4.netmask)),
             _ => None,
         })
-        .collect();
-    out.sort_by_key(|ip| match ip {
-        IpAddr::V4(v4) if v4.is_private() => 0,
-        _ => 1,
-    });
-    out.dedup();
-    out.truncate(6);
-    out
+        .collect()
+}
+
+/// Advertisable IPv4 addresses of this machine, LAN addresses first.
+pub fn local_ipv4_addrs() -> Vec<IpAddr> {
+    let ifaces = ipv4_ifaces();
+    rank_local_ipv4(ifaces.iter().map(|(n, ip, _)| (n.as_str(), *ip)))
+}
+
+/// `(address, netmask)` of each advertisable IPv4 interface. The QR scanner
+/// uses these to dial a peer address on a directly attached subnet first.
+pub fn local_ipv4_nets() -> Vec<(Ipv4Addr, Ipv4Addr)> {
+    let ifaces = ipv4_ifaces();
+    let kept = rank_local_ipv4(ifaces.iter().map(|(n, ip, _)| (n.as_str(), *ip)));
+    ifaces
+        .iter()
+        .filter(|(_, ip, _)| kept.contains(&IpAddr::V4(*ip)))
+        .map(|(_, ip, mask)| (*ip, *mask))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_addrs_drop_virtual_and_non_unicast() {
+        let ifs = [
+            ("eth0", "192.168.18.9"),
+            ("vEthernet (WSL (Hyper-V firewall))", "172.28.16.1"),
+            ("vEthernet (Default Switch)", "172.20.144.1"),
+            ("OpenVPN Data Channel Offload", "10.8.0.2"),
+            ("tailscale0", "100.101.2.3"),
+            ("tun0", "10.2.0.5"),
+            ("Ethernet", "169.254.10.10"),
+            ("lo", "127.0.0.1"),
+            ("docker0", "172.17.0.1"),
+            ("wlan0", "0.0.0.0"),
+            ("wlan0", "192.168.18.9"),
+        ];
+        let got = rank_local_ipv4(
+            ifs.iter()
+                .map(|(n, ip)| (*n, ip.parse::<Ipv4Addr>().unwrap())),
+        );
+        assert_eq!(got, vec![IpAddr::V4("192.168.18.9".parse().unwrap())]);
+    }
+
+    #[test]
+    fn local_addrs_list_lan_first_and_capped() {
+        let ips: Vec<(&str, Ipv4Addr)> = vec![
+            ("eth0", "8.8.4.4".parse().unwrap()),
+            ("eth1", "10.0.0.2".parse().unwrap()),
+            ("wlan0", "192.168.1.5".parse().unwrap()),
+            ("eth2", "10.0.0.3".parse().unwrap()),
+            ("eth3", "10.0.0.4".parse().unwrap()),
+            ("eth4", "10.0.0.5".parse().unwrap()),
+            ("eth5", "10.0.0.6".parse().unwrap()),
+            ("eth6", "10.0.0.7".parse().unwrap()),
+        ];
+        let got = rank_local_ipv4(ips.iter().copied());
+        assert_eq!(got.len(), MAX_LOCAL_ADDRS);
+        assert_eq!(got[0], IpAddr::V4("10.0.0.2".parse().unwrap()));
+        assert!(!got.contains(&IpAddr::V4("8.8.4.4".parse().unwrap())));
+    }
 
     #[test]
     fn new_capabilities_get_defaults_once() {
