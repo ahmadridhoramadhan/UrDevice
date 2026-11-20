@@ -96,10 +96,16 @@ The tasks follow [design.md](design.md) and are grouped into phases. Each phase 
 ## Phase 9: Hardening and release
 
 - [ ] T9.1 Battery profiling on Android and tuning of discovery and keep-alive. _Req: R15.4_
+  - Done in the final device test pass.
 - [ ] T9.2 Run the device-matrix smoke tests (design §16) and fix issues found.
-- [ ] T9.3 Packaging and signing: macOS `.dmg` with notarization, Windows `.msi` with Authenticode, Linux `.deb`/`.rpm`/AppImage/Flatpak, and a signed Android AAB. _Req: R14.3_
+  - Done in the final device test pass.
+- [x] T9.3 Packaging and signing: macOS `.dmg` with notarization, Windows `.msi` with Authenticode, Linux `.deb`/`.rpm`/AppImage/Flatpak, and a signed Android AAB. _Req: R14.3_
+  - Done for **unsigned test packages** (`.github/workflows/release.yml`, on a `v*` tag): Windows `.zip` and `.msi` (with a Private-network firewall rule), Linux `.deb`, `.AppImage` and `.tar.gz`, macOS `.dmg` (aarch64 and x86_64), Android release APK signed with a throwaway debug key.
+  - TODO (needs certificates and accounts, not done): macOS Developer ID signing and notarization; Windows Authenticode signing; Android release keystore and signed AAB for Google Play; Linux `.rpm` and Flatpak.
 - [ ] T9.4 External security review of pairing, transport, and permissions, and fixes for its findings. _Req: R3, R4, R5_
-- [ ] T9.5 User documentation in `docs/`: getting started, permissions on each OS, and troubleshooting.
+  - Done in the final device test pass.
+- [x] T9.5 User documentation in `docs/`: getting started, permissions on each OS, and troubleshooting.
+  - [getting-started.md](../../../docs/getting-started.md), [permissions.md](../../../docs/permissions.md), [troubleshooting.md](../../../docs/troubleshooting.md).
 
 ---
 

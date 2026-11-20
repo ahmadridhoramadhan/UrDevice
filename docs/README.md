@@ -1,5 +1,11 @@
 # UrDevice documentation
 
+## Using UrDevice
+
+- [Getting started](getting-started.md): install, first run, and pairing.
+- [Permissions on each OS](permissions.md): firewall, Accessibility, Screen Recording, portals, and Android settings.
+- [Troubleshooting](troubleshooting.md): pairing unreachable, Wayland portal prompts, and the Bluetooth banner.
+
 ## Spec
 
 - [Requirements](../.kiro/specs/urdevice/requirements.md): what UrDevice must do, as user stories with acceptance criteria.
