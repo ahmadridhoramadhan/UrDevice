@@ -27,6 +27,8 @@ use super::parse::{osascript_bool, osascript_volume};
 #[link(name = "AppKit", kind = "framework")]
 unsafe extern "C" {}
 
+// `input/macos.rs` declares `CGEventPost` too, with a plain `c_void` event pointer.
+#[allow(clashing_extern_declarations)]
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
     fn CGEventPost(tap: u32, event: *mut CgEvent);
