@@ -1,6 +1,5 @@
 package com.urdevice.app.ui
 
-import android.os.Build
 import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,6 +60,11 @@ fun peerLine(p: FfiPeer): String = when (p.status) {
     else -> if (p.lastSeen > 0u) stringResource(R.string.status_last_seen, lastSeen(p.lastSeen)) else stringResource(R.string.status_offline)
 }
 
+/** The one-line status in the device list. */
+@Composable
+fun peerShort(p: FfiPeer): String =
+    if (p.status == "connected") stringResource(R.string.status_connected) else peerLine(p)
+
 /** "X is using Y on this device" with Stop (R5.4). */
 @Composable
 fun ActiveBanner(a: FfiActivity, onStop: () -> Unit) {
@@ -98,10 +102,7 @@ fun HomeScreen(snap: FfiSnapshot, onThisDevice: () -> Unit, onPeer: (String) -> 
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(snap.me.name, color = c.onHeader, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text(
-                        stringResource(R.string.home_this_device_line, Build.VERSION.RELEASE, snap.me.addresses.firstOrNull() ?: "—"),
-                        color = c.onHeader, style = MaterialTheme.typography.bodySmall,
-                    )
+                    Text(stringResource(R.string.this_device), color = c.onHeader, style = MaterialTheme.typography.bodySmall)
                 }
                 snap.me.batteryPct?.let {
                     Box(Modifier.background(Lime, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -124,7 +125,7 @@ fun HomeScreen(snap: FfiSnapshot, onThisDevice: () -> Unit, onPeer: (String) -> 
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name, fontWeight = FontWeight.SemiBold)
-                        Text(peerLine(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(peerShort(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (p.status == "connected") {
                         p.batteryPct?.let {
@@ -188,7 +189,7 @@ fun DeviceScreen(
                 Column(Modifier.weight(1f)) {
                     Text(peer.name, color = c.onHeader, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text(
-                        listOf(platformName(peer.platform), peerLine(peer), peer.address).filter { it.isNotBlank() }.joinToString(" · "),
+                        peerLine(peer),
                         color = c.onHeader, style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -218,12 +219,7 @@ fun DeviceScreen(
                 }
             }
         } else {
-            Text(stringResource(R.string.features_on, peer.name), fontWeight = FontWeight.SemiBold)
-            Text(
-                "${stringResource(R.string.legend_ask, peer.name)} · ${stringResource(R.string.legend_deny, peer.name)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(stringResource(R.string.features), fontWeight = FontWeight.SemiBold)
             val modes = peer.remotePermissions.associate { it.capability to it.mode }
             // Each feature's tiles (ui/features/), in the order of allFeatures.
             val tiles = allFeatures.flatMap { f -> f.tiles(modes).map { f to it } }
@@ -254,7 +250,6 @@ fun DeviceScreen(
                 }
             }
         }
-        Text(stringResource(R.string.device_id, peer.fingerprint), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
     }
     if (forget) {
         ConfirmDialog(
@@ -339,7 +334,7 @@ fun SettingsScreen(
         }
         // Permissions for other devices (R5.1), with the extra confirmation for terminal and file changes.
         SectionLabel(stringResource(R.string.perms_title))
-        Text(stringResource(R.string.perms_apply_all, snap.me.name), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.perms_apply_all), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         snap.permissions.forEach { p ->
             PermissionRow(p) { m ->
                 if (p.localOnly && m == FfiMode.ALLOW && p.mode != FfiMode.ALLOW) permConfirm = p.capability
@@ -350,14 +345,16 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.set_hidden), fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.set_hidden_body), style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.set_hidden_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(checked = snap.me.hidden, onCheckedChange = onHidden)
             }
             // Feature settings, such as "Pause clipboard on all devices" (ui/features/).
             allFeatures.forEach { it.Settings() }
-            Text(stringResource(R.string.set_language), fontWeight = FontWeight.SemiBold)
-            Text(stringResource(R.string.set_language_body), style = MaterialTheme.typography.bodySmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.set_language), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.set_language_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         SettingsCard {
             OutlinedButton(onClick = onLog, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(stringResource(R.string.set_log)) }

@@ -271,6 +271,7 @@ private fun App() {
                             s, ::scanned,
                             onPairNearby = { runCatching { node()?.pairNearby(it) } },
                             onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
+                            compact = true,
                         )
                         Page.Settings -> SettingsScreen(
                             s,
