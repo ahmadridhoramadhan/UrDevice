@@ -173,6 +173,7 @@ fun DeviceScreen(
     onStop: (ULong) -> Unit,
 ) {
     val c = LocalModes.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var forget by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -248,7 +249,7 @@ fun DeviceScreen(
                                 else onRequest(t.cap)
                             },
                             menu = { if (f.tileMenu) f.TileMenu(peer, t.key, menuOpen) { menuOpen = false } },
-                            onGear = onSettings,
+                            onGear = { if (!f.openSettings(ctx)) onSettings() },
                             switchOn = switchOn,
                             onSwitch = { flipped = it; f.setSwitch(peer, it) },
                             modifier = Modifier.weight(1f),

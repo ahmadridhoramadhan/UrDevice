@@ -3,6 +3,7 @@ package com.urdevice.app.ui.features
 import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
+import android.app.DownloadManager
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -11,6 +12,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.os.Handler
 import android.os.Looper
 import android.text.format.Formatter
@@ -128,6 +130,20 @@ object FilesFeature : Feature {
     fun clearFinished() {
         node?.filesClearFinished()
         refresh()
+    }
+
+    /** The settings icon of the tile opens the folder where received files are saved. */
+    override fun openSettings(context: Context): Boolean {
+        val folder = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload%2FUrDevice")
+        val tries = listOf(
+            Intent(Intent.ACTION_VIEW).setDataAndType(folder, DocumentsContract.Document.MIME_TYPE_DIR),
+            // The folder does not exist before the first file arrives: show all downloads then.
+            Intent(DownloadManager.ACTION_VIEW_DOWNLOADS),
+        )
+        for (intent in tries) {
+            if (runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return true
+        }
+        return false
     }
 
     /** Tapping the tile asks for files or a folder at once. */

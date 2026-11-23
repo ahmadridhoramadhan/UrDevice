@@ -37,6 +37,12 @@ interface Feature {
     /** The user flipped the switch tile of [peer]. */
     fun setSwitch(peer: FfiPeer, on: Boolean) {}
 
+    /**
+     * The settings icon of a tile: return true after handling it here (for example by opening a
+     * folder). False opens the Settings screen.
+     */
+    fun openSettings(context: Context): Boolean = false
+
     /** True when tapping a tile opens a menu ([TileMenu]) instead of a screen. */
     val tileMenu: Boolean get() = false
 
