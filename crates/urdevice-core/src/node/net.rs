@@ -709,6 +709,11 @@ async fn handle_request(inner: Arc<Inner>, peer: DeviceId, r: urdevice_proto::Ac
 
 /// Show the Always Ask prompt. `None` when it timed out.
 async fn ask(inner: &Arc<Inner>, peer: DeviceId, name: &str, cap: Capability) -> Option<bool> {
+    ask_str(inner, peer, name, cap.as_str()).await
+}
+
+/// The same question for a capability string; `"pair"` asks whether a device may pair.
+async fn ask_str(inner: &Arc<Inner>, peer: DeviceId, name: &str, capability: &str) -> Option<bool> {
     let (reply, rx) = oneshot::channel();
     let id = {
         let mut st = lock(&inner.state);
@@ -720,7 +725,7 @@ async fn ask(inner: &Arc<Inner>, peer: DeviceId, name: &str, cap: Capability) ->
         id,
         device_name: name.into(),
         device_id: peer.hex(),
-        capability: cap.as_str().into(),
+        capability: capability.into(),
         timeout_secs: u32::try_from(inner.ask_timeout.as_secs()).unwrap_or(30),
     }));
     let answer = timeout(inner.ask_timeout, rx)
@@ -750,7 +755,7 @@ async fn qr_host(
             reason: reason.into(),
         })
     };
-    if let Err(reason) = inner.pairing_allowed() {
+    if let Err(reason) = inner.pairing_allowed(true) {
         let _ = write_msg(&mut send, reject(reason)).await;
         finish_reject(&conn).await;
         return Err(CoreError::Pairing(reason.into()));
@@ -910,8 +915,9 @@ async fn code_initiate_inner(
         }),
     )
     .await?;
+    // The other user may have to accept first.
     let reply = reader
-        .next_timeout(HANDSHAKE_TIMEOUT)
+        .next_timeout(inner.ask_timeout + Duration::from_secs(5))
         .await
         .map_err(|_| CoreError::Pairing("rejected".into()))?;
     let (name, platform) = match reply {
@@ -934,16 +940,36 @@ async fn code_host(
     name: String,
     platform: String,
 ) -> Result<()> {
-    if let Err(reason) = inner.pairing_allowed() {
-        let _ = write_msg(
-            &mut send,
-            control::Msg::PairReject(urdevice_proto::PairReject {
-                reason: reason.into(),
-            }),
-        )
-        .await;
+    let reject = |reason: &'static str| {
+        control::Msg::PairReject(urdevice_proto::PairReject {
+            reason: reason.into(),
+        })
+    };
+    if let Err(reason) = inner.pairing_allowed(false) {
+        let _ = write_msg(&mut send, reject(reason)).await;
         finish_reject(&conn).await;
         return Err(CoreError::Pairing(reason.into()));
+    }
+    // The Pair screen is closed: the user decides whether this device may pair.
+    // Accepting opens the Pair screen, so both screens then show the same code.
+    if lock(&inner.state).pair_screen.is_none() {
+        let reason = if inner.pair_ask_begin(peer) {
+            let answer = ask_str(&inner, peer, &pairing::clean_name(&name), "pair").await;
+            inner.pair_ask_end(peer, answer == Some(true));
+            match answer {
+                Some(true) => None,
+                Some(false) => Some("declined"),
+                None => Some("timeout"),
+            }
+        } else {
+            Some("busy")
+        };
+        if let Some(reason) = reason {
+            let _ = write_msg(&mut send, reject(reason)).await;
+            finish_reject(&conn).await;
+            return Err(CoreError::Pairing(reason.into()));
+        }
+        inner.open_pair_screen();
     }
     let me = lock(&inner.state).name.clone();
     write_msg(

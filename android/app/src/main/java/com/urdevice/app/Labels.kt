@@ -61,6 +61,8 @@ object Labels {
         "expired" -> R.string.pair_fail_expired
         "locked" -> R.string.pair_fail_locked
         "closed" -> R.string.pair_fail_closed
+        "declined" -> R.string.pair_fail_declined
+        "busy" -> R.string.pair_fail_busy
         "hidden" -> R.string.pair_fail_hidden
         "unreachable" -> R.string.pair_fail_unreachable
         "invalid" -> R.string.pair_fail_invalid

@@ -11,7 +11,7 @@ These rules apply to every change. The full model is in section 15 of [design.md
 - Permission settings apply to every paired device, so a lost device gets whatever is set to Allow. Keep Remote control and Screen sharing at Always Ask by default, and keep the indicator and Stop button working.
 - Never log secrets, clipboard content, file contents, keystrokes, audio, or camera frames. Logs go through the redaction layer.
 - Treat every network message, QR payload, mDNS and UDP announcement, and file name as hostile: enforce size limits, validate, rate-limit.
-- Pairing works only while the Pair screen is open. QR tokens are single use and expire after 120 s. Pairing codes are compared by eye; never add a way to type one in.
+- QR pairing works only while the Pair screen is open. A code pairing asked for while it is closed needs the user's Accept on this device first (one question at a time, 5 a minute, 60 s quiet after a no). Hidden mode and the lockout still refuse everything. QR tokens are single use and expire after 120 s. Pairing codes are compared by eye; never add a way to type one in.
 - The desktop camera is on only while scanning a QR code. Frames stay in memory and are never stored or sent.
 - File transfer and the file browser must clean paths and refuse anything outside the chosen folder, including through symbolic links.
 - Localhost sharing connects to loopback only, and only to ports the host shared. "Expose on LAN" is off by default; "Always on" needs an extra confirmation and a persistent indicator.

@@ -83,18 +83,24 @@ object Notifications {
 
     fun showPrompt(ctx: Context, p: FfiEvent.Prompt) {
         if (!canPost(ctx)) return
-        val feature = Labels.capName(ctx, p.capability)
+        val pairing = p.capability == "pair"
+        val feature = if (pairing) "" else Labels.capName(ctx, p.capability)
         val id = p.id.toLong()
         val n = Notification.Builder(ctx, CH_PROMPTS)
             .setSmallIcon(R.drawable.ic_urdevice_symbol)
-            .setContentTitle(ctx.getString(R.string.prompt_title, p.deviceName, feature))
-            .setContentText(ctx.getString(R.string.prompt_body, p.timeoutSecs.toInt()))
+            .setContentTitle(
+                if (pairing) ctx.getString(R.string.prompt_pair_title, p.deviceName)
+                else ctx.getString(R.string.prompt_title, p.deviceName, feature),
+            )
+            .setContentText(
+                ctx.getString(if (pairing) R.string.prompt_pair_body else R.string.prompt_body, p.timeoutSecs.toInt()),
+            )
             .setCategory(Notification.CATEGORY_CALL)
             .setTimeoutAfter(p.timeoutSecs.toLong() * 1000)
             .setAutoCancel(true)
             .setContentIntent(openApp(ctx))
-            .addAction(Notification.Action.Builder(null, ctx.getString(R.string.deny), action(ctx, promptId(p.id) * 2, ActionReceiver.DENY, id)).build())
-            .addAction(Notification.Action.Builder(null, ctx.getString(R.string.allow), action(ctx, promptId(p.id) * 2 + 1, ActionReceiver.ALLOW, id)).build())
+            .addAction(Notification.Action.Builder(null, ctx.getString(if (pairing) R.string.pair_decline else R.string.deny), action(ctx, promptId(p.id) * 2, ActionReceiver.DENY, id)).build())
+            .addAction(Notification.Action.Builder(null, ctx.getString(if (pairing) R.string.pair_accept else R.string.allow), action(ctx, promptId(p.id) * 2 + 1, ActionReceiver.ALLOW, id)).build())
             .build()
         ctx.getSystemService(NotificationManager::class.java).notify(promptId(p.id), n)
     }

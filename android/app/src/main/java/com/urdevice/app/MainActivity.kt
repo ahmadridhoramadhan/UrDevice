@@ -141,6 +141,12 @@ private fun App() {
             if (stack.removeAt(stack.lastIndex) == Page.Pair) node()?.closePairScreen()
         }
     }
+    fun pairNearby(key: String) {
+        val name = snap?.nearby?.firstOrNull { it.key == key }?.name ?: ""
+        if (runCatching { node()?.pairNearby(key) }.isSuccess) {
+            android.widget.Toast.makeText(ctx, ctx.getString(R.string.pair_waiting_for, name), android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
     fun scanned(text: String) {
         try {
             node()?.scanQr(text)
@@ -170,6 +176,11 @@ private fun App() {
         }
         return
     }
+    // Another device asked to pair and the user accepted: show the code.
+    val hasCodes = s.codePairings.isNotEmpty()
+    LaunchedEffect(hasCodes) {
+        if (hasCodes && inOnboarding != true && stack.last() != Page.Pair) go(Page.Pair)
+    }
     if (inOnboarding == null) inOnboarding = !s.me.onboarded
     if (!s.me.onboarded && inOnboarding == false) inOnboarding = true
 
@@ -183,7 +194,7 @@ private fun App() {
             onOpenPair = { node()?.openPairScreen() },
             onClosePair = { node()?.closePairScreen() },
             onScanned = ::scanned,
-            onPairNearby = { runCatching { node()?.pairNearby(it) } },
+            onPairNearby = ::pairNearby,
             onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
             onFinish = { inOnboarding = false; stack.clear(); stack.add(Page.Home) },
         )
@@ -269,7 +280,7 @@ private fun App() {
                         }
                         Page.Pair -> PairBody(
                             s, ::scanned,
-                            onPairNearby = { runCatching { node()?.pairNearby(it) } },
+                            onPairNearby = ::pairNearby,
                             onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
                             compact = true,
                         )
@@ -328,12 +339,25 @@ private fun PromptDialog(p: FfiEvent.Prompt) {
             left -= 1
         }
     }
-    val feature = stringResource(Labels.cap(p.capability))
+    val pairing = p.capability == "pair"
     AlertDialog(
         onDismissRequest = {},
-        title = { Text(stringResource(R.string.prompt_title, p.deviceName, feature)) },
-        text = { Text(stringResource(R.string.prompt_body, left)) },
-        confirmButton = { TextButton(onClick = { Core.node()?.answerPrompt(p.id, true) }) { Text(stringResource(R.string.allow)) } },
-        dismissButton = { TextButton(onClick = { Core.node()?.answerPrompt(p.id, false) }) { Text(stringResource(R.string.deny)) } },
+        title = {
+            Text(
+                if (pairing) stringResource(R.string.prompt_pair_title, p.deviceName)
+                else stringResource(R.string.prompt_title, p.deviceName, stringResource(Labels.cap(p.capability))),
+            )
+        },
+        text = { Text(stringResource(if (pairing) R.string.prompt_pair_body else R.string.prompt_body, left)) },
+        confirmButton = {
+            TextButton(onClick = { Core.node()?.answerPrompt(p.id, true) }) {
+                Text(stringResource(if (pairing) R.string.pair_accept else R.string.allow))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { Core.node()?.answerPrompt(p.id, false) }) {
+                Text(stringResource(if (pairing) R.string.pair_decline else R.string.deny))
+            }
+        },
     )
 }

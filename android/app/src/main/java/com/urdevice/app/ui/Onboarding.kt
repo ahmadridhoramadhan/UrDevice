@@ -36,6 +36,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -82,6 +83,9 @@ fun Onboarding(
                 .forEach { add(FfiPermission(it, defaultMode(it), false)) }
         }
     }
+    // Another device asked to pair and the user accepted: show the code.
+    val hasCodes = snap.codePairings.isNotEmpty()
+    LaunchedEffect(hasCodes) { if (hasCodes && step < 3) step = 3 }
     // Pairing finished while the pair step was open: jump to the last step.
     val shown = if (pairedName != null && step == 3) 4 else step
 

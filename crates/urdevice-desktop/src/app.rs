@@ -571,6 +571,17 @@ impl Ui {
                 .collect(),
         );
 
+        // Another device asked to pair and the user accepted: show the code.
+        if !snap.code_pairings.is_empty() {
+            if w.get_onboarding() {
+                if w.get_onboarding_step() < 3 {
+                    w.set_onboarding_step(3);
+                }
+            } else if w.get_page() != crate::ui::Page::Pair {
+                w.set_page(crate::ui::Page::Pair);
+            }
+        }
+
         match &snap.pair_screen {
             Some(p) => {
                 if *self.qr_uri.borrow() != p.qr_uri {
@@ -651,6 +662,7 @@ impl Ui {
         };
         let Ok(win) = PromptWindow::new() else { return };
         win.set_device(p.device_name.into());
+        win.set_pairing(p.capability == "pair");
         win.set_feature(Self::labels(&w).invoke_cap_label(p.capability.into()));
         win.set_seconds_left(i32::try_from(p.timeout_secs).unwrap_or(30));
         let id = p.id;
@@ -747,10 +759,22 @@ impl Ui {
         let m2 = me.clone();
         w.on_pair_nearby(move |key| {
             let failed = n.pair_nearby(&key).is_err();
-            if let (true, Some(ui)) = (failed, m2.upgrade())
+            let name = n
+                .snapshot()
+                .nearby
+                .iter()
+                .find(|d| d.key == key.as_str())
+                .map(|d| d.name.clone())
+                .unwrap_or_default();
+            if let Some(ui) = m2.upgrade()
                 && let Some(w) = ui.window.upgrade()
             {
-                ui.toast(Self::labels(&w).invoke_pairing_failed("unreachable".into()));
+                let l = Self::labels(&w);
+                ui.toast(if failed {
+                    l.invoke_pairing_failed("unreachable".into())
+                } else {
+                    l.invoke_pairing_waiting(name.into())
+                });
             }
         });
         let n = node.clone();

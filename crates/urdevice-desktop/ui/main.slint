@@ -454,6 +454,8 @@ export component PromptWindow inherits Window {
     in property <string> device;
     in property <string> feature;
     in property <int> seconds-left: 30;
+    // A device asks to pair instead of asking for a feature.
+    in property <bool> pairing: false;
     callback answer(bool);
     title: @tr("UrDevice: permission request");
     icon: @image-url("../../../assets/urdevice-icon-512.png");
@@ -464,14 +466,17 @@ export component PromptWindow inherits Window {
     VerticalLayout {
         padding: 20px;
         spacing: 12px;
-        Text { text: @tr("{} wants to use {} on this device.", root.device, root.feature); font-size: Theme.font-title; font-weight: 600; color: Theme.text; wrap: word-wrap; }
-        Muted { text: @tr("This setting is Always Ask. If you don't answer, the request is denied in {} s.", root.seconds-left); }
+        Text {
+            text: root.pairing ? @tr("{} wants to pair with this device.", root.device) : @tr("{} wants to use {} on this device.", root.device, root.feature);
+            font-size: Theme.font-title; font-weight: 600; color: Theme.text; wrap: word-wrap;
+        }
+        Muted { text: root.pairing ? @tr("If you don't answer, it is declined in {} s.", root.seconds-left) : @tr("This setting is Always Ask. If you don't answer, the request is denied in {} s.", root.seconds-left); }
         Rectangle { vertical-stretch: 1; }
         HorizontalLayout {
             alignment: end;
             spacing: 10px;
-            Btn { text: @tr("Deny"); kind: 2; clicked => { root.answer(false); } }
-            Btn { text: @tr("Allow"); kind: 0; clicked => { root.answer(true); } }
+            Btn { text: root.pairing ? @tr("Decline") : @tr("Deny"); kind: 2; clicked => { root.answer(false); } }
+            Btn { text: root.pairing ? @tr("Accept") : @tr("Allow"); kind: 0; clicked => { root.answer(true); } }
         }
     }
 }

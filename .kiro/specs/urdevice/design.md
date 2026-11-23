@@ -209,7 +209,7 @@ This flow is used for devices found by discovery. The user selects a device in t
 
 ### 7.3 Pairing limits
 
-- Pairing contexts exist only while the pairing screen is open (R3.8), and each lasts at most 120 s. When a QR token expires while the screen is still open, the core creates a new token and the UI shows the new QR code with a countdown (R3.11).
+- QR pairing contexts exist only while the pairing screen is open (R3.8), and each lasts at most 120 s. A code pairing asked for while the screen is closed first shows an Accept/Decline prompt (the Always Ask prompt with capability `pair`); Accept opens the screen and the code flow continues. Unknown devices can then connect (unless hidden or locked) but can only send `PairStart` or `PairProof`. The questions are rate-limited (one at a time, 5 a minute, 60 s of quiet after a decline or timeout). When a QR token expires while the screen is still open, the core creates a new token and the UI shows the new QR code with a countdown (R3.11).
 - Failure counter: 5 failures within a 5-minute window locks pairing for 5 minutes (R3.7).
 
 ### 7.4 Permission engine (R5)

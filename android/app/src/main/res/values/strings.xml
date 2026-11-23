@@ -154,6 +154,13 @@
     <string name="pair_fail_timeout">Pairing timed out.</string>
     <string name="pair_fail_expired">That QR code expired or was already used. Scan the new one.</string>
     <string name="pair_fail_locked">Pairing is locked on the other device after too many failures.</string>
+    <string name="pair_fail_declined">The other device said no.</string>
+    <string name="pair_fail_busy">Try again in a minute.</string>
+    <string name="pair_waiting_for">Waiting for %1$s to accept…</string>
+    <string name="pair_accept">Accept</string>
+    <string name="pair_decline">Decline</string>
+    <string name="prompt_pair_title">%1$s wants to pair with this device</string>
+    <string name="prompt_pair_body">If you don\'t answer, it is declined in %1$d s.</string>
     <string name="pair_fail_closed">Open Add Device on the other device first.</string>
     <string name="pair_fail_hidden">The other device is in hidden mode.</string>
     <string name="pair_fail_unreachable">Could not reach the other device, or its key did not match the QR code.</string>
