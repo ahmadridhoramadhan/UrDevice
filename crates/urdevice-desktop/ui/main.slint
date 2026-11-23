@@ -543,6 +543,9 @@ export component MainWindow inherits Window {
     in-out property <string> onboarding-name;
     in property <string> paired-name;
     in-out property <Page> page: Page.this-device;
+    // The settings icon of Send files opens Settings at the download folder and flashes it.
+    in-out property <bool> jump-files: false;
+    in-out property <bool> files-highlight: false;
     in-out property <string> selected-peer;
     // The open feature view: feature id and tile key.
     in-out property <string> feature;
@@ -590,6 +593,13 @@ export component MainWindow inherits Window {
     min-height: 560px;
     background: Theme.bg;
     default-font-size: Theme.font-body;
+
+    // Ends the flash of the download folder card.
+    Timer {
+        interval: 1800ms;
+        running: root.files-highlight;
+        triggered => { root.files-highlight = false; }
+    }
 
     function go-pair() {
         root.page = Page.pair;
@@ -689,7 +699,7 @@ export component MainWindow inherits Window {
                             Icon { source: @image-url("icons/gear.svg"); y: (parent.height - self.height) / 2; }
                             Text { text: @tr("Settings"); font-weight: 600; color: Theme.text; vertical-alignment: center; }
                         }
-                        set-ta := TouchArea { mouse-cursor: pointer; clicked => { leave-pair(); root.page = Page.settings; } }
+                        set-ta := TouchArea { mouse-cursor: pointer; clicked => { leave-pair(); root.jump-files = false; root.page = Page.settings; } }
                     }
                 }
             }
@@ -718,7 +728,7 @@ export component MainWindow inherits Window {
                     Text { text: root.toast; color: Theme.allow-fg; font-weight: 600; }
                 }
 
-                ScrollView {
+                main-scroll := ScrollView {
                     vertical-stretch: 1;
                     VerticalLayout {
                         padding: 22px;
@@ -881,7 +891,13 @@ export component MainWindow inherits Window {
                                                 width: 28px; height: 28px; border-radius: 14px;
                                                 background: gear-ta.has-hover ? Theme.border : transparent;
                                                 Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }
-                                                gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.settings; } }
+                                                gear-ta := TouchArea {
+                                                    mouse-cursor: pointer;
+                                                    clicked => {
+                                                        root.jump-files = t.feature == "files";
+                                                        root.page = Page.settings;
+                                                    }
+                                                }
                                             }
                                             if off: Icon { source: @image-url("icons/close.svg"); width: 14px; height: 14px; tint: Theme.muted; }
                                         }
@@ -970,7 +986,7 @@ export component MainWindow inherits Window {
                         }
 
                         // ------------------------------------------------ Settings
-                        if root.page == Page.settings: VerticalLayout {
+                        if root.page == Page.settings: settings-col := VerticalLayout {
                             spacing: 12px;
                             Text { text: @tr("Settings"); font-size: 22px; font-weight: 700; color: Theme.text; }
                             Card {
@@ -1034,7 +1050,18 @@ export component MainWindow inherits Window {
                                 }
                             }
                             // Files (#17): the download folder (R8.6).
-                            FilesSettings { }
+                            files-card := FilesSettings { highlight: root.files-highlight; }
+                            // Coming from the settings icon of Send files: scroll to the download folder.
+                            Timer {
+                                interval: 120ms;
+                                running: root.jump-files;
+                                triggered => {
+                                    root.jump-files = false;
+                                    main-scroll.viewport-y = min(0px, max(main-scroll.height - main-scroll.viewport-height,
+                                        -(22px + files-card.absolute-position.y - settings-col.absolute-position.y - 8px)));
+                                    root.files-highlight = true;
+                                }
+                            }
                             Card {
                                 VerticalLayout {
                                     padding: 16px;

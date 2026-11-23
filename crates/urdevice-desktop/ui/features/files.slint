@@ -98,6 +98,11 @@ export component TransferCard inherits Card {
 
 // The download-folder setting, shown in Settings.
 export component FilesSettings inherits Card {
+    // Flashes the card, for example after the settings icon of Send files jumped here.
+    in property <bool> highlight: false;
+    border-width: root.highlight ? 2px : 1px;
+    border-color: root.highlight ? Theme.accent : Theme.border;
+    animate border-color { duration: 300ms; }
     VerticalLayout {
         padding: 16px;
         spacing: 10px;
