@@ -211,22 +211,37 @@ component PairBody inherits VerticalLayout {
     callback confirm-code(string, bool);
     spacing: 16px;
     alignment: start;
-    HorizontalLayout {
+    // Onboarding: everything stacked and centered.
+    if root.compact: VerticalLayout {
+        spacing: 10px;
+        HorizontalLayout {
+            alignment: center;
+            QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; show-countdown: false; }
+        }
+        Text { text: @tr("Scan with your other device"); font-size: Theme.font-title; font-weight: 600; color: Theme.text; horizontal-alignment: center; }
+        Muted { text: @tr("Open UrDevice there and choose Add Device."); horizontal-alignment: center; }
+        if root.has-camera: HorizontalLayout {
+            alignment: center;
+            Btn { text: @tr("Scan QR"); has-icon: true; icon: @image-url("icons/camera.svg"); clicked => { root.scan(); } }
+        }
+        Rectangle { height: 12px; }
+    }
+    if !root.compact: HorizontalLayout {
         spacing: 24px;
         alignment: start;
-        QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; show-countdown: !root.compact; }
+        QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; }
         VerticalLayout {
             spacing: 10px;
-            alignment: root.compact ? LayoutAlignment.center : LayoutAlignment.start;
-            SectionTitle { text: root.compact ? @tr("Scan with your other device") : @tr("Scan this code with the other device"); }
-            Muted { text: root.compact ? @tr("Open UrDevice there and choose Add Device.") : @tr("On the phone, open UrDevice, tap Add Device, and scan. The code works once and changes every 2 minutes."); }
+            alignment: start;
+            SectionTitle { text: @tr("Scan this code with the other device"); }
+            Muted { text: @tr("On the phone, open UrDevice, tap Add Device, and scan. The code works once and changes every 2 minutes."); }
             if root.has-camera: HorizontalLayout {
                 alignment: start;
                 Btn { text: @tr("Scan QR"); has-icon: true; icon: @image-url("icons/camera.svg"); clicked => { root.scan(); } }
             }
         }
     }
-    SectionTitle { text: root.compact ? @tr("Or pick a device nearby") : @tr("Devices on the network"); }
+    SectionTitle { text: root.compact ? @tr("Or pick a device nearby") : @tr("Devices on the network"); horizontal-alignment: root.compact ? TextHorizontalAlignment.center : TextHorizontalAlignment.left; }
     if !root.compact: Muted { text: @tr("Pick a device. Both screens then show the same 6-digit code."); }
     for c in root.codes: CodeConfirm {
         item: c;
@@ -234,6 +249,7 @@ component PairBody inherits VerticalLayout {
     }
     if root.nearby.length == 0 && root.codes.length == 0: Muted {
         text: root.compact ? @tr("Looking for devices on your Wi-Fi…") : @tr("No devices found yet. Open UrDevice on the other device, on the same Wi-Fi.");
+        horizontal-alignment: root.compact ? TextHorizontalAlignment.center : TextHorizontalAlignment.left;
     }
     for n in root.nearby: Card {
         height: 54px;
@@ -369,7 +385,6 @@ component Onboarding inherits Rectangle {
                 spacing: 10px;
                 if root.step == 2 || root.step == 3: Btn {
                     text: @tr("Back");
-                    kind: 3;
                     clicked => {
                         if (root.step == 3) { root.close-pair(); }
                         root.step -= 1;
