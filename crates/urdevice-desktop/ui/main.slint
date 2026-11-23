@@ -139,15 +139,17 @@ component QrBox inherits Rectangle {
     in property <image> qr;
     in property <string> countdown;
     in property <string> locked;
-    width: 220px;
-    height: 250px;
+    // The compact form (onboarding) has no countdown text.
+    in property <bool> show-countdown: true;
+    width: show-countdown ? 220px : 200px;
+    height: show-countdown ? 250px : 200px;
     VerticalLayout {
         spacing: 8px;
         alignment: start;
         Rectangle {
             width: 200px;
             height: 200px;
-            x: 10px;
+            x: root.show-countdown ? 10px : 0px;
             border-radius: 12px;
             background: #ffffff;
             if root.locked == "": Image {
@@ -164,7 +166,7 @@ component QrBox inherits Rectangle {
                 horizontal-alignment: center;
             }
         }
-        Text {
+        if root.show-countdown: Text {
             text: root.countdown;
             wrap: word-wrap;
             horizontal-alignment: center;
@@ -208,13 +210,14 @@ component PairBody inherits VerticalLayout {
     callback pair-nearby(string);
     callback confirm-code(string, bool);
     spacing: 16px;
+    alignment: start;
     HorizontalLayout {
         spacing: 24px;
         alignment: start;
-        QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; }
+        QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; show-countdown: !root.compact; }
         VerticalLayout {
             spacing: 10px;
-            alignment: start;
+            alignment: root.compact ? LayoutAlignment.center : LayoutAlignment.start;
             SectionTitle { text: root.compact ? @tr("Scan with your other device") : @tr("Scan this code with the other device"); }
             Muted { text: root.compact ? @tr("Open UrDevice there and choose Add Device.") : @tr("On the phone, open UrDevice, tap Add Device, and scan. The code works once and changes every 2 minutes."); }
             if root.has-camera: HorizontalLayout {
@@ -364,7 +367,6 @@ component Onboarding inherits Rectangle {
             }
             HorizontalLayout {
                 spacing: 10px;
-                alignment: end;
                 if root.step == 2 || root.step == 3: Btn {
                     text: @tr("Back");
                     kind: 3;
