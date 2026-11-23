@@ -211,20 +211,58 @@ component PairBody inherits VerticalLayout {
     callback confirm-code(string, bool);
     spacing: 16px;
     alignment: start;
-    // Onboarding: everything stacked and centered.
-    if root.compact: VerticalLayout {
-        spacing: 10px;
+    // Onboarding: two cards, "scan" and "nearby".
+    if root.compact: Card {
+        background: Theme.surface;
         HorizontalLayout {
-            alignment: center;
+            padding: 16px;
+            spacing: 20px;
             QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; show-countdown: false; }
+            VerticalLayout {
+                alignment: center;
+                spacing: 8px;
+                IconBox { icon: @image-url("icons/qr.svg"); size: 40px; }
+                Text { text: @tr("Scan with your other device"); font-size: Theme.font-title; font-weight: 700; color: Theme.text; wrap: word-wrap; }
+                Muted { text: @tr("Open UrDevice there and choose Add Device."); }
+                if root.has-camera: HorizontalLayout {
+                    alignment: start;
+                    Btn { text: @tr("Scan QR"); has-icon: true; icon: @image-url("icons/camera.svg"); clicked => { root.scan(); } }
+                }
+            }
         }
-        Text { text: @tr("Scan with your other device"); font-size: Theme.font-title; font-weight: 600; color: Theme.text; horizontal-alignment: center; }
-        Muted { text: @tr("Open UrDevice there and choose Add Device."); horizontal-alignment: center; }
-        if root.has-camera: HorizontalLayout {
-            alignment: center;
-            Btn { text: @tr("Scan QR"); has-icon: true; icon: @image-url("icons/camera.svg"); clicked => { root.scan(); } }
+    }
+    if root.compact: Card {
+        background: Theme.surface;
+        VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
+            HorizontalLayout {
+                spacing: 12px;
+                IconBox { icon: @image-url("icons/wifi.svg"); size: 40px; }
+                Text { text: @tr("Or pick a device nearby"); font-size: Theme.font-title; font-weight: 700; color: Theme.text; vertical-alignment: center; }
+            }
+            for c in root.codes: CodeConfirm {
+                item: c;
+                answer(ok) => { root.confirm-code(c.key, ok); }
+            }
+            if root.nearby.length == 0 && root.codes.length == 0: Muted { text: @tr("Looking for devices on your Wi-Fi…"); }
+            for n in root.nearby: Rectangle {
+                height: 50px;
+                border-radius: 8px;
+                background: Theme.surface-2;
+                HorizontalLayout {
+                    padding: 8px;
+                    spacing: 10px;
+                    IconBox { icon: n.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg"); size: 32px; y: (parent.height - self.height) / 2; }
+                    VerticalLayout {
+                        alignment: center;
+                        Text { text: n.name; font-weight: 600; color: Theme.text; font-size: Theme.font-body; }
+                        Text { text: n.platform; color: Theme.muted; font-size: Theme.font-small; }
+                    }
+                    Btn { text: @tr("Pair"); kind: 0; y: (parent.height - self.height) / 2; clicked => { root.pair-nearby(n.key); } }
+                }
+            }
         }
-        Rectangle { height: 12px; }
     }
     if !root.compact: HorizontalLayout {
         spacing: 24px;
@@ -241,28 +279,28 @@ component PairBody inherits VerticalLayout {
             }
         }
     }
-    SectionTitle { text: root.compact ? @tr("Or pick a device nearby") : @tr("Devices on the network"); horizontal-alignment: root.compact ? TextHorizontalAlignment.center : TextHorizontalAlignment.left; }
+    if !root.compact: SectionTitle { text: @tr("Devices on the network"); }
     if !root.compact: Muted { text: @tr("Pick a device. Both screens then show the same 6-digit code."); }
-    for c in root.codes: CodeConfirm {
-        item: c;
-        answer(ok) => { root.confirm-code(c.key, ok); }
-    }
-    if root.nearby.length == 0 && root.codes.length == 0: Muted {
-        text: root.compact ? @tr("Looking for devices on your Wi-Fi…") : @tr("No devices found yet. Open UrDevice on the other device, on the same Wi-Fi.");
-        horizontal-alignment: root.compact ? TextHorizontalAlignment.center : TextHorizontalAlignment.left;
-    }
-    for n in root.nearby: Card {
-        height: 54px;
-        HorizontalLayout {
-            padding: 10px;
-            spacing: 10px;
-            IconBox { icon: n.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg"); size: 32px; y: (parent.height - self.height) / 2; }
-            VerticalLayout {
-                alignment: center;
-                Text { text: n.name; font-weight: 600; color: Theme.text; font-size: Theme.font-body; }
-                Text { text: root.compact ? n.platform : n.platform + " · " + n.address; color: Theme.muted; font-size: Theme.font-small; }
+    if !root.compact: VerticalLayout {
+        spacing: 16px;
+        for c in root.codes: CodeConfirm {
+            item: c;
+            answer(ok) => { root.confirm-code(c.key, ok); }
+        }
+        if root.nearby.length == 0 && root.codes.length == 0: Muted { text: @tr("No devices found yet. Open UrDevice on the other device, on the same Wi-Fi."); }
+        for n in root.nearby: Card {
+            height: 54px;
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 10px;
+                IconBox { icon: n.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg"); size: 32px; y: (parent.height - self.height) / 2; }
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: n.name; font-weight: 600; color: Theme.text; font-size: Theme.font-body; }
+                    Text { text: n.platform + " · " + n.address; color: Theme.muted; font-size: Theme.font-small; }
+                }
+                Btn { text: @tr("Pair"); y: (parent.height - self.height) / 2; clicked => { root.pair-nearby(n.key); } }
             }
-            Btn { text: @tr("Pair"); y: (parent.height - self.height) / 2; clicked => { root.pair-nearby(n.key); } }
         }
     }
 }
@@ -323,8 +361,15 @@ component Onboarding inherits Rectangle {
             if root.step == 2: VerticalLayout {
                 vertical-stretch: 1;
                 spacing: 8px;
-                Text { text: @tr("What can your other devices do here?"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; wrap: word-wrap; }
-                Muted { text: @tr("You can change this any time."); }
+                HorizontalLayout {
+                    spacing: 12px;
+                    IconBox { icon: @image-url("icons/shield.svg"); size: 44px; }
+                    VerticalLayout {
+                        alignment: center;
+                        Text { text: @tr("What can your other devices do here?"); font-size: Theme.font-title + 2px; font-weight: 700; color: Theme.text; wrap: word-wrap; }
+                        Muted { text: @tr("You can change this any time."); }
+                    }
+                }
                 ScrollView {
                     vertical-stretch: 1;
                     VerticalLayout {
@@ -340,7 +385,11 @@ component Onboarding inherits Rectangle {
             if root.step == 3: VerticalLayout {
                 vertical-stretch: 1;
                 spacing: 12px;
-                Text { text: @tr("Add your first device"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; }
+                HorizontalLayout {
+                    spacing: 12px;
+                    IconBox { icon: @image-url("icons/plus.svg"); size: 44px; }
+                    Text { text: @tr("Add your first device"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; vertical-alignment: center; }
+                }
                 ScrollView {
                     vertical-stretch: 1;
                     PairBody {
