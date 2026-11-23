@@ -792,18 +792,6 @@ export component MainWindow inherits Window {
                                     }
                                 }
                             }
-                            SectionTitle { text: @tr("Permissions for other devices"); }
-                            Muted { text: @tr("Applies to every device paired with {}. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.", root.me-name); }
-                            for p in root.permissions: PermRow {
-                                item: p;
-                                picked(m) => {
-                                    if (p.local-only && m == 0 && p.mode != 0) {
-                                        root.confirm-cap = p.cap;
-                                    } else {
-                                        root.set-permission(p.cap, m, false);
-                                    }
-                                }
-                            }
                             TunnelHostSection { }
                         }
 
@@ -905,7 +893,7 @@ export component MainWindow inherits Window {
                                                 width: 28px; height: 28px; border-radius: 14px;
                                                 background: gear-ta.has-hover ? Theme.border : transparent;
                                                 Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }
-                                                gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.this-device; } }
+                                                gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.settings; } }
                                             }
                                         }
                                         Text { text: t.label; font-weight: 600; color: Theme.text; }
@@ -979,6 +967,18 @@ export component MainWindow inherits Window {
                                     }
                                     Text { text: @tr("Device ID"); font-weight: 600; color: Theme.text; }
                                     Text { text: root.me-fingerprint; font-family: "monospace"; color: Theme.muted; }
+                                }
+                            }
+                            SectionTitle { text: @tr("Permissions for other devices"); }
+                            Muted { text: @tr("Applies to every device paired with {}. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.", root.me-name); }
+                            for p in root.permissions: PermRow {
+                                item: p;
+                                picked(m) => {
+                                    if (p.local-only && m == 0 && p.mode != 0) {
+                                        root.confirm-cap = p.cap;
+                                    } else {
+                                        root.set-permission(p.cap, m, false);
+                                    }
                                 }
                             }
                             Card {
