@@ -35,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -231,6 +233,7 @@ fun DeviceScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { (f, t) ->
                         val mode = modes[t.cap] ?: FfiMode.DENY
+                        var menuOpen by remember(peer.id, t.key) { mutableStateOf(false) }
                         var flipped by remember(peer.id, t.key) { mutableStateOf<Boolean?>(null) }
                         val switchOn = f.switch(peer)?.let { flipped ?: it }
                         FeatureTile(
@@ -239,7 +242,12 @@ fun DeviceScreen(
                             mode = mode,
                             available = BluetoothFeature.available(peer, t.cap),
                             host = peer.name,
-                            onClick = { if (f.hasScreen) onOpenFeature(f.id, t.key) else onRequest(t.cap) },
+                            onClick = {
+                                if (f.tileMenu) menuOpen = true
+                                else if (f.hasScreen) onOpenFeature(f.id, t.key)
+                                else onRequest(t.cap)
+                            },
+                            menu = { if (f.tileMenu) f.TileMenu(peer, t.key, menuOpen) { menuOpen = false } },
                             onGear = onSettings,
                             switchOn = switchOn,
                             onSwitch = { flipped = it; f.setSwitch(peer, it) },
@@ -284,6 +292,8 @@ private fun FeatureTile(
     switchOn: Boolean?,
     onSwitch: (Boolean) -> Unit,
     modifier: Modifier,
+    /** Extra content anchored to the tile, for example a menu. */
+    menu: @Composable () -> Unit = {},
 ) {
     val c = LocalModes.current
     val off = mode == FfiMode.DENY || !available
@@ -305,6 +315,7 @@ private fun FeatureTile(
             },
         ),
         modifier = modifier.heightIn(min = 88.dp)
+            .alpha(if (off) 0.45f else 1f)
             .semantics(mergeDescendants = true) {
                 stateDescription = state
                 if (switchOn != null) toggleableState = ToggleableState(switchOn)
@@ -320,11 +331,20 @@ private fun FeatureTile(
                     ) {
                         Icon(capIcon(icon), contentDescription = null, tint = fg, modifier = Modifier.size(17.dp))
                     }
+                } else if (off) {
+                    Box(
+                        Modifier.size(34.dp).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(capIcon(icon), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(17.dp))
+                    }
                 } else {
                     IconBox(capIcon(icon), 34)
                 }
                 Spacer(Modifier.weight(1f))
-                if (switchOn == null) {
+                if (off) {
+                    Icon(Icons.Outlined.Close, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                } else if (switchOn == null) {
                     IconButton(onClick = onGear, modifier = Modifier.size(44.dp)) {
                         Icon(Icons.Outlined.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }
@@ -338,6 +358,7 @@ private fun FeatureTile(
                     Box(Modifier.size(8.dp).background(c.askFg, CircleShape))
                 }
             }
+            menu()
         }
     }
 }

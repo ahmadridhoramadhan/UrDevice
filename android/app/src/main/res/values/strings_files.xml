@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- File transfer (#17). -->
 <resources>
-    <string name="files_send_to">Send files to %1$s</string>
-    <string name="files_send_hint">Each file is checked with SHA-256. You can also share files to UrDevice from any app.</string>
     <string name="files_choose">Choose files</string>
-    <string name="files_transfers">Transfers</string>
+    <string name="files_choose_folder">Choose a folder</string>
     <string name="files_clear">Clear finished</string>
-    <string name="files_none">No transfers yet.</string>
     <string name="files_to">To %1$s</string>
     <string name="files_from">From %1$s</string>
     <string name="files_cancel">Cancel</string>

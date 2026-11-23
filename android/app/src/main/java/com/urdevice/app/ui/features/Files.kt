@@ -23,8 +23,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -44,6 +45,7 @@ import com.urdevice.app.R
 import com.urdevice.app.host.FilesHost
 import com.urdevice.app.host.UriSource
 import com.urdevice.app.host.describe
+import com.urdevice.app.host.describeTree
 import com.urdevice.core.FfiMode
 import com.urdevice.core.FfiPeer
 import com.urdevice.core.FfiSendFile
@@ -65,7 +67,7 @@ object FilesFeature : Feature {
 
     override fun tiles(modes: Map<String, FfiMode>) = listOf(FeatureTile("files.v1", "files.v1", R.string.tile_send_files))
 
-    override val hasScreen get() = true
+    override val tileMenu get() = true
 
     private val _transfers = MutableStateFlow<List<FfiTransfer>>(emptyList())
     /** Every transfer, newest first. */
@@ -103,9 +105,18 @@ object FilesFeature : Feature {
     }
 
     /** Send content URIs to [device]. Returns false when nothing could be read. */
-    fun send(context: Context, device: String, uris: List<Uri>): Boolean {
+    fun send(context: Context, device: String, uris: List<Uri>): Boolean = sendPicked(context, device, describe(context, uris))
+
+    /** Send every file in the folder [tree] (from the folder picker), keeping the folder structure. */
+    fun sendFolder(context: Context, device: String, tree: Uri): Boolean {
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return sendPicked(context, device, describeTree(context, tree))
+    }
+
+    private fun sendPicked(context: Context, device: String, picked: List<com.urdevice.app.host.Picked>): Boolean {
         val n = node ?: return false
-        val picked = describe(context, uris)
         if (picked.isEmpty()) return false
         return runCatching {
             n.filesSend(device, picked.map { FfiSendFile(it.name, it.size.toULong()) }, UriSource(context, picked.map { it.uri }))
@@ -119,25 +130,42 @@ object FilesFeature : Feature {
         refresh()
     }
 
+    /** Tapping the tile asks for files or a folder at once. */
     @Composable
-    override fun Screen(peer: FfiPeer, tile: String) {
+    override fun TileMenu(peer: FfiPeer, tile: String, expanded: Boolean, onDismiss: () -> Unit) {
         val ctx = LocalContext.current
-        val list by transfers.collectAsState()
-        val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             if (uris.isNotEmpty()) send(ctx, peer.id, uris)
         }
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.files_send_to, peer.name), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(R.string.files_send_hint), style = MaterialTheme.typography.bodySmall)
-            Button(onClick = { pick.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.files_choose))
+        val folder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) sendFolder(ctx, peer.id, uri)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.files_choose)) },
+                onClick = { onDismiss(); files.launch(arrayOf("*/*")) },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.files_choose_folder)) },
+                onClick = { onDismiss(); folder.launch(null) },
+            )
+        }
+    }
+
+    /** The transfers with this device, under the device info and above the features. */
+    @Composable
+    override fun DeviceBanner(peer: FfiPeer) {
+        val list by transfers.collectAsState()
+        val mine = list.filter { it.deviceId == peer.id }
+        if (mine.isEmpty()) return
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            mine.forEach { TransferCard(it) }
+            if (mine.any { it.state.final() }) {
+                Row(Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { clearFinished() }) { Text(stringResource(R.string.files_clear)) }
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.files_transfers), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                if (list.any { it.state.final() }) TextButton(onClick = { clearFinished() }) { Text(stringResource(R.string.files_clear)) }
-            }
-            if (list.isEmpty()) Text(stringResource(R.string.files_none), style = MaterialTheme.typography.bodySmall)
-            list.forEach { TransferCard(it) }
         }
     }
 

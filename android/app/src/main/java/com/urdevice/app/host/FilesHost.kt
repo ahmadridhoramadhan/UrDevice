@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -70,6 +71,52 @@ fun describe(context: Context, uris: List<Uri>): List<Picked> = uris.mapNotNull 
                 if (real < 0) null else Picked(uri, name, real)
             }
     }.getOrNull()
+}
+
+/** Most files taken from one folder, so a huge folder cannot stall the app. */
+private const val MAX_TREE_FILES = 10_000
+
+/**
+ * Every file under the folder [tree] (from the folder picker), named `Folder/sub/file` so the
+ * other device rebuilds the structure. Files whose size is unknown are left out.
+ */
+fun describeTree(context: Context, tree: Uri): List<Picked> {
+    val resolver = context.contentResolver
+    val out = ArrayList<Picked>()
+    val rootId = runCatching { DocumentsContract.getTreeDocumentId(tree) }.getOrNull() ?: return out
+    val rootName = runCatching {
+        resolver.query(
+            DocumentsContract.buildDocumentUriUsingTree(tree, rootId),
+            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null,
+        )?.use { if (it.moveToFirst()) it.getString(0) else null }
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: "folder"
+
+    fun walk(docId: String, prefix: String) {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, docId)
+        resolver.query(
+            children,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+                DocumentsContract.Document.COLUMN_SIZE,
+            ),
+            null, null, null,
+        )?.use { c ->
+            while (c.moveToNext() && out.size < MAX_TREE_FILES) {
+                val id = c.getString(0) ?: continue
+                val name = c.getString(1)?.replace('/', '_')?.takeIf { it.isNotBlank() } ?: continue
+                val size = if (c.isNull(3)) -1L else c.getLong(3)
+                if (c.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR) {
+                    walk(id, "$prefix$name/")
+                } else if (size >= 0) {
+                    out += Picked(DocumentsContract.buildDocumentUriUsingTree(tree, id), "$prefix$name", size)
+                }
+            }
+        }
+    }
+    runCatching { walk(rootId, "${rootName.replace('/', '_')}/") }
+    return out
 }
 
 /** Opens the picked URIs for the core, which owns the descriptor it gets. */

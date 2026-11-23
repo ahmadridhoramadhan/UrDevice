@@ -6,7 +6,7 @@ import { Icon, IconBox, Btn, Card, Chip, Dot, ModeSwitch, Toggle, SectionTitle, 
 import { Labels } from "labels.slint";
 import { FeatureView } from "features/features.slint";
 import { ClipboardFeature } from "features/clipboard.slint";
-import { FilesSettings } from "features/files.slint";
+import { FilesSettings, FilesFeature, TransferCard } from "features/files.slint";
 // Localhost sharing (#22): this device's shared ports and the LAN indicator.
 import { TunnelHostSection, TunnelLanBanner } from "features/tunnel.slint";
 // Bluetooth fallback (#23): the banner while on Bluetooth LE.
@@ -813,10 +813,22 @@ export component MainWindow inherits Window {
                                     Muted { text: root.peer.status == "disconnected" ? @tr("Press Reconnect to connect again.") : @tr("Connects on its own when {} is nearby.", root.peer.name); }
                                 }
                             }
+                            // File transfers with this device, under the device info.
+                            if FilesFeature.transfers.length > 0: VerticalLayout {
+                                spacing: 8px;
+                                for t in FilesFeature.transfers: TransferCard { t: t; }
+                                HorizontalLayout {
+                                    alignment: end;
+                                    Btn { text: @tr("Clear finished"); kind: 3; clicked => { FilesFeature.clear(); } }
+                                }
+                            }
                             SectionTitle { text: @tr("Features"); }
                             if root.peer.status == "connected": GridLayout {
                                 spacing: 10px;
                                 for t[i] in root.tiles: Rectangle {
+                                    // Off: the host turned the feature off, or Bluetooth LE cannot carry it.
+                                    property <bool> off: t.mode >= 2;
+                                    property <bool> lit: t.toggle && t.on && !off;
                                     row: i / 3;
                                     col: mod(i, 3);
                                     height: 84px;
@@ -826,16 +838,18 @@ export component MainWindow inherits Window {
                                     accessible-label: t.label;
                                     accessible-description: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : t.mode == 3 ? @tr("Not available over Bluetooth") : @tr("Turned off by {}", root.peer.name);
                                     border-radius: Theme.radius;
-                                    border-width: 1px;
+                                    border-width: off ? 0px : 1px;
                                     border-color: Theme.border;
-                                    background: t.toggle && t.on && t.mode < 2 ? Theme.accent : t.mode >= 2 ? Theme.surface-2 : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
-                                    opacity: t.mode >= 2 ? 0.6 : 1;
+                                    background: lit ? Theme.accent : off ? Theme.surface-2.with-alpha(0.5) : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
+                                    opacity: off ? 0.45 : 1;
                                     tile-ta := TouchArea {
-                                        enabled: t.mode < 2;
-                                        mouse-cursor: t.mode >= 2 ? default : pointer;
+                                        enabled: !off;
+                                        mouse-cursor: off ? MouseCursor.not-allowed : MouseCursor.pointer;
                                         clicked => {
                                             if (t.toggle) {
                                                 root.toggle-tile(root.peer.id, t.feature, !t.on);
+                                            } else if (t.feature == "files") {
+                                                files-menu.show();
                                             } else if (t.view) {
                                                 root.feature = t.feature;
                                                 root.feature-tile = t.key;
@@ -850,30 +864,66 @@ export component MainWindow inherits Window {
                                         padding: 12px;
                                         spacing: 6px;
                                         HorizontalLayout {
-                                            // A switch tile lights up when it is on.
-                                            if !(t.toggle && t.on && t.mode < 2): IconBox { icon: t.icon; size: 32px; }
-                                            if t.toggle && t.on && t.mode < 2: Rectangle {
+                                            // A switch tile lights up when it is on; an off tile is grey.
+                                            if !lit && !off: IconBox { icon: t.icon; size: 32px; }
+                                            if lit: Rectangle {
                                                 width: 32px; height: 32px; border-radius: 8px;
                                                 background: Theme.on-accent.with-alpha(0.16);
                                                 Icon { source: t.icon; tint: Theme.on-accent; width: 16px; height: 16px; }
                                             }
+                                            if off: Rectangle {
+                                                width: 32px; height: 32px; border-radius: 8px;
+                                                background: Theme.border.with-alpha(0.6);
+                                                Icon { source: t.icon; tint: Theme.muted; width: 16px; height: 16px; }
+                                            }
                                             Rectangle { horizontal-stretch: 1; }
-                                            if !t.toggle: Rectangle {
+                                            if !t.toggle && !off: Rectangle {
                                                 width: 28px; height: 28px; border-radius: 14px;
                                                 background: gear-ta.has-hover ? Theme.border : transparent;
                                                 Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }
                                                 gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.settings; } }
                                             }
+                                            if off: Icon { source: @image-url("icons/close.svg"); width: 14px; height: 14px; tint: Theme.muted; }
                                         }
-                                        // No status words: an amber dot means "you approve first"; a dimmed tile is off.
+                                        // An amber dot means "you approve first". Off tiles are grey with an x.
                                         HorizontalLayout {
                                             spacing: 6px;
                                             alignment: start;
-                                            Text { text: t.label; font-weight: 600; color: t.mode >= 2 ? Theme.muted : t.toggle && t.on ? Theme.on-accent : Theme.text; vertical-alignment: center; }
+                                            Text { text: t.label; font-weight: 600; color: off ? Theme.muted : lit ? Theme.on-accent : Theme.text; vertical-alignment: center; }
                                             if t.mode == 1: Rectangle {
                                                 y: (parent.height - self.height) / 2;
                                                 width: 8px; height: 8px; border-radius: 4px;
                                                 background: Theme.ask-fg;
+                                            }
+                                        }
+                                    }
+                                    // Send files: choose files or a folder right away.
+                                    files-menu := PopupWindow {
+                                        x: 12px;
+                                        y: parent.height - 6px;
+                                        width: 200px;
+                                        height: 86px;
+                                        Rectangle {
+                                            background: Theme.surface;
+                                            border-radius: 8px;
+                                            border-width: 1px;
+                                            border-color: Theme.border;
+                                            VerticalLayout {
+                                                padding: 6px;
+                                                spacing: 2px;
+                                                for item[k] in [@tr("Choose files…"), @tr("Choose a folder…")]: Rectangle {
+                                                    height: 34px;
+                                                    border-radius: 6px;
+                                                    background: menu-ta.has-hover ? Theme.surface-2 : transparent;
+                                                    Text { text: item; color: Theme.text; x: 10px; vertical-alignment: center; }
+                                                    menu-ta := TouchArea {
+                                                        mouse-cursor: MouseCursor.pointer;
+                                                        clicked => {
+                                                            FilesFeature.peer-id = root.peer.id;
+                                                            if (k == 0) { FilesFeature.pick-files(); } else { FilesFeature.pick-folder(); }
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }

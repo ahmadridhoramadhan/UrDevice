@@ -65,6 +65,7 @@ import com.urdevice.app.ui.ThisDeviceScreen
 import com.urdevice.app.ui.UrDeviceTheme
 import com.urdevice.app.ui.features.feature
 import com.urdevice.core.FfiEvent
+import com.urdevice.core.FfiMode
 import com.urdevice.core.FfiException
 import com.urdevice.core.FfiLogEntry
 import com.urdevice.core.UrDeviceNode
@@ -314,8 +315,12 @@ private fun App() {
                         is Page.Feature -> {
                             val peer = s.peers.firstOrNull { it.id == page.device }
                             val f = feature(page.feature)
-                            if (peer == null || f == null) {
-                                LaunchedEffect(page) { back() }
+                            val modes = peer?.remotePermissions?.associate { it.capability to it.mode } ?: emptyMap()
+                            val cap = f?.tiles(modes)?.firstOrNull { it.key == page.tile }?.cap
+                            // A feature page stays open only while its feature is on.
+                            val denied = cap != null && (modes[cap] ?: FfiMode.DENY) == FfiMode.DENY
+                            if (peer == null || f == null || denied) {
+                                LaunchedEffect(page, denied) { back() }
                             } else {
                                 f.Screen(peer, page.tile)
                             }

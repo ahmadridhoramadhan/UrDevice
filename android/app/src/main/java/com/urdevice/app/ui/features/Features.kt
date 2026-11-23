@@ -37,6 +37,13 @@ interface Feature {
     /** The user flipped the switch tile of [peer]. */
     fun setSwitch(peer: FfiPeer, on: Boolean) {}
 
+    /** True when tapping a tile opens a menu ([TileMenu]) instead of a screen. */
+    val tileMenu: Boolean get() = false
+
+    /** The menu of a [tileMenu] tile, anchored to the tile. Show it while [expanded]. */
+    @Composable
+    fun TileMenu(peer: FfiPeer, tile: String, expanded: Boolean, onDismiss: () -> Unit) {}
+
     /** The feature screen for [peer], opened from the tile with key [tile]. */
     @Composable
     fun Screen(peer: FfiPeer, tile: String) {}

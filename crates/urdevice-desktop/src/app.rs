@@ -525,6 +525,13 @@ impl Ui {
                     });
                 }
             }
+            // A feature page stays open only while its feature is on.
+            if w.get_page() == crate::ui::Page::Feature {
+                let open = w.get_feature_tile();
+                if tiles.iter().any(|t| t.key == open && t.mode >= 2) {
+                    w.set_page(crate::ui::Page::Peer);
+                }
+            }
             sync(&self.models.tiles, tiles);
         } else if matches!(
             w.get_page(),
