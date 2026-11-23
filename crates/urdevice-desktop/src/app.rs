@@ -611,7 +611,7 @@ impl Ui {
                     self.toast(l.invoke_paired_with(name.clone().into()));
                     if w.get_onboarding() {
                         w.set_paired_name(name.into());
-                        w.set_onboarding_step(6);
+                        w.set_onboarding_step(4);
                     }
                 } else {
                     self.toast(l.invoke_pairing_failed(reason.into()));

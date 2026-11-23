@@ -194,12 +194,14 @@ component CodeConfirm inherits Rectangle {
     }
 }
 
-// The Pair screen body, shared by onboarding step 4/5 and "Add device".
+// The Pair screen body, shared by onboarding and "Add device".
+// compact: fewer words and no IP addresses (onboarding).
 component PairBody inherits VerticalLayout {
     in property <image> qr;
     in property <string> countdown;
     in property <string> locked;
     in property <bool> has-camera;
+    in property <bool> compact: false;
     in property <[NearbyItem]> nearby;
     in property <[CodeItem]> codes;
     callback scan();
@@ -213,21 +215,23 @@ component PairBody inherits VerticalLayout {
         VerticalLayout {
             spacing: 10px;
             alignment: start;
-            SectionTitle { text: @tr("Scan this code with the other device"); }
-            Muted { text: @tr("On the phone, open UrDevice, tap Add Device, and scan. The code works once and changes every 2 minutes."); }
+            SectionTitle { text: root.compact ? @tr("Scan with your other device") : @tr("Scan this code with the other device"); }
+            Muted { text: root.compact ? @tr("Open UrDevice there and choose Add Device.") : @tr("On the phone, open UrDevice, tap Add Device, and scan. The code works once and changes every 2 minutes."); }
             if root.has-camera: HorizontalLayout {
                 alignment: start;
                 Btn { text: @tr("Scan QR"); has-icon: true; icon: @image-url("icons/camera.svg"); clicked => { root.scan(); } }
             }
         }
     }
-    SectionTitle { text: @tr("Devices on the network"); }
-    Muted { text: @tr("Pick a device. Both screens then show the same 6-digit code."); }
+    SectionTitle { text: root.compact ? @tr("Or pick a device nearby") : @tr("Devices on the network"); }
+    if !root.compact: Muted { text: @tr("Pick a device. Both screens then show the same 6-digit code."); }
     for c in root.codes: CodeConfirm {
         item: c;
         answer(ok) => { root.confirm-code(c.key, ok); }
     }
-    if root.nearby.length == 0 && root.codes.length == 0: Muted { text: @tr("No devices found yet. Open UrDevice on the other device, on the same Wi-Fi."); }
+    if root.nearby.length == 0 && root.codes.length == 0: Muted {
+        text: root.compact ? @tr("Looking for devices on your Wi-Fi…") : @tr("No devices found yet. Open UrDevice on the other device, on the same Wi-Fi.");
+    }
     for n in root.nearby: Card {
         height: 54px;
         HorizontalLayout {
@@ -237,17 +241,17 @@ component PairBody inherits VerticalLayout {
             VerticalLayout {
                 alignment: center;
                 Text { text: n.name; font-weight: 600; color: Theme.text; font-size: Theme.font-body; }
-                Text { text: n.platform + " · " + n.address; color: Theme.muted; font-size: Theme.font-small; }
+                Text { text: root.compact ? n.platform : n.platform + " · " + n.address; color: Theme.muted; font-size: Theme.font-small; }
             }
             Btn { text: @tr("Pair"); y: (parent.height - self.height) / 2; clicked => { root.pair-nearby(n.key); } }
         }
     }
 }
 
+// First start: one panel, four steps (name, permissions, pair, done).
 component Onboarding inherits Rectangle {
     in-out property <int> step: 1;
     in-out property <string> name;
-    in property <string> fingerprint;
     in property <[PermItem]> perms;
     in property <image> qr;
     in property <string> countdown;
@@ -264,148 +268,131 @@ component Onboarding inherits Rectangle {
     callback pair-nearby(string);
     callback confirm-code(string, bool);
     callback finish();
-    background: Theme.forest;
+    background: Theme.bg;
 
+    // One centered column, at most 600 px wide.
     Rectangle {
-        width: min(parent.width - 48px, 860px);
-        height: min(parent.height - 48px, 620px);
-        border-radius: 14px;
-        background: #132214;
-        border-width: 1px;
-        border-color: #2a3d2c;
-        HorizontalLayout {
-            Rectangle {
-                width: 200px;
-                border-width: 0;
-                Rectangle {
-                    width: 84px;
-                    height: 84px;
-                    border-radius: 20px;
-                    background: Theme.lime;
-                    Icon {
-                        width: 40px;
-                        height: 40px;
-                        tint: Theme.forest;
-                        source: root.step == 1 ? @image-url("icons/hand.svg")
-                            : root.step == 2 ? @image-url("icons/shield.svg")
-                            : root.step == 3 ? @image-url("icons/list.svg")
-                            : root.step <= 5 ? @image-url("icons/qr.svg")
-                            : @image-url("icons/check.svg");
+        width: min(parent.width - 64px, 600px);
+        height: parent.height - 64px;
+        VerticalLayout {
+            spacing: 24px;
+            HorizontalLayout {
+                spacing: 6px;
+                for i in 4: Rectangle {
+                    height: 4px;
+                    border-radius: 2px;
+                    background: i < root.step ? Theme.accent : Theme.border;
+                }
+            }
+            if root.step == 1: VerticalLayout {
+                vertical-stretch: 1;
+                alignment: center;
+                spacing: 14px;
+                HorizontalLayout {
+                    alignment: center;
+                    Image { source: @image-url("../../../assets/urdevice-icon-512.png"); width: 80px; height: 80px; }
+                }
+                Text { text: @tr("Welcome to UrDevice"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; horizontal-alignment: center; }
+                Text { text: @tr("Your devices, working together."); font-size: Theme.font-title; color: Theme.muted; horizontal-alignment: center; }
+                Rectangle { height: 8px; }
+                Text { text: @tr("Name this device"); font-weight: 600; color: Theme.text; }
+                LineEdit {
+                    text <=> root.name;
+                    placeholder-text: @tr("Device name");
+                }
+            }
+            if root.step == 2: VerticalLayout {
+                vertical-stretch: 1;
+                spacing: 8px;
+                Text { text: @tr("What can your other devices do here?"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; wrap: word-wrap; }
+                Muted { text: @tr("You can change this any time."); }
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        for p[i] in root.perms: PermRow {
+                            item: p;
+                            picked(m) => { root.set-mode(i, m); }
+                        }
                     }
                 }
             }
-            Rectangle { width: 1px; background: #2a3d2c; }
-            VerticalLayout {
-                padding: 24px;
+            if root.step == 3: VerticalLayout {
+                vertical-stretch: 1;
+                spacing: 12px;
+                Text { text: @tr("Add your first device"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; }
+                ScrollView {
+                    vertical-stretch: 1;
+                    PairBody {
+                        compact: true;
+                        qr: root.qr;
+                        countdown: root.countdown;
+                        locked: root.locked;
+                        has-camera: root.has-camera;
+                        nearby: root.nearby;
+                        codes: root.codes;
+                        scan => { root.scan(); }
+                        pair-nearby(k) => { root.pair-nearby(k); }
+                        confirm-code(k, ok) => { root.confirm-code(k, ok); }
+                    }
+                }
+            }
+            if root.step == 4: VerticalLayout {
+                vertical-stretch: 1;
+                alignment: center;
                 spacing: 14px;
                 HorizontalLayout {
-                    spacing: 6px;
-                    for i in 6: Rectangle {
-                        height: 4px;
-                        border-radius: 2px;
-                        background: i < root.step ? Theme.lime : #2a3d2c;
+                    alignment: center;
+                    IconBox { icon: @image-url("icons/check.svg"); size: 72px; }
+                }
+                Text {
+                    text: root.paired-name != "" ? @tr("Paired with {}", root.paired-name) : @tr("You're all set");
+                    font-size: Theme.font-hero;
+                    font-weight: 700;
+                    color: Theme.text;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: root.paired-name != "" ? @tr("They connect by themselves on the same Wi-Fi.") : @tr("Add a device any time with Add Device.");
+                    font-size: Theme.font-title;
+                    color: Theme.muted;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: end;
+                if root.step == 2 || root.step == 3: Btn {
+                    text: @tr("Back");
+                    kind: 3;
+                    clicked => {
+                        if (root.step == 3) { root.close-pair(); }
+                        root.step -= 1;
                     }
                 }
-                if root.step == 1: VerticalLayout {
-                    spacing: 10px;
-                    Text { text: @tr("Welcome to UrDevice"); font-size: 22px; font-weight: 700; color: #e8f5dc; }
-                    Text { text: @tr("Connect your own devices on one local network. No account and no cloud server."); color: #b9cdb4; wrap: word-wrap; }
-                    Text { text: @tr("Name this device"); color: #e8f5dc; font-weight: 600; }
-                    name-edit := LineEdit {
-                        text <=> root.name;
-                        placeholder-text: @tr("Device name");
-                    }
-                    Text { text: @tr("Other devices see this name. You can change it later in Settings."); color: #9fb59a; font-size: Theme.font-small; }
+                Rectangle { horizontal-stretch: 1; }
+                if root.step == 3: Btn {
+                    text: @tr("Skip for now");
+                    clicked => { root.close-pair(); root.step = 4; }
                 }
-                if root.step == 2: VerticalLayout {
-                    spacing: 10px;
-                    Text { text: @tr("Safe and local"); font-size: 22px; font-weight: 700; color: #e8f5dc; }
-                    Text { text: @tr("Your devices talk directly on the same network. There is no server, and every connection is encrypted with this device's own key."); color: #b9cdb4; wrap: word-wrap; }
-                    Text { text: @tr("The key for this device is ready and kept in the system keychain. Its Device ID:"); color: #b9cdb4; wrap: word-wrap; }
-                    Rectangle {
-                        height: 44px;
-                        border-radius: 8px;
-                        background: #0c180d;
-                        Text { text: root.fingerprint; font-family: "monospace"; color: Theme.lime; font-size: 14px; }
-                    }
-                    Text { text: @tr("Check this ID on the other device when you pair."); color: #9fb59a; font-size: Theme.font-small; }
+                if root.step == 1: Btn {
+                    text: @tr("Continue");
+                    kind: 0;
+                    enabled: root.name != "";
+                    clicked => { root.step = 2; }
                 }
-                if root.step == 3: VerticalLayout {
-                    vertical-stretch: 1;
-                    spacing: 8px;
-                    Text { text: @tr("Permissions for other devices"); font-size: 22px; font-weight: 700; color: #e8f5dc; }
-                    Text { text: @tr("Choose what your other devices may do here. This applies to every paired device. You can change it later on This device."); color: #b9cdb4; wrap: word-wrap; }
-                    ScrollView {
-                        vertical-stretch: 1;
-                        VerticalLayout {
-                            spacing: 6px;
-                            alignment: start;
-                            for p[i] in root.perms: PermRow {
-                                item: p;
-                                picked(m) => { root.set-mode(i, m); }
-                            }
-                        }
-                    }
+                if root.step == 2: Btn {
+                    text: @tr("Continue");
+                    kind: 0;
+                    clicked => { root.save(root.name); root.open-pair(); root.step = 3; }
                 }
-                if root.step == 4 || root.step == 5: ScrollView {
-                    vertical-stretch: 1;
-                    VerticalLayout {
-                        alignment: start;
-                        spacing: 8px;
-                        Text { text: @tr("Pair your first device"); font-size: 22px; font-weight: 700; color: #e8f5dc; }
-                        Rectangle {
-                            border-radius: 10px;
-                            background: Theme.surface;
-                            VerticalLayout {
-                                padding: 14px;
-                                PairBody {
-                                    qr: root.qr;
-                                    countdown: root.countdown;
-                                    locked: root.locked;
-                                    has-camera: root.has-camera;
-                                    nearby: root.nearby;
-                                    codes: root.codes;
-                                    scan => { root.scan(); }
-                                    pair-nearby(k) => { root.pair-nearby(k); }
-                                    confirm-code(k, ok) => { root.confirm-code(k, ok); }
-                                }
-                            }
-                        }
-                    }
-                }
-                if root.step == 6: VerticalLayout {
-                    spacing: 10px;
-                    Text { text: root.paired-name != "" ? @tr("Paired with {}", root.paired-name) : @tr("Ready"); font-size: 22px; font-weight: 700; color: #e8f5dc; }
-                    Text { text: root.paired-name != "" ? @tr("Both devices are connected. They reconnect on their own when they are on the same network.") : @tr("You can pair a device any time with Add Device."); color: #b9cdb4; wrap: word-wrap; }
-                }
-                if root.step <= 2 || root.step == 6: Rectangle { vertical-stretch: 1; }
-                HorizontalLayout {
-                    spacing: 10px;
-                    alignment: end;
-                    if root.step > 1 && root.step < 4: Btn {
-                        text: @tr("Back");
-                        clicked => { root.step -= 1; }
-                    }
-                    if root.step == 4 || root.step == 5: Btn {
-                        text: @tr("Skip for now");
-                        clicked => { root.close-pair(); root.step = 6; }
-                    }
-                    if root.step < 3: Btn {
-                        text: @tr("Continue");
-                        kind: 0;
-                        enabled: root.name != "";
-                        clicked => { root.step += 1; }
-                    }
-                    if root.step == 3: Btn {
-                        text: @tr("Save and continue");
-                        kind: 0;
-                        clicked => { root.save(root.name); root.open-pair(); root.step = 4; }
-                    }
-                    if root.step == 6: Btn {
-                        text: @tr("Open UrDevice");
-                        kind: 0;
-                        clicked => { root.finish(); }
-                    }
+                if root.step == 4: Btn {
+                    text: @tr("Open UrDevice");
+                    kind: 0;
+                    clicked => { root.finish(); }
                 }
             }
         }
@@ -557,7 +544,6 @@ export component MainWindow inherits Window {
     if root.onboarding: Onboarding {
         step <=> root.onboarding-step;
         name <=> root.onboarding-name;
-        fingerprint: root.me-fingerprint;
         perms: root.onboarding-perms;
         qr: root.qr;
         countdown: root.qr-countdown;
