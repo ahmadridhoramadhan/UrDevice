@@ -75,22 +75,19 @@
 
     <!-- Onboarding -->
     <string name="ob_welcome">Welcome to UrDevice</string>
-    <string name="ob_welcome_body">Connect your own devices on one local network. No account and no cloud server.</string>
+    <string name="ob_welcome_body">Your devices, working together.</string>
     <string name="ob_name">Name this device</string>
-    <string name="ob_name_hint">Other devices see this name. You can change it later in Settings.</string>
-    <string name="ob_safe">Safe and local</string>
-    <string name="ob_safe_body">Your devices talk directly on the same network. There is no server, and every connection is encrypted with this device\'s own key.</string>
-    <string name="ob_safe_key">The key for this device is ready and protected by Android Keystore. Its Device ID:</string>
-    <string name="ob_safe_check">Check this ID on the other device when you pair.</string>
-    <string name="ob_perms">Permissions for other devices</string>
-    <string name="ob_perms_body">Choose what your other devices may do here. This applies to every paired device. You can change it later on This device.</string>
-    <string name="ob_save">Save and continue</string>
-    <string name="ob_pair">Pair your first device</string>
+    <string name="ob_perms">What can your other devices do here?</string>
+    <string name="ob_perms_body">You can change this any time.</string>
+    <string name="ob_pair">Add your first device</string>
+    <string name="ob_pair_qr_body">Scan this code with your other device.</string>
+    <string name="ob_pair_nearby">Or pick a device nearby</string>
+    <string name="ob_pair_none">Looking for devices on your Wi-Fi…</string>
     <string name="ob_skip">Skip for now</string>
-    <string name="ob_ready">Ready</string>
-    <string name="ob_ready_body">You can pair a device any time with Add Device.</string>
+    <string name="ob_ready">You\'re all set</string>
+    <string name="ob_ready_body">Add a device any time with Add Device.</string>
     <string name="ob_paired">Paired with %1$s</string>
-    <string name="ob_paired_body">Both devices are connected. They reconnect on their own when they are on the same network.</string>
+    <string name="ob_paired_body">They connect by themselves on the same Wi-Fi.</string>
     <string name="ob_open">Open UrDevice</string>
 
     <!-- OS permission explanations (R15.2) -->

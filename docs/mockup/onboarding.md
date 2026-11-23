@@ -6,7 +6,7 @@ The look follows the brand colors (dark green `#0F1F10`, lime `#C6F19D`) in a da
 
 ## Steps
 
-> **Desktop (2026-11-24):** one panel, no side panel, four steps: 1 name, 2 permissions, 3 pair (QR and nearby devices on one screen, with "Skip for now"), 4 done. The "Safe and local" screen and the Device ID are removed from onboarding; the Device ID stays in Settings. The mockup HTML and the table below still show the older six steps and apply to Android until it is revised.
+> **Desktop and Android (2026-11-24):** one panel, four steps: 1 name, 2 permissions, 3 pair (QR and nearby devices on one screen, with "Skip for now"), 4 done. The "Safe and local" screen and the Device ID are removed from onboarding; the Device ID stays in Settings. The mockup HTML and the table below still show the older six steps.
 
 | # | Screen | Desktop | Android |
 |---|---|---|---|
