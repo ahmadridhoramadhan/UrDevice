@@ -93,10 +93,14 @@ object InputFeature : Feature, InputListener {
     override val hasScreen get() = true
 
     /** The Mousepad fills the page; the other screens scroll. */
-    override fun fullScreen(tile: String) = tile != "presenter" && tile != "keyboard" && tile != MOUSEPAD_SETTINGS
+    override fun fullScreen(tile: String) = tile != "keyboard" && tile != MOUSEPAD_SETTINGS && tile != PRESENTER_SETTINGS
 
     /** The settings icon of the Mousepad tile opens the Mousepad settings page. */
-    override fun settingsPage(tile: String): String? = if (tile == "input.v1") MOUSEPAD_SETTINGS else null
+    override fun settingsPage(tile: String): String? = when (tile) {
+        "input.v1" -> MOUSEPAD_SETTINGS
+        "presenter" -> PRESENTER_SETTINGS
+        else -> null
+    }
 
     override fun onCoreStarted(context: Context, node: UrDeviceNode) {
         node.inputSetListener(this)
@@ -183,14 +187,22 @@ object InputFeature : Feature, InputListener {
         val node = Core.node() ?: return
         val all by sessions.collectAsState()
         val session = all[peer.id] ?: Session()
-        // Open the session with the screen and end it when the screen closes.
-        DisposableEffect(peer.id) {
-            connect(node, peer.id)
-            onDispose { end(node, peer.id) }
+        // A settings page opened from the device page needs no session, so it does not ask the
+        // other device. Opened from the pad, it keeps the session the pad started.
+        val needsSession = remember { tile != MOUSEPAD_SETTINGS && tile != PRESENTER_SETTINGS }
+        if (needsSession) {
+            // Open the session with the screen and end it when the screen closes.
+            DisposableEffect(peer.id) {
+                connect(node, peer.id)
+                onDispose { end(node, peer.id) }
+            }
         }
-        // The settings page keeps the session, so opening it does not ask the other device again.
         if (tile == MOUSEPAD_SETTINGS) {
             MousepadSettings()
+            return
+        }
+        if (tile == PRESENTER_SETTINGS) {
+            PresenterSettings()
             return
         }
         Column(
@@ -199,7 +211,7 @@ object InputFeature : Feature, InputListener {
         ) {
             SessionStatus(peer, session, onStart = { connect(node, peer.id) }, onStop = { end(node, peer.id) })
             when (tile) {
-                "presenter" -> PresenterPad(node, peer.id, session.active)
+                "presenter" -> PresenterPad(node, peer.id, session.active, Modifier.weight(1f))
                 "keyboard" -> KeyboardPad(node, peer.id, session.active)
                 else -> MousepadPad(node, peer.id, session.active, Modifier.weight(1f))
             }

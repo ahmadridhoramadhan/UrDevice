@@ -19,6 +19,7 @@
     <string name="input_left_click">Left</string>
     <string name="input_middle_click">Middle</string>
     <string name="input_right_click">Right</string>
+    <string name="input_presenter_settings">Presenter settings</string>
     <string name="input_mousepad_settings">Mousepad settings</string>
     <string name="input_sensitivity">Sensitivity</string>
     <string name="input_acceleration">Acceleration</string>
@@ -26,17 +27,12 @@
 
     <string name="input_previous">Previous</string>
     <string name="input_next">Next</string>
-    <string name="input_volume_hint">The volume keys also work: down is next, up is previous.</string>
     <string name="input_blank">Blank</string>
     <string name="input_start_show">Start show</string>
     <string name="input_end_show">End show</string>
-    <string name="input_laser_touch">Laser pointer: touch</string>
     <string name="input_laser_touch_hint">Touch and move to show the laser</string>
-    <string name="input_laser_gyro">Laser pointer: turn the phone</string>
     <string name="input_laser_gyro_hint">Hold and turn the phone</string>
     <string name="input_no_gyro">This phone has no rotation sensor.</string>
-    <string name="input_timer">Slide timer</string>
-    <string name="input_timer_elapsed">Elapsed %1$s</string>
     <string name="input_timer_start">Start</string>
     <string name="input_timer_pause">Pause</string>
     <string name="input_timer_reset">Reset</string>
