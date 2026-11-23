@@ -307,6 +307,24 @@ component PairBody inherits VerticalLayout {
     }
 }
 
+// Fades and rises in when it is created: each onboarding step, and the app after it.
+component StepIn inherits Rectangle {
+    private property <bool> shown: false;
+    vertical-stretch: 1;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: 260ms; easing: ease-out; }
+    Timer {
+        interval: 20ms;
+        running: !root.shown;
+        triggered => { root.shown = true; }
+    }
+    VerticalLayout {
+        padding-top: root.shown ? 0px : 18px;
+        animate padding-top { duration: 260ms; easing: ease-out; }
+        @children
+    }
+}
+
 // First start: one panel, four steps (name, permissions, pair, done).
 component Onboarding inherits Rectangle {
     in-out property <int> step: 1;
@@ -343,93 +361,101 @@ component Onboarding inherits Rectangle {
                     background: i < root.step ? Theme.accent : Theme.border;
                 }
             }
-            if root.step == 1: VerticalLayout {
-                vertical-stretch: 1;
-                alignment: center;
-                spacing: 14px;
-                HorizontalLayout {
+            if root.step == 1: StepIn {
+    VerticalLayout {
+                    vertical-stretch: 1;
                     alignment: center;
-                    Image { source: @image-url("../../../assets/urdevice-icon-512.png"); width: 80px; height: 80px; }
-                }
-                Text { text: @tr("Welcome to UrDevice"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; horizontal-alignment: center; }
-                Text { text: @tr("Your devices, working together."); font-size: Theme.font-title; color: Theme.muted; horizontal-alignment: center; }
-                Rectangle { height: 8px; }
-                Text { text: @tr("Name this device"); font-weight: 600; color: Theme.text; }
-                LineEdit {
-                    text <=> root.name;
-                    placeholder-text: @tr("Device name");
-                }
-            }
-            if root.step == 2: VerticalLayout {
-                vertical-stretch: 1;
-                spacing: 8px;
-                HorizontalLayout {
-                    spacing: 12px;
-                    IconBox { icon: @image-url("icons/shield.svg"); size: 44px; }
-                    VerticalLayout {
+                    spacing: 14px;
+                    HorizontalLayout {
                         alignment: center;
-                        Text { text: @tr("What can your other devices do here?"); font-size: Theme.font-title + 2px; font-weight: 700; color: Theme.text; wrap: word-wrap; }
-                        Muted { text: @tr("You can change this any time."); }
+                        Image { source: @image-url("../../../assets/urdevice-icon-512.png"); width: 80px; height: 80px; }
+                    }
+                    Text { text: @tr("Welcome to UrDevice"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; horizontal-alignment: center; }
+                    Text { text: @tr("Your devices, working together."); font-size: Theme.font-title; color: Theme.muted; horizontal-alignment: center; }
+                    Rectangle { height: 8px; }
+                    Text { text: @tr("Name this device"); font-weight: 600; color: Theme.text; }
+                    LineEdit {
+                        text <=> root.name;
+                        placeholder-text: @tr("Device name");
                     }
                 }
-                ScrollView {
+            }
+            if root.step == 2: StepIn {
+    VerticalLayout {
                     vertical-stretch: 1;
-                    VerticalLayout {
-                        spacing: 6px;
-                        alignment: start;
-                        for p[i] in root.perms: PermRow {
-                            item: p;
-                            picked(m) => { root.set-mode(i, m); }
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        IconBox { icon: @image-url("icons/shield.svg"); size: 44px; }
+                        VerticalLayout {
+                            alignment: center;
+                            Text { text: @tr("What can your other devices do here?"); font-size: Theme.font-title + 2px; font-weight: 700; color: Theme.text; wrap: word-wrap; }
+                            Muted { text: @tr("You can change this any time."); }
+                        }
+                    }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            for p[i] in root.perms: PermRow {
+                                item: p;
+                                picked(m) => { root.set-mode(i, m); }
+                            }
                         }
                     }
                 }
             }
-            if root.step == 3: VerticalLayout {
-                vertical-stretch: 1;
-                spacing: 12px;
-                HorizontalLayout {
-                    spacing: 12px;
-                    IconBox { icon: @image-url("icons/plus.svg"); size: 44px; }
-                    Text { text: @tr("Add your first device"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; vertical-alignment: center; }
-                }
-                ScrollView {
+            if root.step == 3: StepIn {
+    VerticalLayout {
                     vertical-stretch: 1;
-                    PairBody {
-                        compact: true;
-                        qr: root.qr;
-                        countdown: root.countdown;
-                        locked: root.locked;
-                        has-camera: root.has-camera;
-                        nearby: root.nearby;
-                        codes: root.codes;
-                        scan => { root.scan(); }
-                        pair-nearby(k) => { root.pair-nearby(k); }
-                        confirm-code(k, ok) => { root.confirm-code(k, ok); }
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        IconBox { icon: @image-url("icons/plus.svg"); size: 44px; }
+                        Text { text: @tr("Add your first device"); font-size: Theme.font-hero; font-weight: 700; color: Theme.text; vertical-alignment: center; }
+                    }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        PairBody {
+                            compact: true;
+                            qr: root.qr;
+                            countdown: root.countdown;
+                            locked: root.locked;
+                            has-camera: root.has-camera;
+                            nearby: root.nearby;
+                            codes: root.codes;
+                            scan => { root.scan(); }
+                            pair-nearby(k) => { root.pair-nearby(k); }
+                            confirm-code(k, ok) => { root.confirm-code(k, ok); }
+                        }
                     }
                 }
             }
-            if root.step == 4: VerticalLayout {
-                vertical-stretch: 1;
-                alignment: center;
-                spacing: 14px;
-                HorizontalLayout {
+            if root.step == 4: StepIn {
+    VerticalLayout {
+                    vertical-stretch: 1;
                     alignment: center;
-                    IconBox { icon: @image-url("icons/check.svg"); size: 72px; }
-                }
-                Text {
-                    text: root.paired-name != "" ? @tr("Paired with {}", root.paired-name) : @tr("You're all set");
-                    font-size: Theme.font-hero;
-                    font-weight: 700;
-                    color: Theme.text;
-                    horizontal-alignment: center;
-                    wrap: word-wrap;
-                }
-                Text {
-                    text: root.paired-name != "" ? @tr("They connect by themselves on the same Wi-Fi.") : @tr("Add a device any time with Add Device.");
-                    font-size: Theme.font-title;
-                    color: Theme.muted;
-                    horizontal-alignment: center;
-                    wrap: word-wrap;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        alignment: center;
+                        IconBox { icon: @image-url("icons/check.svg"); size: 72px; }
+                    }
+                    Text {
+                        text: root.paired-name != "" ? @tr("Paired with {}", root.paired-name) : @tr("You're all set");
+                        font-size: Theme.font-hero;
+                        font-weight: 700;
+                        color: Theme.text;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: root.paired-name != "" ? @tr("They connect by themselves on the same Wi-Fi.") : @tr("Add a device any time with Add Device.");
+                        font-size: Theme.font-title;
+                        color: Theme.muted;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
                 }
             }
             HorizontalLayout {
@@ -630,416 +656,418 @@ export component MainWindow inherits Window {
         finish => { root.close-pair(); root.onboarding = false; root.page = Page.this-device; }
     }
 
-    if !root.onboarding: HorizontalLayout {
-        // Sidebar
-        Rectangle {
-            width: 260px;
-            background: Theme.sidebar;
-            VerticalLayout {
-                padding: 14px;
-                spacing: 8px;
-                HorizontalLayout {
-                    spacing: 10px;
-                    padding-bottom: 6px;
-                    Image { source: @image-url("../../../assets/urdevice-icon-512.png"); width: 40px; height: 40px; }
-                    Text { text: "UrDevice"; font-size: 22px; font-weight: 500; color: Theme.text; vertical-alignment: center; }
-                }
-                SideItem {
-                    title: root.me-name;
-                    line1: @tr("This device · {}", root.me-platform);
-                    line2: root.me-address + (root.me-battery != "" ? " · " + @tr("Battery {}", root.me-battery) : "");
-                    icon: @image-url("icons/laptop.svg");
-                    selected: root.page == Page.this-device;
-                    online: true;
-                    clicked => { leave-pair(); root.page = Page.this-device; }
-                }
-                Rectangle { height: 1px; background: Theme.border; }
-                Text { text: @tr("Devices"); font-size: Theme.font-small; font-weight: 700; color: Theme.muted; }
-                ScrollView {
-                    vertical-stretch: 1;
-                    VerticalLayout {
-                        spacing: 4px;
-                        alignment: start;
-                        for p in root.peers: SideItem {
-                            title: p.name;
-                            line1: p.status == "connected" ? p.platform + " · " + p.path + " · " + p.rtt : p.platform + " · " + p.status-text;
-                            line2: p.status == "connected" && p.battery != "" ? @tr("Battery {}", p.battery) : "";
-                            icon: p.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg");
-                            selected: (root.page == Page.peer || root.page == Page.feature) && root.selected-peer == p.id;
-                            online: p.status == "connected";
-                            clicked => { leave-pair(); root.select-peer(p.id); root.page = Page.peer; }
-                        }
-                        Rectangle {
-                            height: 40px;
-                            border-radius: Theme.radius;
-                            border-width: 1px;
-                            border-color: Theme.border;
-                            background: add-ta.has-hover ? Theme.surface-2 : transparent;
-                            HorizontalLayout {
-                                alignment: center;
-                                spacing: 6px;
-                                Icon { source: @image-url("icons/plus.svg"); tint: Theme.accent; width: 14px; height: 14px; y: (parent.height - self.height) / 2; }
-                                Text { text: @tr("Add Device"); color: Theme.accent; font-weight: 700; vertical-alignment: center; }
-                            }
-                            add-ta := TouchArea { mouse-cursor: pointer; clicked => { go-pair(); } }
-                        }
-                    }
-                }
-                Rectangle {
-                    height: 36px;
-                    border-radius: 8px;
-                    background: root.page == Page.settings || root.page == Page.log ? Theme.surface : set-ta.has-hover ? Theme.surface-2 : transparent;
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        spacing: 8px;
-                        Icon { source: @image-url("icons/gear.svg"); y: (parent.height - self.height) / 2; }
-                        Text { text: @tr("Settings"); font-weight: 600; color: Theme.text; vertical-alignment: center; }
-                    }
-                    set-ta := TouchArea { mouse-cursor: pointer; clicked => { leave-pair(); root.page = Page.settings; } }
-                }
-            }
-        }
-        Rectangle { width: 1px; background: Theme.border; }
-
-        // Main area
-        VerticalLayout {
-            // "X is controlling / viewing this device" with Stop (R5.4).
-            for a in root.activities: Rectangle {
-                height: a.incoming ? 44px : 0px;
-                visible: a.incoming;
-                background: Theme.warn-bg;
-                HorizontalLayout {
-                    padding-left: 16px;
-                    padding-right: 16px;
-                    spacing: 10px;
-                    Text { text: @tr("{} is using {} on this device.", a.device, a.label); color: Theme.text; font-weight: 600; vertical-alignment: center; horizontal-stretch: 1; }
-                    Btn { text: @tr("Stop"); kind: 2; y: (parent.height - self.height) / 2; clicked => { root.stop-activity(a.id); } }
-                }
-            }
-            // Ports open on the LAN (R13.6), on every page.
-            TunnelLanBanner { }
-            if root.toast != "": Rectangle {
-                height: 36px;
-                background: Theme.allow-bg;
-                Text { text: root.toast; color: Theme.allow-fg; font-weight: 600; }
-            }
-
-            ScrollView {
-                vertical-stretch: 1;
+    if !root.onboarding: StepIn {
+        HorizontalLayout {
+            // Sidebar
+            Rectangle {
+                width: 260px;
+                background: Theme.sidebar;
                 VerticalLayout {
-                    padding: 22px;
-                    spacing: 14px;
-                    alignment: start;
-
-                    // ------------------------------------------------ This device
-                    if root.page == Page.this-device: VerticalLayout {
-                        spacing: 14px;
-                        Rectangle {
-                            height: 110px;
-                            border-radius: 12px;
-                            background: Theme.header;
-                            HorizontalLayout {
-                                padding: 20px;
-                                spacing: 16px;
-                                Rectangle {
-                                    width: 56px; height: 56px; border-radius: 12px; background: #ffffff.with-alpha(0.12);
-                                    y: (parent.height - self.height) / 2;
-                                    Icon { source: @image-url("icons/laptop.svg"); tint: Theme.on-header; width: 28px; height: 28px; }
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    spacing: 8px;
-                                    Text { text: root.me-name; font-size: 24px; font-weight: 600; color: Theme.on-header; }
-                                    HorizontalLayout {
-                                        spacing: 6px;
-                                        alignment: start;
-                                        Chip { text: root.me-platform; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
-                                        Chip { text: @tr("This device"); bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
-                                        if root.me-address != "": Chip { text: root.me-address; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
-                                    }
-                                }
-                                if root.me-battery != "": VerticalLayout {
-                                    alignment: center;
-                                    Text { text: root.me-battery; font-size: 28px; font-weight: 700; color: Theme.on-header; horizontal-alignment: right; }
-                                    Text { text: @tr("battery"); font-size: Theme.font-small; color: Theme.on-header; horizontal-alignment: right; }
-                                }
-                            }
-                        }
-                        SectionTitle { text: @tr("Permissions for other devices"); }
-                        Muted { text: @tr("Applies to every device paired with {}. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.", root.me-name); }
-                        for p in root.permissions: PermRow {
-                            item: p;
-                            picked(m) => {
-                                if (p.local-only && m == 0 && p.mode != 0) {
-                                    root.confirm-cap = p.cap;
-                                } else {
-                                    root.set-permission(p.cap, m, false);
-                                }
-                            }
-                        }
-                        TunnelHostSection { }
+                    padding: 14px;
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        padding-bottom: 6px;
+                        Image { source: @image-url("../../../assets/urdevice-icon-512.png"); width: 40px; height: 40px; }
+                        Text { text: "UrDevice"; font-size: 22px; font-weight: 500; color: Theme.text; vertical-alignment: center; }
                     }
-
-                    // ------------------------------------------------ Paired device
-                    if root.page == Page.peer: VerticalLayout {
-                        spacing: 14px;
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: end;
-                            if root.peer.status == "connected": Btn { text: @tr("Disconnect"); clicked => { root.disconnect(root.peer.id); } }
-                            if root.peer.status != "connected": Btn { text: @tr("Reconnect"); kind: 0; enabled: root.peer.status == "disconnected"; clicked => { root.reconnect(root.peer.id); } }
-                            Btn { text: @tr("Forget device"); kind: 2; clicked => { root.confirm-forget = root.peer.id; } }
-                        }
-                        Rectangle {
-                            height: 110px;
-                            border-radius: 12px;
-                            background: Theme.header;
-                            HorizontalLayout {
-                                padding: 20px;
-                                spacing: 16px;
-                                Rectangle {
-                                    width: 56px; height: 56px; border-radius: 12px; background: #ffffff.with-alpha(0.12);
-                                    y: (parent.height - self.height) / 2;
-                                    Icon { source: root.peer.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg"); tint: Theme.on-header; width: 28px; height: 28px; }
-                                }
-                                VerticalLayout {
-                                    alignment: center;
-                                    spacing: 8px;
-                                    Text { text: root.peer.name; font-size: 24px; font-weight: 600; color: Theme.on-header; }
-                                    HorizontalLayout {
-                                        spacing: 6px;
-                                        alignment: start;
-                                        Chip { text: root.peer.platform; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
-                                        Chip {
-                                            text: root.peer.status == "connected" ? root.peer.path + " · " + root.peer.rtt : root.peer.status-text;
-                                            bg: root.peer.status == "connected" ? Theme.allow-bg : #ffffff.with-alpha(0.14);
-                                            fg: root.peer.status == "connected" ? Theme.allow-fg : Theme.on-header;
-                                        }
-                                        if root.peer.address != "": Chip { text: root.peer.address; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
-                                    }
-                                }
-                                if root.peer.battery != "": VerticalLayout {
-                                    alignment: center;
-                                    Text { text: root.peer.battery; font-size: 28px; font-weight: 700; color: Theme.on-header; horizontal-alignment: right; }
-                                    Text { text: @tr("battery"); font-size: Theme.font-small; color: Theme.on-header; horizontal-alignment: right; }
-                                }
-                            }
-                        }
-                        BleBanner { }
-                        if root.peer.status != "connected": Card {
-                            height: 70px;
-                            VerticalLayout {
-                                padding: 14px;
-                                spacing: 4px;
-                                Text { text: root.peer.status == "disconnected" ? @tr("Disconnected") : @tr("{} is offline", root.peer.name); font-weight: 600; color: Theme.text; }
-                                Muted { text: root.peer.status == "disconnected" ? @tr("Press Reconnect on either device to connect again. The pairing is kept.") : @tr("UrDevice connects on its own when {} is on the same network.", root.peer.name); }
-                            }
-                        }
-                        SectionTitle { text: @tr("Features on {}", root.peer.name); }
-                        HorizontalLayout {
-                            spacing: 12px;
+                    SideItem {
+                        title: root.me-name;
+                        line1: @tr("This device · {}", root.me-platform);
+                        line2: root.me-address + (root.me-battery != "" ? " · " + @tr("Battery {}", root.me-battery) : "");
+                        icon: @image-url("icons/laptop.svg");
+                        selected: root.page == Page.this-device;
+                        online: true;
+                        clicked => { leave-pair(); root.page = Page.this-device; }
+                    }
+                    Rectangle { height: 1px; background: Theme.border; }
+                    Text { text: @tr("Devices"); font-size: Theme.font-small; font-weight: 700; color: Theme.muted; }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 4px;
                             alignment: start;
-                            Chip { text: @tr("Allow"); bg: Theme.allow-bg; fg: Theme.allow-fg; }
-                            Chip { text: @tr("Always Ask: {} confirms first", root.peer.name); bg: Theme.ask-bg; fg: Theme.ask-fg; }
-                            Chip { text: @tr("Deny: turned off by {}", root.peer.name); bg: Theme.deny-bg; fg: Theme.deny-fg; }
-                        }
-                        if root.peer.status == "connected": GridLayout {
-                            spacing: 10px;
-                            for t[i] in root.tiles: Rectangle {
-                                row: i / 3;
-                                col: mod(i, 3);
-                                height: 92px;
+                            for p in root.peers: SideItem {
+                                title: p.name;
+                                line1: p.status == "connected" ? p.platform + " · " + p.path + " · " + p.rtt : p.platform + " · " + p.status-text;
+                                line2: p.status == "connected" && p.battery != "" ? @tr("Battery {}", p.battery) : "";
+                                icon: p.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg");
+                                selected: (root.page == Page.peer || root.page == Page.feature) && root.selected-peer == p.id;
+                                online: p.status == "connected";
+                                clicked => { leave-pair(); root.select-peer(p.id); root.page = Page.peer; }
+                            }
+                            Rectangle {
+                                height: 40px;
                                 border-radius: Theme.radius;
                                 border-width: 1px;
                                 border-color: Theme.border;
-                                background: t.mode >= 2 ? Theme.surface-2 : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
-                                opacity: t.mode >= 2 ? 0.6 : 1;
-                                tile-ta := TouchArea {
-                                    enabled: t.mode < 2;
-                                    mouse-cursor: t.mode >= 2 ? default : pointer;
-                                    clicked => {
-                                        if (t.view) {
-                                            root.feature = t.feature;
-                                            root.feature-tile = t.key;
-                                            root.open-feature(root.peer.id, t.feature, t.key);
-                                            root.page = Page.feature;
-                                        } else {
-                                            root.request(root.peer.id, t.cap);
-                                        }
-                                    }
-                                }
-                                VerticalLayout {
-                                    padding: 12px;
+                                background: add-ta.has-hover ? Theme.surface-2 : transparent;
+                                HorizontalLayout {
+                                    alignment: center;
                                     spacing: 6px;
-                                    HorizontalLayout {
-                                        IconBox { icon: t.icon; size: 32px; }
-                                        Rectangle { horizontal-stretch: 1; }
-                                        Rectangle {
-                                            width: 28px; height: 28px; border-radius: 14px;
-                                            background: gear-ta.has-hover ? Theme.border : transparent;
-                                            Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }
-                                            gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.this-device; } }
+                                    Icon { source: @image-url("icons/plus.svg"); tint: Theme.accent; width: 14px; height: 14px; y: (parent.height - self.height) / 2; }
+                                    Text { text: @tr("Add Device"); color: Theme.accent; font-weight: 700; vertical-alignment: center; }
+                                }
+                                add-ta := TouchArea { mouse-cursor: pointer; clicked => { go-pair(); } }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        height: 36px;
+                        border-radius: 8px;
+                        background: root.page == Page.settings || root.page == Page.log ? Theme.surface : set-ta.has-hover ? Theme.surface-2 : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            spacing: 8px;
+                            Icon { source: @image-url("icons/gear.svg"); y: (parent.height - self.height) / 2; }
+                            Text { text: @tr("Settings"); font-weight: 600; color: Theme.text; vertical-alignment: center; }
+                        }
+                        set-ta := TouchArea { mouse-cursor: pointer; clicked => { leave-pair(); root.page = Page.settings; } }
+                    }
+                }
+            }
+            Rectangle { width: 1px; background: Theme.border; }
+
+            // Main area
+            VerticalLayout {
+                // "X is controlling / viewing this device" with Stop (R5.4).
+                for a in root.activities: Rectangle {
+                    height: a.incoming ? 44px : 0px;
+                    visible: a.incoming;
+                    background: Theme.warn-bg;
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        spacing: 10px;
+                        Text { text: @tr("{} is using {} on this device.", a.device, a.label); color: Theme.text; font-weight: 600; vertical-alignment: center; horizontal-stretch: 1; }
+                        Btn { text: @tr("Stop"); kind: 2; y: (parent.height - self.height) / 2; clicked => { root.stop-activity(a.id); } }
+                    }
+                }
+                // Ports open on the LAN (R13.6), on every page.
+                TunnelLanBanner { }
+                if root.toast != "": Rectangle {
+                    height: 36px;
+                    background: Theme.allow-bg;
+                    Text { text: root.toast; color: Theme.allow-fg; font-weight: 600; }
+                }
+
+                ScrollView {
+                    vertical-stretch: 1;
+                    VerticalLayout {
+                        padding: 22px;
+                        spacing: 14px;
+                        alignment: start;
+
+                        // ------------------------------------------------ This device
+                        if root.page == Page.this-device: VerticalLayout {
+                            spacing: 14px;
+                            Rectangle {
+                                height: 110px;
+                                border-radius: 12px;
+                                background: Theme.header;
+                                HorizontalLayout {
+                                    padding: 20px;
+                                    spacing: 16px;
+                                    Rectangle {
+                                        width: 56px; height: 56px; border-radius: 12px; background: #ffffff.with-alpha(0.12);
+                                        y: (parent.height - self.height) / 2;
+                                        Icon { source: @image-url("icons/laptop.svg"); tint: Theme.on-header; width: 28px; height: 28px; }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 8px;
+                                        Text { text: root.me-name; font-size: 24px; font-weight: 600; color: Theme.on-header; }
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+                                            Chip { text: root.me-platform; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
+                                            Chip { text: @tr("This device"); bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
+                                            if root.me-address != "": Chip { text: root.me-address; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
                                         }
                                     }
-                                    Text { text: t.label; font-weight: 600; color: Theme.text; }
-                                    Text {
-                                        text: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : t.mode == 3 ? @tr("Not available over Bluetooth") : @tr("Turned off by {}", root.peer.name);
-                                        font-size: Theme.font-small;
-                                        color: t.mode == 0 ? Theme.allow-fg : t.mode == 1 ? Theme.ask-fg : Theme.muted;
+                                    if root.me-battery != "": VerticalLayout {
+                                        alignment: center;
+                                        Text { text: root.me-battery; font-size: 28px; font-weight: 700; color: Theme.on-header; horizontal-alignment: right; }
+                                        Text { text: @tr("battery"); font-size: Theme.font-small; color: Theme.on-header; horizontal-alignment: right; }
                                     }
                                 }
                             }
+                            SectionTitle { text: @tr("Permissions for other devices"); }
+                            Muted { text: @tr("Applies to every device paired with {}. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.", root.me-name); }
+                            for p in root.permissions: PermRow {
+                                item: p;
+                                picked(m) => {
+                                    if (p.local-only && m == 0 && p.mode != 0) {
+                                        root.confirm-cap = p.cap;
+                                    } else {
+                                        root.set-permission(p.cap, m, false);
+                                    }
+                                }
+                            }
+                            TunnelHostSection { }
                         }
-                        for a in root.activities: Card {
-                            height: a.incoming ? 0 : 52px;
-                            visible: !a.incoming;
+
+                        // ------------------------------------------------ Paired device
+                        if root.page == Page.peer: VerticalLayout {
+                            spacing: 14px;
                             HorizontalLayout {
-                                padding: 10px;
-                                Text { text: @tr("You are using {} on {}", a.label, a.device); vertical-alignment: center; color: Theme.text; horizontal-stretch: 1; }
-                                Btn { text: @tr("End"); clicked => { root.stop-activity(a.id); } }
+                                spacing: 8px;
+                                alignment: end;
+                                if root.peer.status == "connected": Btn { text: @tr("Disconnect"); clicked => { root.disconnect(root.peer.id); } }
+                                if root.peer.status != "connected": Btn { text: @tr("Reconnect"); kind: 0; enabled: root.peer.status == "disconnected"; clicked => { root.reconnect(root.peer.id); } }
+                                Btn { text: @tr("Forget device"); kind: 2; clicked => { root.confirm-forget = root.peer.id; } }
                             }
-                        }
-                        Muted { text: @tr("Device ID: {}", root.peer.fingerprint); }
-                    }
-
-                    // ------------------------------------------------ Feature view
-                    if root.page == Page.feature: VerticalLayout {
-                        spacing: 14px;
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: start;
-                            Btn { text: @tr("Back"); clicked => { root.page = Page.peer; } }
-                            Text { text: Labels.tile-label(root.feature-tile) + " · " + root.peer.name; font-size: 22px; font-weight: 700; color: Theme.text; vertical-alignment: center; }
-                        }
-                        FeatureView { feature: root.feature; tile: root.feature-tile; peer-name: root.peer.name; }
-                    }
-
-                    // ------------------------------------------------ Add device
-                    if root.page == Page.pair: VerticalLayout {
-                        spacing: 14px;
-                        Text { text: @tr("Add Device"); font-size: 22px; font-weight: 700; color: Theme.text; }
-                        Card {
-                            VerticalLayout {
-                                padding: 18px;
-                                PairBody {
-                                    qr: root.qr;
-                                    countdown: root.qr-countdown;
-                                    locked: root.pair-locked;
-                                    has-camera: root.has-camera;
-                                    nearby: root.nearby;
-                                    codes: root.codes;
-                                    scan => { root.scan-qr(); }
-                                    pair-nearby(k) => { root.pair-nearby(k); }
-                                    confirm-code(k, ok) => { root.confirm-code(k, ok); }
-                                }
-                            }
-                        }
-                    }
-
-                    // ------------------------------------------------ Settings
-                    if root.page == Page.settings: VerticalLayout {
-                        spacing: 12px;
-                        Text { text: @tr("Settings"); font-size: 22px; font-weight: 700; color: Theme.text; }
-                        Card {
-                            VerticalLayout {
-                                padding: 16px;
-                                spacing: 10px;
-                                Text { text: @tr("Device name"); font-weight: 600; color: Theme.text; }
+                            Rectangle {
+                                height: 110px;
+                                border-radius: 12px;
+                                background: Theme.header;
                                 HorizontalLayout {
-                                    spacing: 8px;
-                                    name-edit := LineEdit { text: root.me-name; }
-                                    Btn { text: @tr("Save"); clicked => { root.set-name(name-edit.text); } }
-                                }
-                                Text { text: @tr("Device ID"); font-weight: 600; color: Theme.text; }
-                                Text { text: root.me-fingerprint; font-family: "monospace"; color: Theme.muted; }
-                            }
-                        }
-                        Card {
-                            VerticalLayout {
-                                padding: 16px;
-                                spacing: 14px;
-                                HorizontalLayout {
-                                    spacing: 10px;
-                                    VerticalLayout {
-                                        Text { text: @tr("Hidden mode"); font-weight: 600; color: Theme.text; }
-                                        Muted { text: @tr("Stop announcing this device. Paired devices can still connect; new devices can't pair."); }
+                                    padding: 20px;
+                                    spacing: 16px;
+                                    Rectangle {
+                                        width: 56px; height: 56px; border-radius: 12px; background: #ffffff.with-alpha(0.12);
+                                        y: (parent.height - self.height) / 2;
+                                        Icon { source: root.peer.platform == "Android" ? @image-url("icons/phone.svg") : @image-url("icons/laptop.svg"); tint: Theme.on-header; width: 28px; height: 28px; }
                                     }
-                                    Toggle { checked: root.me-hidden; toggled(v) => { root.set-hidden(v); } y: (parent.height - self.height) / 2; }
-                                }
-                                HorizontalLayout {
-                                    spacing: 10px;
                                     VerticalLayout {
-                                        Text { text: @tr("Start at login"); font-weight: 600; color: Theme.text; }
-                                        Muted { text: @tr("Open UrDevice in the tray when you sign in."); }
+                                        alignment: center;
+                                        spacing: 8px;
+                                        Text { text: root.peer.name; font-size: 24px; font-weight: 600; color: Theme.on-header; }
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+                                            Chip { text: root.peer.platform; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
+                                            Chip {
+                                                text: root.peer.status == "connected" ? root.peer.path + " · " + root.peer.rtt : root.peer.status-text;
+                                                bg: root.peer.status == "connected" ? Theme.allow-bg : #ffffff.with-alpha(0.14);
+                                                fg: root.peer.status == "connected" ? Theme.allow-fg : Theme.on-header;
+                                            }
+                                            if root.peer.address != "": Chip { text: root.peer.address; bg: #ffffff.with-alpha(0.14); fg: Theme.on-header; }
+                                        }
                                     }
-                                    Toggle { checked: root.autostart; toggled(v) => { root.set-autostart(v); } y: (parent.height - self.height) / 2; }
-                                }
-                                // clipboard (#16, R7.6)
-                                HorizontalLayout {
-                                    spacing: 10px;
-                                    VerticalLayout {
-                                        Text { text: @tr("Pause clipboard on all devices"); font-weight: 600; color: Theme.text; }
-                                        Muted { text: @tr("Nothing you copy is sent, and nothing from other devices is written to your clipboard. Switch it off per device on its page."); }
-                                    }
-                                    Toggle { checked: ClipboardFeature.paused; toggled(v) => { ClipboardFeature.set-paused(v); } y: (parent.height - self.height) / 2; }
-                                }
-                                HorizontalLayout {
-                                    VerticalLayout {
-                                        Text { text: @tr("Language"); font-weight: 600; color: Theme.text; }
-                                        Muted { text: @tr("English. More languages come later."); }
+                                    if root.peer.battery != "": VerticalLayout {
+                                        alignment: center;
+                                        Text { text: root.peer.battery; font-size: 28px; font-weight: 700; color: Theme.on-header; horizontal-alignment: right; }
+                                        Text { text: @tr("battery"); font-size: Theme.font-small; color: Theme.on-header; horizontal-alignment: right; }
                                     }
                                 }
                             }
-                        }
-                        // Files (#17): the download folder (R8.6).
-                        FilesSettings { }
-                        Card {
-                            VerticalLayout {
-                                padding: 16px;
-                                spacing: 10px;
-                                Text { text: @tr("Your data"); font-weight: 600; color: Theme.text; }
-                                Muted { text: @tr("Stored in {}", root.data-path); }
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    alignment: start;
-                                    Btn { text: @tr("Activity log"); clicked => { root.show-log(); root.page = Page.log; } }
-                                    Btn { text: @tr("Export data"); clicked => { root.export-data(); } }
-                                    Btn { text: @tr("Reset identity"); kind: 2; clicked => { root.confirm-reset = true; } }
-                                    Btn { text: @tr("Delete all data"); kind: 2; clicked => { root.confirm-delete = true; } }
+                            BleBanner { }
+                            if root.peer.status != "connected": Card {
+                                height: 70px;
+                                VerticalLayout {
+                                    padding: 14px;
+                                    spacing: 4px;
+                                    Text { text: root.peer.status == "disconnected" ? @tr("Disconnected") : @tr("{} is offline", root.peer.name); font-weight: 600; color: Theme.text; }
+                                    Muted { text: root.peer.status == "disconnected" ? @tr("Press Reconnect on either device to connect again. The pairing is kept.") : @tr("UrDevice connects on its own when {} is on the same network.", root.peer.name); }
                                 }
                             }
-                        }
-                        HorizontalLayout {
-                            alignment: start;
-                            spacing: 12px;
-                            Muted { text: @tr("UrDevice {}", root.core-version); vertical-alignment: center; }
-                            AboutSlint { max-height: 60px; }
-                        }
-                    }
-
-                    // ------------------------------------------------ Activity log
-                    if root.page == Page.log: VerticalLayout {
-                        spacing: 10px;
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Btn { text: @tr("Back"); clicked => { root.page = Page.settings; } }
-                            Text { text: @tr("Activity log"); font-size: 22px; font-weight: 700; color: Theme.text; vertical-alignment: center; }
-                        }
-                        Muted { text: @tr("Requests from other devices in the last 30 days. Content is never recorded."); }
-                        if root.log.length == 0: Muted { text: @tr("Nothing yet."); }
-                        for e in root.log: Card {
-                            height: 44px;
+                            SectionTitle { text: @tr("Features on {}", root.peer.name); }
                             HorizontalLayout {
-                                padding: 10px;
                                 spacing: 12px;
-                                Text { text: e.time; color: Theme.muted; width: 150px; vertical-alignment: center; }
-                                Text { text: e.device; color: Theme.text; font-weight: 600; width: 160px; vertical-alignment: center; overflow: elide; }
-                                Text { text: e.label; color: Theme.text; horizontal-stretch: 1; vertical-alignment: center; }
-                                Chip {
-                                    y: (parent.height - self.height) / 2;
-                                    text: e.decision-label;
-                                    bg: e.decision == "allowed" ? Theme.allow-bg : Theme.deny-bg;
-                                    fg: e.decision == "allowed" ? Theme.allow-fg : Theme.deny-fg;
+                                alignment: start;
+                                Chip { text: @tr("Allow"); bg: Theme.allow-bg; fg: Theme.allow-fg; }
+                                Chip { text: @tr("Always Ask: {} confirms first", root.peer.name); bg: Theme.ask-bg; fg: Theme.ask-fg; }
+                                Chip { text: @tr("Deny: turned off by {}", root.peer.name); bg: Theme.deny-bg; fg: Theme.deny-fg; }
+                            }
+                            if root.peer.status == "connected": GridLayout {
+                                spacing: 10px;
+                                for t[i] in root.tiles: Rectangle {
+                                    row: i / 3;
+                                    col: mod(i, 3);
+                                    height: 92px;
+                                    border-radius: Theme.radius;
+                                    border-width: 1px;
+                                    border-color: Theme.border;
+                                    background: t.mode >= 2 ? Theme.surface-2 : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
+                                    opacity: t.mode >= 2 ? 0.6 : 1;
+                                    tile-ta := TouchArea {
+                                        enabled: t.mode < 2;
+                                        mouse-cursor: t.mode >= 2 ? default : pointer;
+                                        clicked => {
+                                            if (t.view) {
+                                                root.feature = t.feature;
+                                                root.feature-tile = t.key;
+                                                root.open-feature(root.peer.id, t.feature, t.key);
+                                                root.page = Page.feature;
+                                            } else {
+                                                root.request(root.peer.id, t.cap);
+                                            }
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 6px;
+                                        HorizontalLayout {
+                                            IconBox { icon: t.icon; size: 32px; }
+                                            Rectangle { horizontal-stretch: 1; }
+                                            Rectangle {
+                                                width: 28px; height: 28px; border-radius: 14px;
+                                                background: gear-ta.has-hover ? Theme.border : transparent;
+                                                Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }
+                                                gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.this-device; } }
+                                            }
+                                        }
+                                        Text { text: t.label; font-weight: 600; color: Theme.text; }
+                                        Text {
+                                            text: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : t.mode == 3 ? @tr("Not available over Bluetooth") : @tr("Turned off by {}", root.peer.name);
+                                            font-size: Theme.font-small;
+                                            color: t.mode == 0 ? Theme.allow-fg : t.mode == 1 ? Theme.ask-fg : Theme.muted;
+                                        }
+                                    }
+                                }
+                            }
+                            for a in root.activities: Card {
+                                height: a.incoming ? 0 : 52px;
+                                visible: !a.incoming;
+                                HorizontalLayout {
+                                    padding: 10px;
+                                    Text { text: @tr("You are using {} on {}", a.label, a.device); vertical-alignment: center; color: Theme.text; horizontal-stretch: 1; }
+                                    Btn { text: @tr("End"); clicked => { root.stop-activity(a.id); } }
+                                }
+                            }
+                            Muted { text: @tr("Device ID: {}", root.peer.fingerprint); }
+                        }
+
+                        // ------------------------------------------------ Feature view
+                        if root.page == Page.feature: VerticalLayout {
+                            spacing: 14px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                Btn { text: @tr("Back"); clicked => { root.page = Page.peer; } }
+                                Text { text: Labels.tile-label(root.feature-tile) + " · " + root.peer.name; font-size: 22px; font-weight: 700; color: Theme.text; vertical-alignment: center; }
+                            }
+                            FeatureView { feature: root.feature; tile: root.feature-tile; peer-name: root.peer.name; }
+                        }
+
+                        // ------------------------------------------------ Add device
+                        if root.page == Page.pair: VerticalLayout {
+                            spacing: 14px;
+                            Text { text: @tr("Add Device"); font-size: 22px; font-weight: 700; color: Theme.text; }
+                            Card {
+                                VerticalLayout {
+                                    padding: 18px;
+                                    PairBody {
+                                        qr: root.qr;
+                                        countdown: root.qr-countdown;
+                                        locked: root.pair-locked;
+                                        has-camera: root.has-camera;
+                                        nearby: root.nearby;
+                                        codes: root.codes;
+                                        scan => { root.scan-qr(); }
+                                        pair-nearby(k) => { root.pair-nearby(k); }
+                                        confirm-code(k, ok) => { root.confirm-code(k, ok); }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ------------------------------------------------ Settings
+                        if root.page == Page.settings: VerticalLayout {
+                            spacing: 12px;
+                            Text { text: @tr("Settings"); font-size: 22px; font-weight: 700; color: Theme.text; }
+                            Card {
+                                VerticalLayout {
+                                    padding: 16px;
+                                    spacing: 10px;
+                                    Text { text: @tr("Device name"); font-weight: 600; color: Theme.text; }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        name-edit := LineEdit { text: root.me-name; }
+                                        Btn { text: @tr("Save"); clicked => { root.set-name(name-edit.text); } }
+                                    }
+                                    Text { text: @tr("Device ID"); font-weight: 600; color: Theme.text; }
+                                    Text { text: root.me-fingerprint; font-family: "monospace"; color: Theme.muted; }
+                                }
+                            }
+                            Card {
+                                VerticalLayout {
+                                    padding: 16px;
+                                    spacing: 14px;
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        VerticalLayout {
+                                            Text { text: @tr("Hidden mode"); font-weight: 600; color: Theme.text; }
+                                            Muted { text: @tr("Stop announcing this device. Paired devices can still connect; new devices can't pair."); }
+                                        }
+                                        Toggle { checked: root.me-hidden; toggled(v) => { root.set-hidden(v); } y: (parent.height - self.height) / 2; }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        VerticalLayout {
+                                            Text { text: @tr("Start at login"); font-weight: 600; color: Theme.text; }
+                                            Muted { text: @tr("Open UrDevice in the tray when you sign in."); }
+                                        }
+                                        Toggle { checked: root.autostart; toggled(v) => { root.set-autostart(v); } y: (parent.height - self.height) / 2; }
+                                    }
+                                    // clipboard (#16, R7.6)
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        VerticalLayout {
+                                            Text { text: @tr("Pause clipboard on all devices"); font-weight: 600; color: Theme.text; }
+                                            Muted { text: @tr("Nothing you copy is sent, and nothing from other devices is written to your clipboard. Switch it off per device on its page."); }
+                                        }
+                                        Toggle { checked: ClipboardFeature.paused; toggled(v) => { ClipboardFeature.set-paused(v); } y: (parent.height - self.height) / 2; }
+                                    }
+                                    HorizontalLayout {
+                                        VerticalLayout {
+                                            Text { text: @tr("Language"); font-weight: 600; color: Theme.text; }
+                                            Muted { text: @tr("English. More languages come later."); }
+                                        }
+                                    }
+                                }
+                            }
+                            // Files (#17): the download folder (R8.6).
+                            FilesSettings { }
+                            Card {
+                                VerticalLayout {
+                                    padding: 16px;
+                                    spacing: 10px;
+                                    Text { text: @tr("Your data"); font-weight: 600; color: Theme.text; }
+                                    Muted { text: @tr("Stored in {}", root.data-path); }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        alignment: start;
+                                        Btn { text: @tr("Activity log"); clicked => { root.show-log(); root.page = Page.log; } }
+                                        Btn { text: @tr("Export data"); clicked => { root.export-data(); } }
+                                        Btn { text: @tr("Reset identity"); kind: 2; clicked => { root.confirm-reset = true; } }
+                                        Btn { text: @tr("Delete all data"); kind: 2; clicked => { root.confirm-delete = true; } }
+                                    }
+                                }
+                            }
+                            HorizontalLayout {
+                                alignment: start;
+                                spacing: 12px;
+                                Muted { text: @tr("UrDevice {}", root.core-version); vertical-alignment: center; }
+                                AboutSlint { max-height: 60px; }
+                            }
+                        }
+
+                        // ------------------------------------------------ Activity log
+                        if root.page == Page.log: VerticalLayout {
+                            spacing: 10px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Btn { text: @tr("Back"); clicked => { root.page = Page.settings; } }
+                                Text { text: @tr("Activity log"); font-size: 22px; font-weight: 700; color: Theme.text; vertical-alignment: center; }
+                            }
+                            Muted { text: @tr("Requests from other devices in the last 30 days. Content is never recorded."); }
+                            if root.log.length == 0: Muted { text: @tr("Nothing yet."); }
+                            for e in root.log: Card {
+                                height: 44px;
+                                HorizontalLayout {
+                                    padding: 10px;
+                                    spacing: 12px;
+                                    Text { text: e.time; color: Theme.muted; width: 150px; vertical-alignment: center; }
+                                    Text { text: e.device; color: Theme.text; font-weight: 600; width: 160px; vertical-alignment: center; overflow: elide; }
+                                    Text { text: e.label; color: Theme.text; horizontal-stretch: 1; vertical-alignment: center; }
+                                    Chip {
+                                        y: (parent.height - self.height) / 2;
+                                        text: e.decision-label;
+                                        bg: e.decision == "allowed" ? Theme.allow-bg : Theme.deny-bg;
+                                        fg: e.decision == "allowed" ? Theme.allow-fg : Theme.deny-fg;
+                                    }
                                 }
                             }
                         }

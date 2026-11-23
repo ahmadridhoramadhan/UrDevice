@@ -1,5 +1,12 @@
 package com.urdevice.app.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -90,74 +97,86 @@ fun Onboarding(
                 )
             }
         }
-        when (shown) {
-            1 -> Column(
-                Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Badge(Icons.Outlined.PanTool, 88.dp)
-                Title(stringResource(R.string.ob_welcome), center = true)
-                Body(stringResource(R.string.ob_welcome_body), center = true)
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    stringResource(R.string.ob_name),
-                    color = Mist,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.align(Alignment.Start),
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(64) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            2 -> Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Header(Icons.Outlined.Shield, stringResource(R.string.ob_perms), stringResource(R.string.ob_perms_body))
-                UrDeviceTheme {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        perms.forEachIndexed { i, p -> PermissionRow(p) { m -> perms[i] = p.copy(mode = m) } }
-                    }
+        // Steps slide and fade: forward goes left, back goes right.
+        AnimatedContent(
+            targetState = shown,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            transitionSpec = {
+                val dir = if (targetState > initialState) 1 else -1
+                (slideInHorizontally(tween(280)) { dir * it / 5 } + fadeIn(tween(280))) togetherWith
+                    (slideOutHorizontally(tween(200)) { -dir * it / 5 } + fadeOut(tween(160)))
+            },
+            label = "onboarding-step",
+        ) { page ->
+            when (page) {
+                1 -> Column(
+                    Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Badge(Icons.Outlined.PanTool, 88.dp)
+                    Title(stringResource(R.string.ob_welcome), center = true)
+                    Body(stringResource(R.string.ob_welcome_body), center = true)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.ob_name),
+                        color = Mist,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.align(Alignment.Start),
+                    )
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.take(64) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-            }
-            3 -> Column(
-                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Header(Icons.Outlined.QrCode2, stringResource(R.string.ob_pair))
-                UrDeviceTheme {
-                    Column(
-                        Modifier.fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.background, RoundedCornerShape(16.dp))
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        if (notificationsNeeded) {
-                            Explain(
-                                stringResource(R.string.why_notifications_title),
-                                stringResource(R.string.why_notifications_body),
-                                onGrant = onAskNotifications,
-                            )
+                2 -> Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Header(Icons.Outlined.Shield, stringResource(R.string.ob_perms), stringResource(R.string.ob_perms_body))
+                    UrDeviceTheme {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            perms.forEachIndexed { i, p -> PermissionRow(p) { m -> perms[i] = p.copy(mode = m) } }
                         }
-                        PairBody(snap, onScanned, onPairNearby, onConfirm, compact = true)
                     }
                 }
-            }
-            else -> Column(
-                Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Badge(Icons.Outlined.Check, 88.dp)
-                Title(
-                    if (pairedName != null) stringResource(R.string.ob_paired, pairedName) else stringResource(R.string.ob_ready),
-                    center = true,
-                )
-                Body(stringResource(if (pairedName != null) R.string.ob_paired_body else R.string.ob_ready_body), center = true)
+                3 -> Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Header(Icons.Outlined.QrCode2, stringResource(R.string.ob_pair))
+                    UrDeviceTheme {
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.background, RoundedCornerShape(16.dp))
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            if (notificationsNeeded) {
+                                Explain(
+                                    stringResource(R.string.why_notifications_title),
+                                    stringResource(R.string.why_notifications_body),
+                                    onGrant = onAskNotifications,
+                                )
+                            }
+                            PairBody(snap, onScanned, onPairNearby, onConfirm, compact = true)
+                        }
+                    }
+                }
+                else -> Column(
+                    Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Badge(Icons.Outlined.Check, 88.dp)
+                    Title(
+                        if (pairedName != null) stringResource(R.string.ob_paired, pairedName) else stringResource(R.string.ob_ready),
+                        center = true,
+                    )
+                    Body(stringResource(if (pairedName != null) R.string.ob_paired_body else R.string.ob_ready_body), center = true)
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

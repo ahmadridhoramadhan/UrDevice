@@ -11,6 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -186,7 +189,15 @@ private fun App() {
         )
     } else {
         BackHandler(enabled = stack.size > 1) { back() }
+        // The app fades and rises in when it opens, and after onboarding.
+        var appShown by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { appShown = true }
+        val appIn by animateFloatAsState(if (appShown) 1f else 0f, tween(320), label = "app-in")
         Scaffold(
+            modifier = Modifier.graphicsLayer {
+                alpha = appIn
+                translationY = (1f - appIn) * 24.dp.toPx()
+            },
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 TopAppBar(
