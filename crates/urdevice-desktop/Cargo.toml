@@ -55,3 +55,19 @@ assets = [
     ["../../assets/urdevice-icon-512.png", "usr/share/icons/hicolor/512x512/apps/urdevice.png", "644"],
     ["../../LICENSE", "usr/share/doc/urdevice/copyright", "644"],
 ]
+
+# RPM package for Fedora, built with `cargo generate-rpm -p crates/urdevice-desktop` (see .github/workflows/release.yml).
+[package.metadata.generate-rpm]
+name = "urdevice"
+summary = "Pair your phone and computers and share the clipboard, files, screen and input over your local network."
+assets = [
+    { source = "target/release/urdevice", dest = "/usr/bin/urdevice", mode = "755" },
+    { source = "../../packaging/linux/urdevice.desktop", dest = "/usr/share/applications/urdevice.desktop", mode = "644" },
+    { source = "../../assets/urdevice-icon-512.png", dest = "/usr/share/icons/hicolor/512x512/apps/urdevice.png", mode = "644" },
+    { source = "../../LICENSE", dest = "/usr/share/doc/urdevice/LICENSE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+fontconfig = "*"
+dbus-libs = "*"
+

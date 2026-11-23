@@ -10,7 +10,7 @@ Download the package for your OS from the project's [Releases](https://github.co
 |----|---------|-----------|
 | Windows 10/11 (x86_64) | `.msi` (recommended) or `.zip` | SmartScreen: **More info**, then **Run anyway**. The `.msi` also adds the firewall rule pairing needs (see [permissions](permissions.md#windows)). |
 | macOS (Apple silicon or Intel) | `.dmg` | Drag UrDevice to Applications. Right-click the app, choose **Open**. |
-| Linux (x86_64) | `.deb`, `.AppImage`, or `.tar.gz` | `sudo apt install ./urdevice-linux-amd64.deb`, or `chmod +x` the AppImage. Needs `libfontconfig1` and `libdbus-1-3`. |
+| Linux (x86_64) | `.deb`, `.rpm`, `.AppImage`, or `.tar.gz` | `sudo apt install ./urdevice-linux-amd64.deb`, `sudo dnf install ./urdevice-linux-x86_64.rpm` (Fedora), or `chmod +x` the AppImage. Needs `libfontconfig1` and `libdbus-1-3`. |
 | Android | `.apk` | Allow **Install unknown apps** for the app you opened it from. |
 
 ## Pair two devices
