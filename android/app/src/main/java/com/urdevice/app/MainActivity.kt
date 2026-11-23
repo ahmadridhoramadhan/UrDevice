@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -62,6 +63,7 @@ import com.urdevice.app.ui.Onboarding
 import com.urdevice.app.ui.PairBody
 import com.urdevice.app.ui.SettingsScreen
 import com.urdevice.app.ui.ThisDeviceScreen
+import com.urdevice.app.ui.features.LocalOpenFeaturePage
 import com.urdevice.app.ui.UrDeviceTheme
 import com.urdevice.app.ui.features.feature
 import com.urdevice.core.FfiEvent
@@ -322,7 +324,9 @@ private fun App() {
                             if (peer == null || f == null || denied) {
                                 LaunchedEffect(page, denied) { back() }
                             } else {
-                                f.Screen(peer, page.tile)
+                                CompositionLocalProvider(
+                                    LocalOpenFeaturePage provides { feat, tile -> go(Page.Feature(peer.id, feat, tile)) },
+                                ) { f.Screen(peer, page.tile) }
                             }
                         }
                     }

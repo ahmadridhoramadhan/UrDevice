@@ -2,6 +2,7 @@ package com.urdevice.app.ui.features
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import com.urdevice.core.FfiMode
 import com.urdevice.core.FfiPeer
 import com.urdevice.core.UrDeviceNode
@@ -43,6 +44,12 @@ interface Feature {
      */
     fun openSettings(context: Context): Boolean = false
 
+    /**
+     * The tile key of a settings page for the tile with key [tile], or null. When set, the
+     * settings icon of that tile opens the page ([Screen] gets this key as its tile).
+     */
+    fun settingsPage(tile: String): String? = null
+
     /** True when tapping a tile opens a menu ([TileMenu]) instead of a screen. */
     val tileMenu: Boolean get() = false
 
@@ -69,6 +76,12 @@ interface Feature {
     /** Called once after the core started, on the main thread: register host adapters and listeners. */
     fun onCoreStarted(context: Context, node: UrDeviceNode) {}
 }
+
+/**
+ * Opens another page of a feature for the same device: (feature id, tile key). The screen host
+ * provides it, so a feature screen can link to its own settings page.
+ */
+val LocalOpenFeaturePage = staticCompositionLocalOf<(String, String) -> Unit> { { _, _ -> } }
 
 /** The tiles whose capability the host lists. */
 fun listed(modes: Map<String, FfiMode>, vararg tiles: FeatureTile): List<FeatureTile> =

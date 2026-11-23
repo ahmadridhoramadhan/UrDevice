@@ -91,6 +91,9 @@ object InputFeature : Feature, InputListener {
 
     override val hasScreen get() = true
 
+    /** The settings icon of the Mousepad tile opens the Mousepad settings page. */
+    override fun settingsPage(tile: String): String? = if (tile == "input.v1") MOUSEPAD_SETTINGS else null
+
     override fun onCoreStarted(context: Context, node: UrDeviceNode) {
         node.inputSetListener(this)
         appContext = context.applicationContext
@@ -180,6 +183,11 @@ object InputFeature : Feature, InputListener {
         DisposableEffect(peer.id) {
             connect(node, peer.id)
             onDispose { end(node, peer.id) }
+        }
+        // The settings page keeps the session, so opening it does not ask the other device again.
+        if (tile == MOUSEPAD_SETTINGS) {
+            MousepadSettings()
+            return
         }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SessionStatus(peer, session, onStart = { connect(node, peer.id) }, onStop = { end(node, peer.id) })

@@ -249,7 +249,11 @@ fun DeviceScreen(
                                 else onRequest(t.cap)
                             },
                             menu = { if (f.tileMenu) f.TileMenu(peer, t.key, menuOpen) { menuOpen = false } },
-                            onGear = { if (!f.openSettings(ctx)) onSettings() },
+                            onGear = {
+                                val page = f.settingsPage(t.key)
+                                if (page != null) onOpenFeature(f.id, page)
+                                else if (!f.openSettings(ctx)) onSettings()
+                            },
                             switchOn = switchOn,
                             onSwitch = { flipped = it; f.setSwitch(peer, it) },
                             modifier = Modifier.weight(1f),

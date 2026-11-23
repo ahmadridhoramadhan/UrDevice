@@ -13,6 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -60,6 +64,43 @@ private const val SCROLL_UNITS_PER_PX = 3f
 
 private const val PREFS = "input"
 
+/** The tile key of the Mousepad settings page. */
+const val MOUSEPAD_SETTINGS = "mousepad.settings"
+
+/** Pointer speed, acceleration, and scroll direction for the Mousepad (R9a). Saved at once. */
+@Composable
+fun MousepadSettings() {
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    var sensitivity by remember { mutableFloatStateOf(prefs.getFloat("sensitivity", 1.5f)) }
+    var accel by remember { mutableFloatStateOf(prefs.getFloat("accel", 0.04f)) }
+    var natural by remember { mutableStateOf(prefs.getBoolean("natural", true)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.input_mousepad_settings), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.input_sensitivity), style = MaterialTheme.typography.bodyMedium)
+        Slider(
+            value = sensitivity,
+            onValueChange = { sensitivity = it },
+            onValueChangeFinished = { prefs.edit().putFloat("sensitivity", sensitivity).apply() },
+            valueRange = 0.5f..4f,
+        )
+        Text(stringResource(R.string.input_acceleration), style = MaterialTheme.typography.bodyMedium)
+        Slider(
+            value = accel,
+            onValueChange = { accel = it },
+            onValueChangeFinished = { prefs.edit().putFloat("accel", accel).apply() },
+            valueRange = 0f..0.15f,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.input_natural_scroll), modifier = Modifier.weight(1f))
+            Switch(checked = natural, onCheckedChange = {
+                natural = it
+                prefs.edit().putBoolean("natural", it).apply()
+            })
+        }
+    }
+}
+
 /** Keeps the screen on while a screen that controls another device is open (R9a.5). */
 @Composable
 fun KeepScreenOn() {
@@ -85,7 +126,15 @@ fun MousepadPad(node: UrDeviceNode, device: String, enabled: Boolean) {
     var natural by remember { mutableStateOf(prefs.getBoolean("natural", true)) }
     val haptic = LocalHapticFeedback.current
 
+    val openPage = LocalOpenFeaturePage.current
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Sensitivity and scrolling live on their own page.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.tile_mousepad), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            IconButton(onClick = { openPage("input", MOUSEPAD_SETTINGS) }) {
+                Icon(Icons.Outlined.Settings, stringResource(R.string.input_mousepad_settings))
+            }
+        }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -123,27 +172,6 @@ fun MousepadPad(node: UrDeviceNode, device: String, enabled: Boolean) {
                 enabled = enabled,
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
             ) { Text(stringResource(R.string.input_right_click)) }
-        }
-        Text(stringResource(R.string.input_sensitivity), style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = sensitivity,
-            onValueChange = { sensitivity = it },
-            onValueChangeFinished = { prefs.edit().putFloat("sensitivity", sensitivity).apply() },
-            valueRange = 0.5f..4f,
-        )
-        Text(stringResource(R.string.input_acceleration), style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = accel,
-            onValueChange = { accel = it },
-            onValueChangeFinished = { prefs.edit().putFloat("accel", accel).apply() },
-            valueRange = 0f..0.15f,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.input_natural_scroll), modifier = Modifier.weight(1f))
-            Switch(checked = natural, onCheckedChange = {
-                natural = it
-                prefs.edit().putBoolean("natural", it).apply()
-            })
         }
     }
 }
