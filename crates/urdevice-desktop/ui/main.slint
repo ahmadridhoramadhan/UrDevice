@@ -220,6 +220,7 @@ component PairBody inherits VerticalLayout {
             QrBox { qr: root.qr; countdown: root.countdown; locked: root.locked; show-countdown: false; }
             VerticalLayout {
                 horizontal-stretch: 1;
+                min-width: 240px;
                 alignment: center;
                 spacing: 8px;
                 IconBox { icon: @image-url("icons/qr.svg"); size: 40px; }
