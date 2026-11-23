@@ -831,6 +831,7 @@ impl Ui {
                 let Some(ui) = me.upgrade() else { return };
                 if let Some(f) = ui.features.iter().find(|f| f.id() == feature.as_str()) {
                     f.set_switch(&ui.feature_ctx, &peer, on);
+                    ui.refresh();
                 }
             });
         }

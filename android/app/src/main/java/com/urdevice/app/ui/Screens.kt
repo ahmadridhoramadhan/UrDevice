@@ -38,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -291,21 +293,38 @@ private fun FeatureTile(
         FfiMode.ASK -> stringResource(R.string.tile_needs_approval)
         FfiMode.DENY -> stringResource(R.string.tile_turned_off_by, host)
     }
+    // A switch tile lights up when it is on.
+    val lit = switchOn == true && !off
+    val fg = if (lit) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = if (off) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+            containerColor = when {
+                lit -> MaterialTheme.colorScheme.primary
+                off -> MaterialTheme.colorScheme.surfaceVariant
+                else -> MaterialTheme.colorScheme.surface
+            },
         ),
         modifier = modifier.heightIn(min = 88.dp)
-            .semantics(mergeDescendants = true) { stateDescription = state }
-            .clickable(enabled = !off && switchOn == null, onClick = onClick),
+            .semantics(mergeDescendants = true) {
+                stateDescription = state
+                if (switchOn != null) toggleableState = ToggleableState(switchOn)
+            }
+            .clickable(enabled = !off, onClick = if (switchOn != null) ({ onSwitch(!switchOn) }) else onClick),
     ) {
         Column(Modifier.padding(12.dp).then(if (off) Modifier.padding(0.dp) else Modifier)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconBox(capIcon(icon), 34)
-                Spacer(Modifier.weight(1f))
-                if (switchOn != null) {
-                    Switch(checked = switchOn, onCheckedChange = onSwitch, enabled = !off)
+                if (lit) {
+                    Box(
+                        Modifier.size(34.dp).background(fg.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(capIcon(icon), contentDescription = null, tint = fg, modifier = Modifier.size(17.dp))
+                    }
                 } else {
+                    IconBox(capIcon(icon), 34)
+                }
+                Spacer(Modifier.weight(1f))
+                if (switchOn == null) {
                     IconButton(onClick = onGear, modifier = Modifier.size(44.dp)) {
                         Icon(Icons.Outlined.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                     }
@@ -313,7 +332,7 @@ private fun FeatureTile(
             }
             // No status words: an amber dot means "you approve first"; a dimmed tile is off.
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, fontWeight = FontWeight.SemiBold, color = if (off) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                Text(label, fontWeight = FontWeight.SemiBold, color = if (off) MaterialTheme.colorScheme.onSurfaceVariant else fg)
                 if (!off && mode == FfiMode.ASK) {
                     Spacer(Modifier.width(6.dp))
                     Box(Modifier.size(8.dp).background(c.askFg, CircleShape))
