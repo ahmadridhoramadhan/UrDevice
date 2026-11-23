@@ -229,6 +229,8 @@ fun DeviceScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { (f, t) ->
                         val mode = modes[t.cap] ?: FfiMode.DENY
+                        var flipped by remember(peer.id, t.key) { mutableStateOf<Boolean?>(null) }
+                        val switchOn = f.switch(peer)?.let { flipped ?: it }
                         FeatureTile(
                             label = stringResource(t.label ?: Labels.cap(t.cap)),
                             icon = t.key,
@@ -237,6 +239,8 @@ fun DeviceScreen(
                             host = peer.name,
                             onClick = { if (f.hasScreen) onOpenFeature(f.id, t.key) else onRequest(t.cap) },
                             onGear = onSettings,
+                            switchOn = switchOn,
+                            onSwitch = { flipped = it; f.setSwitch(peer, it) },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -274,6 +278,9 @@ private fun FeatureTile(
     host: String,
     onClick: () -> Unit,
     onGear: () -> Unit,
+    /** Non-null for a switch tile: the state; the tile has a switch instead of the settings icon. */
+    switchOn: Boolean?,
+    onSwitch: (Boolean) -> Unit,
     modifier: Modifier,
 ) {
     val c = LocalModes.current
@@ -290,14 +297,18 @@ private fun FeatureTile(
         ),
         modifier = modifier.heightIn(min = 88.dp)
             .semantics(mergeDescendants = true) { stateDescription = state }
-            .clickable(enabled = !off, onClick = onClick),
+            .clickable(enabled = !off && switchOn == null, onClick = onClick),
     ) {
         Column(Modifier.padding(12.dp).then(if (off) Modifier.padding(0.dp) else Modifier)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconBox(capIcon(icon), 34)
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = onGear, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Outlined.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                if (switchOn != null) {
+                    Switch(checked = switchOn, onCheckedChange = onSwitch, enabled = !off)
+                } else {
+                    IconButton(onClick = onGear, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Outlined.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
             // No status words: an amber dot means "you approve first"; a dimmed tile is off.

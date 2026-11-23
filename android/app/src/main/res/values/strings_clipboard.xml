@@ -3,11 +3,6 @@
     <string name="clip_tile_label">Send clipboard</string>
     <string name="clip_send_action">Send clipboard</string>
     <string name="clip_share_label">UrDevice clipboard</string>
-    <string name="clip_share_with">Share clipboard with %1$s</string>
-    <string name="clip_share_body">Text, rich text, and images you copy here show up on that device, and the other way round. Content marked as sensitive is never sent.</string>
-    <string name="clip_send_now">Send clipboard now</string>
-    <string name="clip_background_hint">Android only lets UrDevice read your clipboard while it is open. To send from another app, use the notification button, the Quick Settings tile, or the share sheet.</string>
-    <string name="clip_paused_hint">Clipboard sharing is paused for all devices. Turn it back on in Settings.</string>
     <string name="clip_pause">Pause clipboard on all devices</string>
     <string name="clip_pause_body">Nothing you copy is sent, and nothing from other devices is written to your clipboard.</string>
     <string name="clip_nothing">Nothing to send on the clipboard</string>

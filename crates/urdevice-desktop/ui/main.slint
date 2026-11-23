@@ -51,6 +51,9 @@ export struct TileItem {
     icon: image,
     // 0 allow, 1 ask, 2 deny, 3 not available over Bluetooth LE (R6.4)
     mode: int,
+    // A switch tile (no view, no settings icon) and its state.
+    toggle: bool,
+    on: bool,
 }
 
 export struct NearbyItem {
@@ -569,6 +572,8 @@ export component MainWindow inherits Window {
     // A tile with a view opened it: peer id, feature id, tile key.
     callback open-feature(string, string, string);
     callback stop-activity(string);
+    // A switch tile was flipped: peer id, feature id, new state.
+    callback toggle-tile(string, string, bool);
     callback set-name(string);
     callback set-hidden(bool);
     callback set-autostart(bool);
@@ -824,7 +829,7 @@ export component MainWindow inherits Window {
                                     background: t.mode >= 2 ? Theme.surface-2 : tile-ta.has-hover ? Theme.surface-2 : Theme.surface;
                                     opacity: t.mode >= 2 ? 0.6 : 1;
                                     tile-ta := TouchArea {
-                                        enabled: t.mode < 2;
+                                        enabled: t.mode < 2 && !t.toggle;
                                         mouse-cursor: t.mode >= 2 ? default : pointer;
                                         clicked => {
                                             if (t.view) {
@@ -843,7 +848,13 @@ export component MainWindow inherits Window {
                                         HorizontalLayout {
                                             IconBox { icon: t.icon; size: 32px; }
                                             Rectangle { horizontal-stretch: 1; }
-                                            Rectangle {
+                                            if t.toggle: Toggle {
+                                                checked: t.on;
+                                                enabled: t.mode < 2;
+                                                toggled(v) => { root.toggle-tile(root.peer.id, t.feature, v); }
+                                                y: (parent.height - self.height) / 2;
+                                            }
+                                            if !t.toggle: Rectangle {
                                                 width: 28px; height: 28px; border-radius: 14px;
                                                 background: gear-ta.has-hover ? Theme.border : transparent;
                                                 Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }

@@ -28,6 +28,15 @@ interface Feature {
     /** True when a tile opens [Screen]; otherwise a tile only sends an activity request. */
     val hasScreen: Boolean get() = false
 
+    /**
+     * For a tile that is a plain switch (no screen, no settings icon): its state for [peer], or
+     * null for a normal tile.
+     */
+    fun switch(peer: FfiPeer): Boolean? = null
+
+    /** The user flipped the switch tile of [peer]. */
+    fun setSwitch(peer: FfiPeer, on: Boolean) {}
+
     /** The feature screen for [peer], opened from the tile with key [tile]. */
     @Composable
     fun Screen(peer: FfiPeer, tile: String) {}

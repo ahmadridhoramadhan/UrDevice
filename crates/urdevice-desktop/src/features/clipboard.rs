@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use slint::ComponentHandle as _;
 use urdevice_core::identity::DeviceId;
-use urdevice_core::node::{PeerView, Snapshot};
+use urdevice_core::node::Snapshot;
 use urdevice_core::services::clipboard::{
     ClipEvent, Clipboard as Service, ClipboardEvents, SkipReason,
 };
@@ -107,10 +107,6 @@ impl Feature for Clipboard {
         }]
     }
 
-    fn has_view(&self) -> bool {
-        true
-    }
-
     fn start(&self, ctx: &FeatureCtx) {
         let Some(w) = ctx.window.upgrade() else {
             return;
@@ -142,16 +138,6 @@ impl Feature for Clipboard {
                 w.global::<ClipboardFeature>().set_paused(s.paused());
             }
         });
-        let win = ctx.window.clone();
-        g.on_set_peer_enabled(move |v| {
-            let Some(w) = win.upgrade() else { return };
-            let g = w.global::<ClipboardFeature>();
-            if let Some(peer) = DeviceId::from_hex(g.get_peer_id().as_str())
-                && let Err(e) = svc.set_peer_enabled(peer, v)
-            {
-                tracing::warn!(error = %e, "could not save the clipboard switch");
-            }
-        });
     }
 
     fn refresh(&self, ctx: &FeatureCtx, _snap: &Snapshot) {
@@ -160,20 +146,17 @@ impl Feature for Clipboard {
         };
         let g = w.global::<ClipboardFeature>();
         g.set_paused(svc.paused());
-        if let Some(peer) = DeviceId::from_hex(g.get_peer_id().as_str()) {
-            g.set_peer_enabled(svc.peer_enabled(peer));
-        }
     }
 
-    fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
-        let Some(w) = ctx.window.upgrade() else {
-            return;
-        };
-        let g = w.global::<ClipboardFeature>();
-        g.set_peer_id(peer.id.clone().into());
-        g.set_status("".into());
-        if let (Some(svc), Some(id)) = (service(&ctx.node), DeviceId::from_hex(&peer.id)) {
-            g.set_peer_enabled(svc.peer_enabled(id));
+    fn switch(&self, ctx: &FeatureCtx, peer: &str) -> Option<bool> {
+        Some(service(&ctx.node)?.peer_enabled(DeviceId::from_hex(peer)?))
+    }
+
+    fn set_switch(&self, ctx: &FeatureCtx, peer: &str, on: bool) {
+        if let (Some(svc), Some(id)) = (service(&ctx.node), DeviceId::from_hex(peer))
+            && let Err(e) = svc.set_peer_enabled(id, on)
+        {
+            tracing::warn!(error = %e, "could not save the clipboard switch");
         }
     }
 }

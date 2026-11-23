@@ -89,6 +89,18 @@ pub(crate) trait Feature {
         let _ = (ctx, snap);
     }
 
+    /// For a tile that is a plain switch (no view, no settings icon): its state
+    /// for `peer` (Device ID, hex). `None` for a normal tile.
+    fn switch(&self, ctx: &FeatureCtx, peer: &str) -> Option<bool> {
+        let _ = (ctx, peer);
+        None
+    }
+
+    /// The user flipped the switch tile of `peer`.
+    fn set_switch(&self, ctx: &FeatureCtx, peer: &str, on: bool) {
+        let _ = (ctx, peer, on);
+    }
+
     /// A tile opened the view for `peer`. `tile` is the [`TileSpec::key`].
     fn open(&self, ctx: &FeatureCtx, peer: &PeerView, tile: &str) {
         let _ = (ctx, peer, tile);

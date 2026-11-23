@@ -510,6 +510,8 @@ impl Ui {
                         key: t.key.into(),
                         feature: f.id().into(),
                         view: f.has_view(),
+                        toggle: f.switch(&self.feature_ctx, &sp.id).is_some(),
+                        on: f.switch(&self.feature_ctx, &sp.id).unwrap_or(false),
                         label: l.invoke_tile_label(t.key.into()),
                         icon: icon(t.key),
                         // On Bluetooth LE only a few features work (R6.4).
@@ -820,6 +822,15 @@ impl Ui {
                 };
                 if let Some(f) = ui.features.iter().find(|f| f.id() == feature.as_str()) {
                     f.open(&ui.feature_ctx, p, &tile);
+                }
+            });
+        }
+        {
+            let me = me.clone();
+            w.on_toggle_tile(move |peer, feature, on| {
+                let Some(ui) = me.upgrade() else { return };
+                if let Some(f) = ui.features.iter().find(|f| f.id() == feature.as_str()) {
+                    f.set_switch(&ui.feature_ctx, &peer, on);
                 }
             });
         }

@@ -138,10 +138,12 @@ export component ModeSwitch inherits Rectangle {
 
 export component Toggle inherits Rectangle {
     in-out property <bool> checked;
+    in property <bool> enabled: true;
     callback toggled(bool);
     width: 40px;
     height: 22px;
     border-radius: 11px;
+    opacity: enabled ? 1 : 0.5;
     background: checked ? Theme.accent : Theme.border;
     Rectangle {
         x: root.checked ? root.width - self.width - 3px : 3px;
@@ -152,6 +154,7 @@ export component Toggle inherits Rectangle {
         background: root.checked ? Theme.on-accent : Theme.surface;
     }
     TouchArea {
+        enabled: root.enabled;
         mouse-cursor: pointer;
         clicked => {
             root.checked = !root.checked;
