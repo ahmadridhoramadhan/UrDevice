@@ -102,7 +102,6 @@ fun HomeScreen(snap: FfiSnapshot, onThisDevice: () -> Unit, onPeer: (String) -> 
                         stringResource(R.string.home_this_device_line, Build.VERSION.RELEASE, snap.me.addresses.firstOrNull() ?: "—"),
                         color = c.onHeader, style = MaterialTheme.typography.bodySmall,
                     )
-                    Text(stringResource(R.string.home_tap_perms), color = c.onHeader, style = MaterialTheme.typography.bodySmall)
                 }
                 snap.me.batteryPct?.let {
                     Box(Modifier.background(Lime, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) {
@@ -145,30 +144,11 @@ fun HomeScreen(snap: FfiSnapshot, onThisDevice: () -> Unit, onPeer: (String) -> 
     }
 }
 
-/** "This device" permission settings (R5.1), with the extra confirmation for terminal and file changes. */
+/** "This device": sections from features, for example shared localhost ports. Permissions are in Settings. */
 @Composable
-fun ThisDeviceScreen(snap: FfiSnapshot, onSet: (String, FfiMode, Boolean) -> Unit) {
-    var confirm by remember { mutableStateOf<String?>(null) }
+fun ThisDeviceScreen() {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(stringResource(R.string.perms_apply_all, snap.me.name), style = MaterialTheme.typography.bodySmall)
-        snap.permissions.forEach { p ->
-            PermissionRow(p) { m ->
-                if (p.localOnly && m == FfiMode.ALLOW && p.mode != FfiMode.ALLOW) confirm = p.capability
-                else onSet(p.capability, m, false)
-            }
-        }
-        // Feature sections for this device, for example shared localhost ports.
         allFeatures.forEach { it.ThisDevice() }
-    }
-    confirm?.let { cap ->
-        val term = cap == "term.v1"
-        ConfirmDialog(
-            title = stringResource(if (term) R.string.confirm_term_title else R.string.confirm_fs_title),
-            body = stringResource(if (term) R.string.confirm_term_body else R.string.confirm_fs_body),
-            confirm = stringResource(R.string.allow),
-            onConfirm = { onSet(cap, FfiMode.ALLOW, true); confirm = null },
-            onDismiss = { confirm = null },
-        )
     }
 }
 
@@ -342,10 +322,12 @@ fun SettingsScreen(
     onExport: () -> Unit,
     onReset: () -> Unit,
     onDeleteAll: () -> Unit,
+    onSetPermission: (String, FfiMode, Boolean) -> Unit,
     version: String,
 ) {
     var name by remember(snap.me.name) { mutableStateOf(snap.me.name) }
     var confirm by remember { mutableStateOf<String?>(null) }
+    var permConfirm by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SettingsCard {
             Text(stringResource(R.string.set_name), fontWeight = FontWeight.SemiBold)
@@ -354,6 +336,15 @@ fun SettingsScreen(
                 Button(onClick = { onRename(name) }, enabled = name.isNotBlank() && name != snap.me.name) { Text(stringResource(R.string.save)) }
             }
             Text(stringResource(R.string.device_id, snap.me.fingerprint), style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+        }
+        // Permissions for other devices (R5.1), with the extra confirmation for terminal and file changes.
+        SectionLabel(stringResource(R.string.perms_title))
+        Text(stringResource(R.string.perms_apply_all, snap.me.name), style = MaterialTheme.typography.bodySmall)
+        snap.permissions.forEach { p ->
+            PermissionRow(p) { m ->
+                if (p.localOnly && m == FfiMode.ALLOW && p.mode != FfiMode.ALLOW) permConfirm = p.capability
+                else onSetPermission(p.capability, m, false)
+            }
         }
         SettingsCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -379,6 +370,16 @@ fun SettingsScreen(
             }
         }
         Text(stringResource(R.string.core_version, version), style = MaterialTheme.typography.bodySmall)
+    }
+    permConfirm?.let { cap ->
+        val term = cap == "term.v1"
+        ConfirmDialog(
+            title = stringResource(if (term) R.string.confirm_term_title else R.string.confirm_fs_title),
+            body = stringResource(if (term) R.string.confirm_term_body else R.string.confirm_fs_body),
+            confirm = stringResource(R.string.allow),
+            onConfirm = { onSetPermission(cap, FfiMode.ALLOW, true); permConfirm = null },
+            onDismiss = { permConfirm = null },
+        )
     }
     when (confirm) {
         "reset" -> ConfirmDialog(

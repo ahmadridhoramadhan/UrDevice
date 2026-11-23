@@ -249,7 +249,7 @@ private fun App() {
                     }
                     when (page) {
                         Page.Home -> HomeScreen(s, onThisDevice = { go(Page.ThisDevice) }, onPeer = { go(Page.Device(it)) }, onAdd = { go(Page.Pair) })
-                        Page.ThisDevice -> ThisDeviceScreen(s) { c, m, confirmed -> runCatching { node()?.setPermission(c, m, confirmed) } }
+                        Page.ThisDevice -> ThisDeviceScreen()
                         is Page.Device -> {
                             val peer = s.peers.firstOrNull { it.id == page.id }
                             if (peer == null) {
@@ -262,7 +262,7 @@ private fun App() {
                                     onForget = { runCatching { node()?.forget(peer.id) } },
                                     onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
                                     onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
-                                    onSettings = { go(Page.ThisDevice) },
+                                    onSettings = { go(Page.Settings) },
                                     onStop = { node()?.stopActivity(it) },
                                 )
                             }
@@ -290,6 +290,7 @@ private fun App() {
                                 )
                             },
                             onReset = { runCatching { node()?.resetIdentity() } },
+                            onSetPermission = { c, m, confirmed -> runCatching { node()?.setPermission(c, m, confirmed) } },
                             onDeleteAll = {
                                 runCatching { node()?.deleteAllData() }
                                 pairedName = null

@@ -103,7 +103,6 @@
 
     <!-- Home -->
     <string name="home_this_device_line">This device · Android %1$s · %2$s</string>
-    <string name="home_tap_perms">Tap to set permissions for other devices</string>
     <string name="status_connected_line">%1$s · %2$s · %3$d ms</string>
     <string name="status_offline">Offline</string>
     <string name="status_last_seen">Offline · last seen %1$s</string>
@@ -111,6 +110,7 @@
     <string name="no_devices">No paired devices yet.</string>
 
     <!-- This device sheet -->
+    <string name="perms_title">Permissions for other devices</string>
     <string name="perms_apply_all">Applies to every device paired with %1$s. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.</string>
     <string name="confirm_term_title">Allow remote terminal?</string>
     <string name="confirm_term_body">Every paired device gets full control of this device\'s shell, with no prompt. Only allow this if you trust all of them.</string>
