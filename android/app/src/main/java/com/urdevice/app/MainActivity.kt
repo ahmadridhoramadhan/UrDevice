@@ -17,6 +17,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -247,7 +248,11 @@ private fun App() {
         ) { inner ->
             Column(Modifier.padding(inner).fillMaxSize()) {
                 s.activities.filter { it.incoming }.forEach { a -> ActiveBanner(a) { node()?.stopActivity(a.id) } }
-                Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+                // A full-screen feature page (the Mousepad) fills the room and does not scroll.
+                val full = (page as? Page.Feature)?.let { feature(it.feature)?.fullScreen(it.tile) } == true
+                Column(
+                    (if (full) Modifier.weight(1f).fillMaxWidth() else Modifier.verticalScroll(rememberScrollState())).padding(16.dp),
+                ) {
                     if (netNeeded) {
                         Explain(
                             stringResource(R.string.why_network_title), stringResource(R.string.why_network_body),

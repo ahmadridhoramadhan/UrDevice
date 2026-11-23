@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -90,6 +91,9 @@ object InputFeature : Feature, InputListener {
     )
 
     override val hasScreen get() = true
+
+    /** The Mousepad fills the page; the other screens scroll. */
+    override fun fullScreen(tile: String) = tile != "presenter" && tile != "keyboard" && tile != MOUSEPAD_SETTINGS
 
     /** The settings icon of the Mousepad tile opens the Mousepad settings page. */
     override fun settingsPage(tile: String): String? = if (tile == "input.v1") MOUSEPAD_SETTINGS else null
@@ -189,12 +193,15 @@ object InputFeature : Feature, InputListener {
             MousepadSettings()
             return
         }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            if (fullScreen(tile)) Modifier.fillMaxSize() else Modifier,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             SessionStatus(peer, session, onStart = { connect(node, peer.id) }, onStop = { end(node, peer.id) })
             when (tile) {
                 "presenter" -> PresenterPad(node, peer.id, session.active)
                 "keyboard" -> KeyboardPad(node, peer.id, session.active)
-                else -> MousepadPad(node, peer.id, session.active)
+                else -> MousepadPad(node, peer.id, session.active, Modifier.weight(1f))
             }
         }
     }

@@ -50,6 +50,9 @@ interface Feature {
      */
     fun settingsPage(tile: String): String? = null
 
+    /** True when the screen for [tile] fills the whole page and handles its own scrolling. */
+    fun fullScreen(tile: String): Boolean = false
+
     /** True when tapping a tile opens a menu ([TileMenu]) instead of a screen. */
     val tileMenu: Boolean get() = false
 
