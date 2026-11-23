@@ -6,21 +6,9 @@
 // Both land under build/generated, so nothing generated is committed.
 
 import com.android.build.api.variant.LibraryVariant
+import com.urdevice.build.tasks.CargoNdkBuild
+import com.urdevice.build.tasks.UniFfiBindgen
 import java.io.File
-import javax.inject.Inject
-import org.gradle.api.DefaultTask
-import org.gradle.api.file.ConfigurableFileCollection
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.provider.ListProperty
-import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.PathSensitive
-import org.gradle.api.tasks.PathSensitivity
-import org.gradle.api.tasks.TaskAction
-import org.gradle.process.ExecOperations
 
 plugins {
     alias(libs.plugins.android.library)
@@ -28,6 +16,12 @@ plugins {
 
 /** Repository root, which is also the Cargo workspace root. */
 val cargoWorkspace: File = rootProject.projectDir.parentFile
+
+/** Path to cargo binary. */
+val cargoPath: String =
+    File(System.getProperty("user.home"), ".cargo/bin/cargo").let {
+        if (it.exists()) it.absolutePath else "cargo"
+    }
 
 /** ABIs to build. Override with `-Purdevice.abis=arm64-v8a` for faster local builds. */
 val rustAbis: List<String> =
@@ -63,79 +57,11 @@ fun ConfigurableFileCollection.rustSources() {
     from(fileTree(File(cargoWorkspace, "crates")) { include("**/*.rs", "**/Cargo.toml", "**/*.toml") })
 }
 
-/** Builds liburdevice_ffi.so for each ABI with cargo-ndk. */
-abstract class CargoNdkBuild : DefaultTask() {
-    @get:Inject abstract val exec: ExecOperations
-    @get:Internal abstract val workspace: DirectoryProperty
-    @get:Internal abstract val ndkDir: DirectoryProperty
-    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) abstract val sources: ConfigurableFileCollection
-    @get:Input abstract val abis: ListProperty<String>
-    @get:Input abstract val release: Property<Boolean>
-    @get:Input abstract val minSdk: Property<Int>
-    @get:OutputDirectory abstract val outputDir: DirectoryProperty
-
-    @TaskAction
-    fun build() {
-        val out = outputDir.get().asFile
-        out.deleteRecursively()
-        out.mkdirs()
-        val args = mutableListOf("cargo", "ndk", "--platform", minSdk.get().toString(), "-o", out.absolutePath)
-        abis.get().forEach { args += listOf("-t", it) }
-        args += listOf("build", "--locked", "-p", "urdevice-ffi", "--lib")
-        if (release.get()) args += "--release"
-        exec.exec {
-            workingDir = workspace.get().asFile
-            environment("ANDROID_NDK_HOME", ndkDir.get().asFile.absolutePath)
-            commandLine(args)
-        }
-    }
-}
-
-/** Generates the Kotlin bindings from a host build of urdevice-ffi. */
-abstract class UniFfiBindgen : DefaultTask() {
-    @get:Inject abstract val exec: ExecOperations
-    @get:Internal abstract val workspace: DirectoryProperty
-    @get:InputFiles @get:PathSensitive(PathSensitivity.RELATIVE) abstract val sources: ConfigurableFileCollection
-    @get:OutputDirectory abstract val outputDir: DirectoryProperty
-
-    @TaskAction
-    fun generate() {
-        val root = workspace.get().asFile
-        val out = outputDir.get().asFile
-        out.deleteRecursively()
-        out.mkdirs()
-
-        // The host build is unstripped, so the UniFFI metadata is still in it.
-        exec.exec {
-            workingDir = root
-            commandLine("cargo", "build", "--locked", "-p", "urdevice-ffi", "--lib")
-        }
-        val os = System.getProperty("os.name").lowercase()
-        val libName = when {
-            os.contains("windows") -> "urdevice_ffi.dll"
-            os.contains("mac") -> "liburdevice_ffi.dylib"
-            else -> "liburdevice_ffi.so"
-        }
-        val targetDir = System.getenv("CARGO_TARGET_DIR")?.let(::File) ?: File(root, "target")
-        val library = File(targetDir, "debug/$libName")
-
-        exec.exec {
-            workingDir = root
-            commandLine(
-                "cargo", "run", "--locked", "-q", "-p", "urdevice-ffi",
-                "--features", "bindgen", "--bin", "uniffi-bindgen", "--",
-                "generate", "--library", library.absolutePath,
-                "--language", "kotlin", "--no-format",
-                "--out-dir", out.absolutePath,
-            )
-        }
-    }
-}
-
 val generateUniFfiBindings = tasks.register<UniFfiBindgen>("generateUniFfiBindings") {
     group = "rust"
     description = "Generates Kotlin bindings for urdevice-ffi with UniFFI."
     workspace.set(cargoWorkspace)
+    cargoBin.set(cargoPath)
     sources.rustSources()
     outputDir.set(layout.buildDirectory.dir("generated/uniffi/kotlin"))
 }
@@ -153,6 +79,7 @@ androidComponents {
             abis.set(rustAbis)
             release.set(variant.buildType == "release")
             minSdk.set(libs.versions.min.sdk.get().toInt())
+            cargoBin.set(cargoPath)
             outputDir.set(layout.buildDirectory.dir("generated/rust/${variant.name}/jniLibs"))
         }
         variant.sources.jniLibs?.addGeneratedSourceDirectory(cargoBuild, CargoNdkBuild::outputDir)

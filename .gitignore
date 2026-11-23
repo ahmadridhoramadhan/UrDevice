@@ -16,3 +16,7 @@ android/captures/
 *.iml
 .vscode/
 .DS_Store
+
+# Local Gradle state
+android/**/.gradle/
+android/gradle/gradle-daemon-jvm.properties
