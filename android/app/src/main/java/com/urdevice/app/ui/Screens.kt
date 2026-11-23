@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -276,11 +278,19 @@ private fun FeatureTile(
 ) {
     val c = LocalModes.current
     val off = mode == FfiMode.DENY || !available
+    // Screen readers still get the state in words.
+    val state = if (!available) stringResource(R.string.bt_tile_unavailable) else when (mode) {
+        FfiMode.ALLOW -> stringResource(R.string.tile_ready)
+        FfiMode.ASK -> stringResource(R.string.tile_needs_approval)
+        FfiMode.DENY -> stringResource(R.string.tile_turned_off_by, host)
+    }
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (off) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
         ),
-        modifier = modifier.heightIn(min = 104.dp).clickable(enabled = !off, onClick = onClick),
+        modifier = modifier.heightIn(min = 88.dp)
+            .semantics(mergeDescendants = true) { stateDescription = state }
+            .clickable(enabled = !off, onClick = onClick),
     ) {
         Column(Modifier.padding(12.dp).then(if (off) Modifier.padding(0.dp) else Modifier)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -290,20 +300,14 @@ private fun FeatureTile(
                     Icon(Icons.Outlined.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 }
             }
-            Text(label, fontWeight = FontWeight.SemiBold, color = if (off) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-            Text(
-                if (!available) stringResource(R.string.bt_tile_unavailable) else when (mode) {
-                    FfiMode.ALLOW -> stringResource(R.string.tile_ready)
-                    FfiMode.ASK -> stringResource(R.string.tile_needs_approval)
-                    FfiMode.DENY -> stringResource(R.string.tile_turned_off_by, host)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = if (!available) MaterialTheme.colorScheme.onSurfaceVariant else when (mode) {
-                    FfiMode.ALLOW -> c.allowFg
-                    FfiMode.ASK -> c.askFg
-                    FfiMode.DENY -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
+            // No status words: an amber dot means "you approve first"; a dimmed tile is off.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, fontWeight = FontWeight.SemiBold, color = if (off) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                if (!off && mode == FfiMode.ASK) {
+                    Spacer(Modifier.width(6.dp))
+                    Box(Modifier.size(8.dp).background(c.askFg, CircleShape))
+                }
+            }
         }
     }
 }

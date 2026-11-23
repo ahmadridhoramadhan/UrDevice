@@ -809,7 +809,10 @@ export component MainWindow inherits Window {
                                 for t[i] in root.tiles: Rectangle {
                                     row: i / 3;
                                     col: mod(i, 3);
-                                    height: 92px;
+                                    height: 84px;
+                                    accessible-role: button;
+                                    accessible-label: t.label;
+                                    accessible-description: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : t.mode == 3 ? @tr("Not available over Bluetooth") : @tr("Turned off by {}", root.peer.name);
                                     border-radius: Theme.radius;
                                     border-width: 1px;
                                     border-color: Theme.border;
@@ -842,11 +845,16 @@ export component MainWindow inherits Window {
                                                 gear-ta := TouchArea { mouse-cursor: pointer; clicked => { root.page = Page.settings; } }
                                             }
                                         }
-                                        Text { text: t.label; font-weight: 600; color: Theme.text; }
-                                        Text {
-                                            text: t.mode == 0 ? @tr("Ready") : t.mode == 1 ? @tr("Needs approval") : t.mode == 3 ? @tr("Not available over Bluetooth") : @tr("Turned off by {}", root.peer.name);
-                                            font-size: Theme.font-small;
-                                            color: t.mode == 0 ? Theme.allow-fg : t.mode == 1 ? Theme.ask-fg : Theme.muted;
+                                        // No status words: an amber dot means "you approve first"; a dimmed tile is off.
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+                                            Text { text: t.label; font-weight: 600; color: t.mode >= 2 ? Theme.muted : Theme.text; vertical-alignment: center; }
+                                            if t.mode == 1: Rectangle {
+                                                y: (parent.height - self.height) / 2;
+                                                width: 8px; height: 8px; border-radius: 4px;
+                                                background: Theme.ask-fg;
+                                            }
                                         }
                                     }
                                 }
