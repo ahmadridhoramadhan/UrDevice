@@ -115,7 +115,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         requestHighRefreshRate()
         UrDeviceService.start(this)
+        readGuide(intent)
         setContent { UrDeviceTheme { App() } }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        readGuide(intent)
+    }
+
+    /** A notification (or the core) asked to guide the user to an Android setting. */
+    private fun readGuide(intent: android.content.Intent?) {
+        intent?.getStringExtra(InputFeature.EXTRA_GUIDE)?.let { InputFeature.guide.value = it }
     }
 
     /**
@@ -228,6 +239,7 @@ private fun App() {
     if (inOnboarding == null) inOnboarding = !s.me.onboarded
     if (!s.me.onboarded && inOnboarding == false) inOnboarding = true
 
+    InputFeature.HostGuideDialog()
     if (inOnboarding == true) {
         Onboarding(
             snap = s,

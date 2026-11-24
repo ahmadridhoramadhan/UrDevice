@@ -24,6 +24,41 @@ export component IconBox inherits Rectangle {
     }
 }
 
+// A round button with only an icon. `label` is read by screen readers.
+// kind: 0 primary (also: on), 1 outline, 2 danger outline
+export component IconBtn inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <int> kind: 1;
+    in property <bool> enabled: true;
+    callback clicked();
+    horizontal-stretch: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 17px;
+    background: !enabled ? Theme.surface-2
+        : kind == 0 ? (ta.has-hover ? Theme.accent.darker(0.15) : Theme.accent)
+        : (ta.has-hover ? Theme.surface-2 : transparent);
+    border-width: 1px;
+    border-color: kind == 2 ? Theme.deny-fg : kind == 0 ? Theme.accent : Theme.border;
+    opacity: enabled ? 1 : 0.6;
+    accessible-role: button;
+    accessible-label: root.label;
+    Icon {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 16px;
+        height: 16px;
+        source: root.icon;
+        tint: kind == 0 ? Theme.on-accent : kind == 2 ? Theme.deny-fg : Theme.text;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
 // kind: 0 primary, 1 outline, 2 danger outline, 3 quiet
 export component Btn inherits Rectangle {
     in property <string> text;

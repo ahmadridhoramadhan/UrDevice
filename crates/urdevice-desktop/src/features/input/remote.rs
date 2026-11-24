@@ -318,7 +318,11 @@ impl Remote {
         self.win.set_captured(self.captured && active);
         let android = self.host.as_ref().is_some_and(|h| h.backend == "android");
         self.win.set_show_nav(android);
-        if let Some((w, h)) = self.host.as_ref().and_then(|h| h.display)
+        // In a screen window the picture itself sets the shape (it changes when the phone turns);
+        // the size the host reported once would squash it.
+        let picture_sets_shape = self.screen && self.fitted != (0, 0);
+        if !picture_sets_shape
+            && let Some((w, h)) = self.host.as_ref().and_then(|h| h.display)
             && h > 0
         {
             self.win.set_aspect(w as f32 / h as f32);

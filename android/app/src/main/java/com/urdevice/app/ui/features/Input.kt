@@ -110,6 +110,38 @@ object InputFeature : Feature, InputListener {
 
     private var appContext: Context? = null
 
+    /** Intent extra that asks the app to guide the user to a setting: `service` or `keyboard`. */
+    const val EXTRA_GUIDE = "urdevice.guide"
+
+    /** The setting the user is being guided to now (`service`, `keyboard`), or empty. */
+    val guide = MutableStateFlow("")
+
+    /**
+     * The dialog behind a controlled phone's missing setting. "Agree" (the Play disclosure for the
+     * accessibility service) goes straight to Android's settings page for it.
+     */
+    @Composable
+    fun HostGuideDialog() {
+        val which by guide.collectAsState()
+        val context = LocalContext.current
+        if (which.isEmpty()) return
+        val service = which == "service"
+        AlertDialog(
+            onDismissRequest = { guide.value = "" },
+            title = { Text(stringResource(if (service) R.string.input_disclosure_title else R.string.input_host_notif_title)) },
+            text = { Text(stringResource(if (service) R.string.input_disclosure_body else R.string.input_host_notif_keyboard)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    guide.value = ""
+                    if (service) InputHost.openAccessibilitySettings(context) else InputHost.openKeyboardSettings(context)
+                }) { Text(stringResource(if (service) R.string.input_disclosure_agree else R.string.input_host_enable_keyboard)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { guide.value = "" }) { Text(stringResource(R.string.input_disclosure_not_now)) }
+            },
+        )
+    }
+
     private const val HOST_CHANNEL = "input_host"
     private const val HOST_NOTIFICATION = 4190
 
@@ -123,11 +155,18 @@ object InputFeature : Feature, InputListener {
         val text = ctx.getString(
             if (missing == "input_method") R.string.input_host_notif_keyboard else R.string.input_host_notif_service,
         )
-        val open = PendingIntent.getActivity(
-            ctx, 0,
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
+        // The accessibility service gates the whole control, so the app opens at once and offers
+        // to go straight to Android's settings. The keyboard only matters for typing: the
+        // notification offers it when tapped.
+        val which = if (missing == "input_method") "keyboard" else "service"
+        val intent = Intent(ctx, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(EXTRA_GUIDE, which)
+        if (which == "service") {
+            guide.value = which
+            runCatching { ctx.startActivity(intent) }
+        }
+        val open = PendingIntent.getActivity(ctx, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = Notification.Builder(ctx, HOST_CHANNEL)
             .setSmallIcon(R.drawable.ic_urdevice_symbol)
             .setContentTitle(ctx.getString(R.string.input_host_notif_title))

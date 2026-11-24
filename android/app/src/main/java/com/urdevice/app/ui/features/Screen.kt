@@ -21,10 +21,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Mouse
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,6 +79,9 @@ object ScreenFeature : Feature {
     override fun tiles(modes: Map<String, FfiMode>) = listOf(FeatureTile("screen.h264.v1", "screen.h264.v1"))
 
     override val hasScreen get() = true
+
+    /** The picture fills the page, in either orientation. */
+    override fun fullScreen(tile: String) = true
 
     override fun onCoreStarted(context: Context, node: UrDeviceNode) {
         val app = context.applicationContext
@@ -348,14 +356,12 @@ private fun ScreenScreen(peer: FfiPeer) {
         }
     }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (shown == ScreenViewer.IDLE) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (shown == ScreenViewer.IDLE) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { ScreenViewer.start(peer.id) }, enabled = peer.status == "connected") {
                     Text(stringResource(R.string.screen_view))
                 }
-            } else {
-                OutlinedButton(onClick = { ScreenViewer.stop(null) }) { Text(stringResource(R.string.screen_stop)) }
             }
         }
         when {
@@ -364,24 +370,24 @@ private fun ScreenScreen(peer: FfiPeer) {
             shown == ScreenViewer.IDLE && ours && reason != null ->
                 Text(reasonText(reason!!, peer.name), color = MaterialTheme.colorScheme.error)
         }
-        if (shown >= ScreenViewer.STARTING && displays.size > 1) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                displays.forEachIndexed { i, d ->
-                    FilterChip(selected = i == selected, onClick = { ScreenViewer.pick(i) }, label = { Text(d.name) })
-                }
-            }
-        }
         if (shown >= ScreenViewer.STARTING) {
             val s = sessions[peer.id]
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                FilterChip(
-                    selected = control,
-                    onClick = {
-                        control = !control
-                        if (control) startControl(peer.id) else Core.node()?.let { InputFeature.end(it, peer.id) }
+                // Icons only, so the bar stays small when the phone is turned sideways.
+                FilledIconToggleButton(
+                    checked = control,
+                    onCheckedChange = {
+                        control = it
+                        if (it) startControl(peer.id) else Core.node()?.let { n -> InputFeature.end(n, peer.id) }
                     },
-                    label = { Text(stringResource(R.string.screen_control)) },
-                )
+                ) { Icon(Icons.Outlined.Mouse, stringResource(R.string.screen_control)) }
+                if (displays.size > 1) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        displays.forEachIndexed { i, d ->
+                            FilterChip(selected = i == selected, onClick = { ScreenViewer.pick(i) }, label = { Text(d.name) })
+                        }
+                    }
+                }
                 val line = when {
                     !control -> null
                     s?.refused?.isNotEmpty() == true -> stringResource(R.string.input_declined, peer.name)
@@ -392,12 +398,15 @@ private fun ScreenScreen(peer: FfiPeer) {
                         "accessibility_service" -> stringResource(R.string.input_missing_accessibility_service, peer.name)
                         else -> stringResource(R.string.input_missing_accessibility, peer.name)
                     }
-                    s?.active == true -> stringResource(R.string.screen_control_on)
                     else -> null
                 }
-                if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                Text(line ?: "", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 2)
+                IconButton(onClick = { ScreenViewer.stop(null) }) { Icon(Icons.Outlined.Close, stringResource(R.string.screen_stop)) }
             }
-            Picture(peer.id, size, control)
+            // The picture takes what is left of the page, in its own shape, whichever way the phone is held.
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Picture(peer.id, size, control)
+            }
         }
     }
 }
@@ -418,7 +427,6 @@ private fun Picture(peerId: String, size: Pair<Int, Int>, control: Boolean) {
 
     Box(
         Modifier
-            .fillMaxWidth()
             .aspectRatio(ratio)
             .clipToBounds()
             .background(Color.Black)
