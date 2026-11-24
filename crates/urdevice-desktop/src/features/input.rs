@@ -56,6 +56,26 @@ thread_local! {
     /// The laser dot on Windows: a small layered window, not a Slint one (see `laser_win`).
     #[cfg(windows)]
     static DOT: RefCell<Option<laser_win::Dot>> = const { RefCell::new(None) };
+
+    /// Keeps the display size up to date for the input back-end.
+    static SIZE_TIMER: slint::Timer = slint::Timer::default();
+}
+
+/// Tell the input back-end how big the display is, in the pixels the pointer
+/// moves in (logical pixels). Wayland cannot place the pointer, so the back-end
+/// works out a position from this. Runs on the UI thread.
+fn report_display_size(window: &slint::Weak<crate::ui::MainWindow>, input: &DesktopInput) {
+    use slint::winit_030::WinitWindowAccessor;
+    let Some(w) = window.upgrade() else { return };
+    w.window().with_winit_window(|win| {
+        if let Some(m) = win.current_monitor().or_else(|| win.primary_monitor()) {
+            let scale = m.scale_factor() as f32;
+            let size = m.size();
+            if scale > 0.0 {
+                input.set_display_size(size.width as f32 / scale, size.height as f32 / scale);
+            }
+        }
+    });
 }
 
 /// Draws the presenter's laser dot (R9b.3).
@@ -297,6 +317,17 @@ impl Feature for Input {
         ));
         let input = sink(secrets);
         svc.set_sink(input.clone());
+        {
+            let (window, input) = (ctx.window.clone(), input.clone());
+            report_display_size(&window, &input);
+            SIZE_TIMER.with(|t| {
+                t.start(
+                    slint::TimerMode::Repeated,
+                    std::time::Duration::from_secs(3),
+                    move || report_display_size(&window, &input),
+                );
+            });
+        }
         svc.set_overlay(Arc::new(Laser { fallback: input }));
         svc.set_events(Arc::new(Events {
             last: AtomicU64::new(0),
