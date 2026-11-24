@@ -1,8 +1,15 @@
 package com.urdevice.app.ui
 
 import android.text.format.DateUtils
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -119,11 +126,25 @@ fun HomeScreen(
     selected: String,
     onSelect: (String) -> Unit,
     onAdd: () -> Unit,
-    content: @Composable () -> Unit,
+    content: @Composable (picked: String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         DevicePicker(snap, selected, onSelect, onAdd)
-        content()
+        // Picking another device slides its page in: from the right for a device further down the list, else from the left.
+        AnimatedContent(
+            targetState = selected,
+            transitionSpec = {
+                val order = listOf(PICK_ME) + snap.peers.map { it.id }
+                val forward = order.indexOf(targetState) >= order.indexOf(initialState)
+                val slide = { width: Int -> if (forward) width / 8 else -width / 8 }
+                val enter = fadeIn(tween(220, delayMillis = 60)) +
+                    slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { slide(it) }
+                val exit = fadeOut(tween(110)) +
+                    slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -slide(it) }
+                (enter togetherWith exit).using(null)
+            },
+            label = "home-content",
+        ) { picked -> content(picked) }
         if (snap.peers.isEmpty() && selected == PICK_ME) {
             Text(stringResource(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
