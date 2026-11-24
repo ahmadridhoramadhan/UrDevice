@@ -23,6 +23,7 @@
     <string name="input_pointer_style">Pointer</string>
     <string name="input_pointer_laser">Laser dot</string>
     <string name="input_pointer_cursor">Desktop cursor</string>
+    <string name="input_cursor_touch_hint">Slide to move the cursor</string>
     <string name="input_mousepad_settings">Mousepad settings</string>
     <string name="input_sensitivity">Sensitivity</string>
     <string name="input_acceleration">Acceleration</string>

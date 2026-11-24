@@ -75,6 +75,12 @@ private const val LASER_EVERY_MS = 16L
 /** Turning the phone this far (radians) from where the laser button went down moves the dot across the screen. */
 private const val GYRO_RANGE = 0.35f
 
+/** Desktop-cursor mode: pixels the cursor moves per pixel the finger moves on the touch area. */
+private const val CURSOR_GAIN = 2.5f
+
+/** Desktop-cursor mode: pixels the cursor moves per radian the phone turns (a full screen is about 0.7 rad). */
+private const val GYRO_CURSOR_PX_PER_RAD = 2500f
+
 /** The Presenter's own settings: the pointer is the laser dot (false) or the desktop cursor (true). */
 private const val PRESENTER_PREFS = "presenter"
 private const val PREF_CURSOR = "cursor"
@@ -215,10 +221,29 @@ private fun LaserTouch(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var last = 0L
+                    var px = down.position.x
+                    var py = down.position.y
+                    var rx = 0f
+                    var ry = 0f
                     fun send(x: Float, y: Float) {
-                        val w = size.width.coerceAtLeast(1)
-                        val h = size.height.coerceAtLeast(1)
-                        pointAt(node, device, useCursor(), x / w, y / h, true)
+                        if (useCursor()) {
+                            // Like a touchpad: the cursor goes on from where it is, by how far the finger moved.
+                            rx += (x - px) * CURSOR_GAIN
+                            ry += (y - py) * CURSOR_GAIN
+                            px = x
+                            py = y
+                            val ix = rx.toInt()
+                            val iy = ry.toInt()
+                            if (ix != 0 || iy != 0) {
+                                rx -= ix
+                                ry -= iy
+                                runCatching { node.inputMove(device, ix, iy) }
+                            }
+                        } else {
+                            val w = size.width.coerceAtLeast(1)
+                            val h = size.height.coerceAtLeast(1)
+                            pointAt(node, device, false, x / w, y / h, true)
+                        }
                     }
                     send(down.position.x, down.position.y)
                     while (true) {
@@ -236,7 +261,10 @@ private fun LaserTouch(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(stringResource(R.string.input_laser_touch_hint), style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(if (useCursor()) R.string.input_cursor_touch_hint else R.string.input_laser_touch_hint),
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -259,6 +287,10 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean, useC
             private var yaw0 = 0f
             private var pitch0 = 0f
             private var started = false
+            private var prevYaw = 0f
+            private var prevPitch = 0f
+            private var rx = 0f
+            private var ry = 0f
             private var last = 0L
 
             override fun onSensorChanged(e: SensorEvent) {
@@ -270,10 +302,30 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean, useC
                     started = true
                     yaw0 = yaw
                     pitch0 = pitch
+                    prevYaw = yaw
+                    prevPitch = pitch
                 }
                 val now = e.timestamp / 1_000_000
                 if (now - last < LASER_EVERY_MS) return
                 last = now
+                if (useCursor()) {
+                    // The cursor goes on from where it is, by how far the phone turned since the last step.
+                    var stepYaw = yaw - prevYaw
+                    if (stepYaw > PI.toFloat()) stepYaw -= 2 * PI.toFloat()
+                    if (stepYaw < -PI.toFloat()) stepYaw += 2 * PI.toFloat()
+                    rx += stepYaw * GYRO_CURSOR_PX_PER_RAD
+                    ry += (pitch - prevPitch) * GYRO_CURSOR_PX_PER_RAD
+                    prevYaw = yaw
+                    prevPitch = pitch
+                    val ix = rx.toInt()
+                    val iy = ry.toInt()
+                    if (ix != 0 || iy != 0) {
+                        rx -= ix
+                        ry -= iy
+                        runCatching { node.inputMove(device, ix, iy) }
+                    }
+                    return
+                }
                 var dYaw = yaw - yaw0
                 // The compass heading wraps around at half a turn.
                 if (dYaw > PI.toFloat()) dYaw -= 2 * PI.toFloat()
