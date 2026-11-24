@@ -59,6 +59,7 @@ import com.urdevice.app.ui.ActiveBanner
 import com.urdevice.app.ui.DeviceScreen
 import com.urdevice.app.ui.Explain
 import com.urdevice.app.ui.HomeScreen
+import com.urdevice.app.ui.PICK_ME
 import com.urdevice.app.ui.LogScreen
 import com.urdevice.app.ui.Onboarding
 import com.urdevice.app.ui.PairBody
@@ -78,8 +79,6 @@ import kotlinx.coroutines.delay
 /** Pages with a back button (Android v1 in docs/mockup/urdevice-layout.html). */
 sealed interface Page {
     data object Home : Page
-    data object ThisDevice : Page
-    data class Device(val id: String) : Page
     data object Pair : Page
     data object Settings : Page
     data object Log : Page
@@ -123,6 +122,8 @@ private fun App() {
     val snackbar = remember { SnackbarHostState() }
     val stack = remember { mutableStateListOf<Page>(Page.Home) }
     var pairedName by rememberSaveable { mutableStateOf<String?>(null) }
+    // The device the Home picker shows: this device (PICK_ME) or a paired device's id. Null: the first paired device.
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
     var inOnboarding by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var notifNeeded by remember { mutableStateOf(needsNotificationPermission(ctx)) }
     var netNeeded by remember { mutableStateOf(needsNetworkPermission(ctx)) }
@@ -220,8 +221,6 @@ private fun App() {
                         Text(
                             when (page) {
                                 Page.Home -> stringResource(R.string.app_name)
-                                Page.ThisDevice -> stringResource(R.string.this_device)
-                                is Page.Device -> s.peers.firstOrNull { it.id == page.id }?.name ?: ""
                                 Page.Pair -> stringResource(R.string.add_device)
                                 Page.Settings -> stringResource(R.string.settings)
                                 Page.Log -> stringResource(R.string.set_log)
@@ -267,23 +266,25 @@ private fun App() {
                         )
                     }
                     when (page) {
-                        Page.Home -> HomeScreen(s, onThisDevice = { go(Page.ThisDevice) }, onPeer = { go(Page.Device(it)) }, onAdd = { go(Page.Pair) })
-                        Page.ThisDevice -> ThisDeviceScreen()
-                        is Page.Device -> {
-                            val peer = s.peers.firstOrNull { it.id == page.id }
-                            if (peer == null) {
-                                LaunchedEffect(page) { back() }
-                            } else {
-                                DeviceScreen(
-                                    s, peer,
-                                    onDisconnect = { runCatching { node()?.disconnect(peer.id) } },
-                                    onReconnect = { runCatching { node()?.reconnect(peer.id) } },
-                                    onForget = { runCatching { node()?.forget(peer.id) } },
-                                    onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
-                                    onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
-                                    onSettings = { go(Page.Settings) },
-                                    onStop = { node()?.stopActivity(it) },
-                                )
+                        Page.Home -> {
+                            val shown = picked?.takeIf { it == PICK_ME || s.peers.any { p -> p.id == it } }
+                                ?: s.peers.firstOrNull()?.id ?: PICK_ME
+                            HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) {
+                                val peer = s.peers.firstOrNull { it.id == shown }
+                                if (peer == null) {
+                                    ThisDeviceScreen()
+                                } else {
+                                    DeviceScreen(
+                                        s, peer,
+                                        onDisconnect = { runCatching { node()?.disconnect(peer.id) } },
+                                        onReconnect = { runCatching { node()?.reconnect(peer.id) } },
+                                        onForget = { runCatching { node()?.forget(peer.id) } },
+                                        onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
+                                        onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
+                                        onSettings = { go(Page.Settings) },
+                                        onStop = { node()?.stopActivity(it) },
+                                    )
+                                }
                             }
                         }
                         Page.Pair -> PairBody(

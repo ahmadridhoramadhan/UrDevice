@@ -13,14 +13,20 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -93,60 +99,111 @@ fun ActiveBanner(a: FfiActivity, onStop: () -> Unit) {
 private fun SectionLabel(t: String) =
     Text(t, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+/** The id the Home picker uses for this device. */
+const val PICK_ME = "me"
+
+/**
+ * The Home page (owner decision 2026-11-24): one picker at the top lists this device and every
+ * paired device, and the page below it shows what belongs to the picked one.
+ */
 @Composable
-fun HomeScreen(snap: FfiSnapshot, onThisDevice: () -> Unit, onPeer: (String) -> Unit, onAdd: () -> Unit) {
+fun HomeScreen(
+    snap: FfiSnapshot,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onAdd: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        DevicePicker(snap, selected, onSelect, onAdd)
+        content()
+        if (snap.peers.isEmpty() && selected == PICK_ME) {
+            Text(stringResource(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                Icon(Icons.Outlined.Add, null)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.add_device), fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+/** The dropdown that picks a device: it shows the picked one and opens a list of all of them. */
+@Composable
+private fun DevicePicker(snap: FfiSnapshot, selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
     val c = LocalModes.current
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    var open by remember { mutableStateOf(false) }
+    val peer = snap.peers.firstOrNull { it.id == selected }
+    Box(Modifier.fillMaxWidth()) {
         Card(
             colors = CardDefaults.cardColors(containerColor = c.header),
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onThisDevice),
+            modifier = Modifier.fillMaxWidth().clickable { open = true },
         ) {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(16.dp).heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(44.dp).background(Lime, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                    Icon(platformIcon("android"), null, tint = Forest)
+                    Icon(platformIcon(peer?.platform ?: "android"), null, tint = Forest)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(snap.me.name, color = c.onHeader, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text(stringResource(R.string.this_device), color = c.onHeader, style = MaterialTheme.typography.bodySmall)
+                    Text(peer?.name ?: snap.me.name, color = c.onHeader, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(
+                        if (peer != null) peerLine(peer) else stringResource(R.string.this_device),
+                        color = c.onHeader,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
-                snap.me.batteryPct?.let {
+                val battery = if (peer != null) peer.batteryPct.takeIf { peer.status == "connected" } else snap.me.batteryPct
+                battery?.let {
+                    val charging = peer?.charging == true
                     Box(Modifier.background(Lime, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                        Text(stringResource(R.string.battery_pct, it.toInt()), color = Forest, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (charging) stringResource(R.string.battery_charging, it.toInt()) else stringResource(R.string.battery_pct, it.toInt()),
+                            color = Forest,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
+                    Spacer(Modifier.width(6.dp))
                 }
+                Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.devices), tint = c.onHeader)
             }
         }
-        SectionLabel(stringResource(R.string.devices))
-        if (snap.peers.isEmpty()) {
-            Text(stringResource(R.string.no_devices), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        snap.peers.forEach { p ->
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth().clickable { onPeer(p.id) },
-            ) {
-                Row(Modifier.padding(14.dp).heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconBox(platformIcon(p.platform))
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(p.name, fontWeight = FontWeight.SemiBold)
-                        Text(peerShort(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = 280.dp)) {
+            DropdownMenuItem(
+                text = {
+                    Column {
+                        Text(snap.me.name, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.this_device), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (p.status == "connected") {
-                        p.batteryPct?.let {
-                            Text(stringResource(R.string.battery_pct, it.toInt()), style = MaterialTheme.typography.bodySmall)
-                            Spacer(Modifier.width(8.dp))
+                },
+                leadingIcon = { Icon(platformIcon("android"), null) },
+                trailingIcon = { if (selected == PICK_ME) Icon(Icons.Outlined.Check, null) },
+                onClick = { open = false; onSelect(PICK_ME) },
+            )
+            snap.peers.forEach { p ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(p.name, fontWeight = FontWeight.SemiBold)
+                            Text(peerShort(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
-                    Box(Modifier.size(9.dp).background(if (p.status == "connected") c.online else c.offline, CircleShape))
-                }
+                    },
+                    leadingIcon = { Icon(platformIcon(p.platform), null) },
+                    trailingIcon = {
+                        if (selected == p.id) {
+                            Icon(Icons.Outlined.Check, null)
+                        } else {
+                            Box(Modifier.size(9.dp).background(if (p.status == "connected") c.online else c.offline, CircleShape))
+                        }
+                    },
+                    onClick = { open = false; onSelect(p.id) },
+                )
             }
-        }
-        OutlinedButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Icon(Icons.Outlined.Add, null)
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.add_device), fontWeight = FontWeight.SemiBold)
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.add_device), fontWeight = FontWeight.SemiBold) },
+                leadingIcon = { Icon(Icons.Outlined.Add, null) },
+                onClick = { open = false; onAdd() },
+            )
         }
     }
 }
@@ -189,26 +246,7 @@ fun DeviceScreen(
                 Text(stringResource(R.string.forget), color = c.denyFg)
             }
         }
-        Card(colors = CardDefaults.cardColors(containerColor = c.header), modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(platformIcon(peer.platform), null, tint = c.onHeader, modifier = Modifier.size(32.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(peer.name, color = c.onHeader, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                    Text(
-                        peerLine(peer),
-                        color = c.onHeader, style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                peer.batteryPct?.let {
-                    Text(
-                        if (peer.charging) stringResource(R.string.battery_charging, it.toInt()) else stringResource(R.string.battery_pct, it.toInt()),
-                        color = c.onHeader, fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        }
-        // Feature cards under the header, for example the Bluetooth LE banner (R6.4).
+        // Feature cards, for example the Bluetooth LE banner (R6.4).
         allFeatures.forEach { it.DeviceBanner(peer) }
         if (peer.status != "connected") {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
