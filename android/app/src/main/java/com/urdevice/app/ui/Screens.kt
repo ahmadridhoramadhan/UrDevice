@@ -1,6 +1,8 @@
 package com.urdevice.app.ui
 
 import android.text.format.DateUtils
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,7 +26,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +42,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -50,6 +56,7 @@ import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.urdevice.app.Labels
@@ -128,27 +135,43 @@ fun HomeScreen(
     }
 }
 
-/** The dropdown that picks a device: it shows the picked one and opens a list of all of them. */
+/**
+ * The dropdown that picks a device. The closed form is a card with the picked device (icon with
+ * its online dot, name, connection line, battery) and a chevron that turns when it is open. The
+ * open form is a rounded list as wide as the card, with the picked row tinted.
+ */
 @Composable
 private fun DevicePicker(snap: FfiSnapshot, selected: String, onSelect: (String) -> Unit, onAdd: () -> Unit) {
     val c = LocalModes.current
     var open by remember { mutableStateOf(false) }
+    var width by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val turn by animateFloatAsState(if (open) 180f else 0f, tween(200), label = "picker-chevron")
     val peer = snap.peers.firstOrNull { it.id == selected }
-    Box(Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth().onSizeChanged { width = it.width }) {
         Card(
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = c.header),
             modifier = Modifier.fillMaxWidth().clickable { open = true },
         ) {
-            Row(Modifier.padding(16.dp).heightIn(min = 44.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).background(Lime, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                    Icon(platformIcon(peer?.platform ?: "android"), null, tint = Forest)
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box {
+                    Box(Modifier.size(46.dp).background(Lime, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                        Icon(platformIcon(peer?.platform ?: "android"), null, tint = Forest)
+                    }
+                    if (peer != null) {
+                        Box(
+                            Modifier.align(Alignment.BottomEnd).size(14.dp).background(c.header, CircleShape).padding(2.dp)
+                                .background(if (peer.status == "connected") c.online else c.offline, CircleShape),
+                        )
+                    }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(peer?.name ?: snap.me.name, color = c.onHeader, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text(
                         if (peer != null) peerLine(peer) else stringResource(R.string.this_device),
-                        color = c.onHeader,
+                        color = c.onHeader.copy(alpha = 0.8f),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -160,50 +183,98 @@ private fun DevicePicker(snap: FfiSnapshot, selected: String, onSelect: (String)
                             if (charging) stringResource(R.string.battery_charging, it.toInt()) else stringResource(R.string.battery_pct, it.toInt()),
                             color = Forest,
                             fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium,
                         )
                     }
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(8.dp))
                 }
-                Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.devices), tint = c.onHeader)
+                Box(
+                    Modifier.size(32.dp).background(c.onHeader.copy(alpha = 0.14f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Outlined.KeyboardArrowDown, stringResource(R.string.devices), tint = c.onHeader, modifier = Modifier.rotate(turn))
+                }
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = 280.dp)) {
-            DropdownMenuItem(
-                text = {
-                    Column {
-                        Text(snap.me.name, fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.this_device), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                leadingIcon = { Icon(platformIcon("android"), null) },
-                trailingIcon = { if (selected == PICK_ME) Icon(Icons.Outlined.Check, null) },
-                onClick = { open = false; onSelect(PICK_ME) },
-            )
-            snap.peers.forEach { p ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(p.name, fontWeight = FontWeight.SemiBold)
-                            Text(peerShort(p), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    },
-                    leadingIcon = { Icon(platformIcon(p.platform), null) },
-                    trailingIcon = {
-                        if (selected == p.id) {
-                            Icon(Icons.Outlined.Check, null)
-                        } else {
-                            Box(Modifier.size(9.dp).background(if (p.status == "connected") c.online else c.offline, CircleShape))
-                        }
-                    },
-                    onClick = { open = false; onSelect(p.id) },
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            modifier = Modifier.width(with(density) { width.toDp() }),
+            offset = DpOffset(0.dp, 8.dp),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 10.dp,
+        ) {
+            Column(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                PickerRow(
+                    icon = platformIcon("android"),
+                    title = snap.me.name,
+                    subtitle = stringResource(R.string.this_device),
+                    selected = selected == PICK_ME,
+                    dot = null,
+                    onClick = { open = false; onSelect(PICK_ME) },
                 )
+                if (snap.peers.isNotEmpty()) {
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp, horizontal = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                    Text(
+                        stringResource(R.string.devices),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                    )
+                }
+                snap.peers.forEach { p ->
+                    PickerRow(
+                        icon = platformIcon(p.platform),
+                        title = p.name,
+                        subtitle = peerShort(p),
+                        selected = selected == p.id,
+                        dot = if (p.status == "connected") c.online else c.offline,
+                        onClick = { open = false; onSelect(p.id) },
+                    )
+                }
+                HorizontalDivider(Modifier.padding(vertical = 4.dp, horizontal = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { open = false; onAdd() }
+                        .padding(10.dp).heightIn(min = 44.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(40.dp).background(Lime.copy(alpha = 0.4f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.Add, null, tint = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.add_device), fontWeight = FontWeight.SemiBold)
+                }
             }
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.add_device), fontWeight = FontWeight.SemiBold) },
-                leadingIcon = { Icon(Icons.Outlined.Add, null) },
-                onClick = { open = false; onAdd() },
-            )
+        }
+    }
+}
+
+/** One device in the open picker. The picked one has a tinted background and a check mark. */
+@Composable
+private fun PickerRow(icon: ImageVector, title: String, subtitle: String, selected: Boolean, dot: Color?, onClick: () -> Unit) {
+    val tint = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(tint).clickable(onClick = onClick)
+            .padding(10.dp).heightIn(min = 44.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).background(if (selected) Lime else MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = if (selected) Forest else MaterialTheme.colorScheme.primary)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        }
+        if (selected) {
+            Icon(Icons.Outlined.Check, null, tint = MaterialTheme.colorScheme.onSurface)
+        } else if (dot != null) {
+            Box(Modifier.size(9.dp).background(dot, CircleShape))
         }
     }
 }

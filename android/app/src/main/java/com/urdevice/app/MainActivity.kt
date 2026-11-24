@@ -122,7 +122,7 @@ private fun App() {
     val snackbar = remember { SnackbarHostState() }
     val stack = remember { mutableStateListOf<Page>(Page.Home) }
     var pairedName by rememberSaveable { mutableStateOf<String?>(null) }
-    // The device the Home picker shows: this device (PICK_ME) or a paired device's id. Null: the first paired device.
+    // The device the Home picker shows: this device (PICK_ME) or a paired device's id. Null: this device.
     var picked by rememberSaveable { mutableStateOf<String?>(null) }
     var inOnboarding by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var notifNeeded by remember { mutableStateOf(needsNotificationPermission(ctx)) }
@@ -268,7 +268,7 @@ private fun App() {
                     when (page) {
                         Page.Home -> {
                             val shown = picked?.takeIf { it == PICK_ME || s.peers.any { p -> p.id == it } }
-                                ?: s.peers.firstOrNull()?.id ?: PICK_ME
+                                ?: PICK_ME
                             HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) {
                                 val peer = s.peers.firstOrNull { it.id == shown }
                                 if (peer == null) {
