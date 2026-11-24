@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaMetadata
+import android.media.VolumeProvider
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -229,10 +230,39 @@ class MediaHost(private val context: Context) : MediaHostFfi {
                 audio.adjustSuggestedStreamVolume(direction, stream, 0)
             }
             if (audio.getStreamVolume(stream) == now) {
+                // Last resort: ask the playing app's media session. The system applies it itself.
+                if (volumeViaSession(want, audio.getStreamMaxVolume(stream))) return
                 Log.w("UrDevice", "the music volume does not move")
                 return
             }
         }
+    }
+
+    /** Set the volume through the first media session that allows it (`MediaController.setVolumeTo`). */
+    private fun volumeViaSession(want: Int, max: Int): Boolean {
+        val list = controllers() ?: return false
+        for ((_, c) in list) {
+            val info = c.playbackInfo ?: continue
+            if (info.volumeControl == VolumeProvider.VOLUME_CONTROL_FIXED || info.maxVolume <= 0) continue
+            val index = if (max > 0) (want.toFloat() / max * info.maxVolume).roundToInt() else want
+            c.setVolumeTo(index.coerceIn(0, info.maxVolume), 0)
+            Log.i("UrDevice", "volume set through the media session")
+            return true
+        }
+        return false
+    }
+
+    /** Mute or unmute through the first media session that allows it. */
+    private fun muteViaSession(muted: Boolean): Boolean {
+        val list = controllers() ?: return false
+        for ((_, c) in list) {
+            val info = c.playbackInfo ?: continue
+            if (info.volumeControl == VolumeProvider.VOLUME_CONTROL_FIXED) continue
+            c.adjustVolume(if (muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE, 0)
+            Log.i("UrDevice", "mute set through the media session")
+            return true
+        }
+        return false
     }
 
     /**
@@ -246,6 +276,7 @@ class MediaHost(private val context: Context) : MediaHostFfi {
         if (audio.isStreamMute(stream) == muted) return
         audio.adjustSuggestedStreamVolume(adjust, stream, 0)
         if (audio.isStreamMute(stream) == muted) return
+        if (muteViaSession(muted)) return
         if (muted) {
             volumeBeforeMute = audio.getStreamVolume(stream)
             setMusicVolume(0)
