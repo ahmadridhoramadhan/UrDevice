@@ -188,7 +188,7 @@ class MediaHost(private val context: Context) : MediaHostFfi {
         when (change) {
             is FfiVolumeChange.Set -> {
                 val max = audio.getStreamMaxVolume(stream)
-                audio.setStreamVolume(stream, (change.value.coerceIn(0f, 1f) * max).roundToInt(), 0)
+                setMusicVolume((change.value.coerceIn(0f, 1f) * max).roundToInt())
             }
             is FfiVolumeChange.Step -> {
                 // The protocol step is 2 % of the range; always move at least one system step.
@@ -196,7 +196,7 @@ class MediaHost(private val context: Context) : MediaHostFfi {
                 val now = audio.getStreamVolume(stream)
                 var target = (now + change.steps * 0.02f * max).roundToInt()
                 if (change.steps != 0 && target == now) target = now + Integer.signum(change.steps)
-                audio.setStreamVolume(stream, target.coerceIn(0, max), 0)
+                setMusicVolume(target)
             }
             is FfiVolumeChange.Mute ->
                 audio.adjustStreamVolume(
@@ -206,9 +206,35 @@ class MediaHost(private val context: Context) : MediaHostFfi {
                 )
         }
         true
-    } catch (e: SecurityException) {
-        Log.w("UrDevice", "volume change refused")
+    } catch (e: Exception) {
+        // Not only SecurityException: a failed change must never take the core's worker down.
+        Log.w("UrDevice", "volume change refused: ${e.javaClass.simpleName}")
         false
+    }
+
+    /**
+     * Put the music volume at step [target]. Some phones ignore `setStreamVolume` from a service,
+     * so when the volume did not move, step it with `adjustStreamVolume` until it gets there.
+     */
+    private fun setMusicVolume(target: Int) {
+        val stream = AudioManager.STREAM_MUSIC
+        val want = target.coerceIn(0, audio.getStreamMaxVolume(stream))
+        audio.setStreamVolume(stream, want, 0)
+        var guard = audio.getStreamMaxVolume(stream)
+        while (guard-- > 0) {
+            val now = audio.getStreamVolume(stream)
+            if (now == want) break
+            audio.adjustStreamVolume(
+                stream,
+                if (want > now) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+                0,
+            )
+            // The system did not move at all: stop instead of looping.
+            if (audio.getStreamVolume(stream) == now) {
+                Log.w("UrDevice", "the music volume does not move")
+                break
+            }
+        }
     }
 
     private companion object {

@@ -871,6 +871,10 @@ export component MainWindow inherits Window {
                                         row: i / 3;
                                         col: mod(i, 3);
                                         height: 84px;
+                                        // Equal columns: no tile asks for more width than the others.
+                                        preferred-width: 0px;
+                                        min-width: 0px;
+                                        horizontal-stretch: 1;
                                         accessible-role: button;
                                         accessible-checkable: t.toggle;
                                         accessible-checked: t.on;
