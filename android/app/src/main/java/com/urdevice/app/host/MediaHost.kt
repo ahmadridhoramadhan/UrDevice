@@ -183,6 +183,9 @@ class MediaHost(private val context: Context) : MediaHostFfi {
         return true
     }
 
+    /** The music volume before a mute that had to be done by setting it to 0. */
+    private var volumeBeforeMute = -1
+
     override fun volume(change: FfiVolumeChange): Boolean = try {
         val stream = AudioManager.STREAM_MUSIC
         when (change) {
@@ -198,12 +201,7 @@ class MediaHost(private val context: Context) : MediaHostFfi {
                 if (change.steps != 0 && target == now) target = now + Integer.signum(change.steps)
                 setMusicVolume(target)
             }
-            is FfiVolumeChange.Mute ->
-                audio.adjustStreamVolume(
-                    stream,
-                    if (change.muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
-                    0,
-                )
+            is FfiVolumeChange.Mute -> setMusicMute(change.muted)
         }
         true
     } catch (e: Exception) {
@@ -213,27 +211,47 @@ class MediaHost(private val context: Context) : MediaHostFfi {
     }
 
     /**
-     * Put the music volume at step [target]. Some phones ignore `setStreamVolume` from a service,
-     * so when the volume did not move, step it with `adjustStreamVolume` until it gets there.
+     * Put the music volume at step [target]. Some phones (a vivo on Android 16 was seen) ignore
+     * `setStreamVolume` and `adjustStreamVolume` and only follow what the volume keys do, so when
+     * the volume did not move, step it the way the keys do (`adjustSuggestedStreamVolume`).
      */
     private fun setMusicVolume(target: Int) {
         val stream = AudioManager.STREAM_MUSIC
         val want = target.coerceIn(0, audio.getStreamMaxVolume(stream))
         audio.setStreamVolume(stream, want, 0)
-        var guard = audio.getStreamMaxVolume(stream)
+        var guard = audio.getStreamMaxVolume(stream) + 1
         while (guard-- > 0) {
             val now = audio.getStreamVolume(stream)
-            if (now == want) break
-            audio.adjustStreamVolume(
-                stream,
-                if (want > now) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
-                0,
-            )
-            // The system did not move at all: stop instead of looping.
+            if (now == want) return
+            val direction = if (want > now) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+            audio.adjustStreamVolume(stream, direction, 0)
+            if (audio.getStreamVolume(stream) == now) {
+                audio.adjustSuggestedStreamVolume(direction, stream, 0)
+            }
             if (audio.getStreamVolume(stream) == now) {
                 Log.w("UrDevice", "the music volume does not move")
-                break
+                return
             }
+        }
+    }
+
+    /**
+     * Mute or unmute the music. If the system ignores that, mute by setting the volume to 0 and
+     * unmute by going back to the volume from before.
+     */
+    private fun setMusicMute(muted: Boolean) {
+        val stream = AudioManager.STREAM_MUSIC
+        val adjust = if (muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE
+        audio.adjustStreamVolume(stream, adjust, 0)
+        if (audio.isStreamMute(stream) == muted) return
+        audio.adjustSuggestedStreamVolume(adjust, stream, 0)
+        if (audio.isStreamMute(stream) == muted) return
+        if (muted) {
+            volumeBeforeMute = audio.getStreamVolume(stream)
+            setMusicVolume(0)
+        } else {
+            val max = audio.getStreamMaxVolume(stream)
+            setMusicVolume(if (volumeBeforeMute > 0) volumeBeforeMute else max / 2)
         }
     }
 
