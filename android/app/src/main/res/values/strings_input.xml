@@ -20,6 +20,9 @@
     <string name="input_middle_click">Middle</string>
     <string name="input_right_click">Right</string>
     <string name="input_presenter_settings">Presenter settings</string>
+    <string name="input_pointer_style">Pointer</string>
+    <string name="input_pointer_laser">Laser dot</string>
+    <string name="input_pointer_cursor">Desktop cursor</string>
     <string name="input_mousepad_settings">Mousepad settings</string>
     <string name="input_sensitivity">Sensitivity</string>
     <string name="input_acceleration">Acceleration</string>

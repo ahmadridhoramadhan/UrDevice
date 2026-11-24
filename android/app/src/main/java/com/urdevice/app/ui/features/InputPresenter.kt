@@ -75,6 +75,23 @@ private const val LASER_EVERY_MS = 16L
 /** Turning the phone this far (radians) from where the laser button went down moves the dot across the screen. */
 private const val GYRO_RANGE = 0.35f
 
+/** The Presenter's own settings: the pointer is the laser dot (false) or the desktop cursor (true). */
+private const val PRESENTER_PREFS = "presenter"
+private const val PREF_CURSOR = "cursor"
+
+/**
+ * Point at `x`, `y` (0.0 to 1.0 of the host's display), or stop pointing with `on = false`. As a
+ * laser the host draws the red dot. As a cursor the host's own mouse pointer moves there, and
+ * there is nothing to hide when the finger lifts.
+ */
+private fun pointAt(node: UrDeviceNode, device: String, cursor: Boolean, x: Float, y: Float, on: Boolean) {
+    if (!cursor) {
+        runCatching { node.inputLaser(device, x, y, on) }
+    } else if (on) {
+        runCatching { node.inputAbs(device, x.coerceIn(0f, 1f), y.coerceIn(0f, 1f)) }
+    }
+}
+
 private fun tap(node: UrDeviceNode, device: String, usage: UInt) {
     runCatching { node.inputTapKey(device, usage, 0u) }
 }
@@ -94,6 +111,8 @@ fun PresenterPad(node: UrDeviceNode, device: String, enabled: Boolean, modifier:
     val previous = rememberUpdatedState { tap(node, device, KEY_LEFT) }
     VolumeKeys(enabled = enabled, onPrevious = { previous.value() }, onNext = { next.value() })
     val openPage = LocalOpenFeaturePage.current
+    val prefs = LocalContext.current.getSharedPreferences(PRESENTER_PREFS, Context.MODE_PRIVATE)
+    val useCursor = { prefs.getBoolean(PREF_CURSOR, false) }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -103,8 +122,8 @@ fun PresenterPad(node: UrDeviceNode, device: String, enabled: Boolean, modifier:
             }
         }
         SlideTimer()
-        LaserTouch(node, device, enabled, Modifier.weight(1f))
-        LaserGyro(node, device, enabled)
+        LaserTouch(node, device, enabled, useCursor, Modifier.weight(1f))
+        LaserGyro(node, device, enabled, useCursor)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
                 onClick = { tap(node, device, KEY_F5) },
@@ -178,7 +197,13 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 
 /** The laser by touch: the dot follows the finger on this area and goes away when it lifts (R9b.3). */
 @Composable
-private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean, modifier: Modifier = Modifier) {
+private fun LaserTouch(
+    node: UrDeviceNode,
+    device: String,
+    enabled: Boolean,
+    useCursor: () -> Boolean,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier
             .fillMaxWidth()
@@ -193,7 +218,7 @@ private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean, mod
                     fun send(x: Float, y: Float) {
                         val w = size.width.coerceAtLeast(1)
                         val h = size.height.coerceAtLeast(1)
-                        runCatching { node.inputLaser(device, x / w, y / h, true) }
+                        pointAt(node, device, useCursor(), x / w, y / h, true)
                     }
                     send(down.position.x, down.position.y)
                     while (true) {
@@ -206,7 +231,7 @@ private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean, mod
                             send(change.position.x, change.position.y)
                         }
                     }
-                    runCatching { node.inputLaser(device, 0f, 0f, false) }
+                    pointAt(node, device, useCursor(), 0f, 0f, false)
                 }
             },
         contentAlignment = Alignment.Center,
@@ -220,7 +245,7 @@ private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean, mod
  * screen and follows the rotation (R9b.3). It goes away when the button is released.
  */
 @Composable
-private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
+private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean, useCursor: () -> Boolean) {
     val ctx = LocalContext.current
     val sensors = remember { ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val sensor = remember { sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) }
@@ -255,7 +280,7 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
                 if (dYaw < -PI.toFloat()) dYaw += 2 * PI.toFloat()
                 val x = 0.5f + dYaw / (2 * GYRO_RANGE)
                 val y = 0.5f + (pitch - pitch0) / (2 * GYRO_RANGE)
-                runCatching { node.inputLaser(device, x, y, true) }
+                pointAt(node, device, useCursor(), x, y, true)
             }
 
             override fun onAccuracyChanged(s: Sensor?, accuracy: Int) {}
@@ -263,7 +288,7 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
         sensors.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
         onDispose {
             sensors.unregisterListener(listener)
-            runCatching { node.inputLaser(device, 0f, 0f, false) }
+            pointAt(node, device, useCursor(), 0f, 0f, false)
         }
     }
 
@@ -367,8 +392,33 @@ private fun SlideTimer() {
 @Composable
 fun PresenterSettings() {
     val t = PresenterTimer
+    val prefs = LocalContext.current.getSharedPreferences(PRESENTER_PREFS, Context.MODE_PRIVATE)
+    var cursor by remember { mutableStateOf(prefs.getBoolean(PREF_CURSOR, false)) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.input_presenter_settings), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.input_pointer_style))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            val pick = { value: Boolean ->
+                cursor = value
+                prefs.edit().putBoolean(PREF_CURSOR, value).apply()
+            }
+            val choice = Modifier.weight(1f).heightIn(min = 48.dp)
+            if (cursor) {
+                OutlinedButton(onClick = { pick(false) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_laser))
+                }
+                Button(onClick = { pick(true) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_cursor))
+                }
+            } else {
+                Button(onClick = { pick(false) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_laser))
+                }
+                OutlinedButton(onClick = { pick(true) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_cursor))
+                }
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.input_timer_length, t.totalMin), modifier = Modifier.weight(1f))
             OutlinedButton(onClick = { t.totalMin = (t.totalMin - 5).coerceAtLeast(5) }) { Text("-5") }

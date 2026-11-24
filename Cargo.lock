@@ -7610,6 +7610,7 @@ dependencies = [
  "urdevice-media",
  "urdevice-platform",
  "urdevice-proto",
+ "windows",
  "zune-jpeg",
 ]
 

@@ -35,8 +35,12 @@ use urdevice_platform::features::input::{
 use urdevice_core::node::PeerView;
 
 use super::{Feature, FeatureCtx, TileSpec};
-use crate::ui::{InputFeature, LaserWindow};
+use crate::ui::InputFeature;
+#[cfg(not(windows))]
+use crate::ui::LaserWindow;
 
+#[cfg(windows)]
+mod laser_win;
 mod remote;
 
 pub(crate) struct Input;
@@ -46,7 +50,12 @@ thread_local! {
     static LAST_NAME: RefCell<String> = const { RefCell::new(String::new()) };
 
     /// The laser window. Slint windows live on the UI thread.
+    #[cfg(not(windows))]
     static LASER: RefCell<Option<LaserWindow>> = const { RefCell::new(None) };
+
+    /// The laser dot on Windows: a small layered window, not a Slint one (see `laser_win`).
+    #[cfg(windows)]
+    static DOT: RefCell<Option<laser_win::Dot>> = const { RefCell::new(None) };
 }
 
 /// Draws the presenter's laser dot (R9b.3).
@@ -81,6 +90,29 @@ impl Overlay for Laser {
 
 /// Show the dot at `pos` (0.0 to 1.0 of the primary display), or hide it.
 /// Runs on the UI thread.
+#[cfg(windows)]
+fn draw(pos: Option<(f32, f32)>) -> Result<(), String> {
+    DOT.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some((x, y)) = pos else {
+            if let Some(dot) = slot.as_mut() {
+                dot.hide();
+            }
+            return Ok(());
+        };
+        if slot.is_none() {
+            *slot = Some(laser_win::Dot::new()?);
+        }
+        match slot.as_mut() {
+            Some(dot) => dot.show_at(x, y),
+            None => Ok(()),
+        }
+    })
+}
+
+/// Show the dot at `pos` (0.0 to 1.0 of the primary display), or hide it.
+/// Runs on the UI thread.
+#[cfg(not(windows))]
 fn draw(pos: Option<(f32, f32)>) -> Result<(), String> {
     LASER.with(|cell| {
         let mut slot = cell.borrow_mut();
@@ -109,6 +141,7 @@ fn draw(pos: Option<(f32, f32)>) -> Result<(), String> {
 
 /// Make the window fill the primary display and let clicks through. Done on
 /// every show: cheap, and it follows a changed monitor setup.
+#[cfg(not(windows))]
 fn cover_display(w: &LaserWindow) {
     use slint::winit_030::WinitWindowAccessor;
     w.window().with_winit_window(|win| {
