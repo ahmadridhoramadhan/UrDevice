@@ -5,6 +5,9 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.provider.Settings
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,20 +19,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -73,18 +78,16 @@ import kotlinx.coroutines.flow.update
  * Media control (#20, R11, design §9.4, §13): the media remote for another device, and the host
  * adapter that lets other devices control this phone.
  *
- * The screen shows one tab per media app on the host, a seek bar, only the controls the session
- * supports, the host's volume and mute, and an on/off switch. Turning it off tells the host to stop
- * sending updates (R11.6).
+ * The remote is not a tile. It is a "Media player" panel on the device page, under the device
+ * info and above the file transfers, with an Active switch (off tells the host to stop sending
+ * updates, R11.6). It shows tabs when the host has more than one media app, the track, a seek
+ * bar, only the controls the session supports, and the host's volume and mute. No shuffle or
+ * repeat (R11).
  */
 object MediaFeature : Feature {
     override val id = "media"
 
-    override fun tiles(modes: Map<String, FfiMode>) = listOf(FeatureTile("media.v1", "media.v1"))
-
-    override val hasScreen get() = true
-
-    /** Bumped when the core has news, so the screen reads the state again now. */
+    /** Bumped when the core has news, so the panel reads the state again now. */
     private val updates = MutableStateFlow(0)
 
     /** The last refusal from a host (`denied`, `declined`, ...), until the next state arrives. */
@@ -110,9 +113,18 @@ object MediaFeature : Feature {
         })
     }
 
+    /** The player of a connected device whose host lists media, under the device info. */
     @Composable
-    override fun Screen(peer: FfiPeer, tile: String) {
-        MediaScreen(peer)
+    override fun DeviceBanner(peer: FfiPeer) {
+        if (peer.status == "connected" && peer.remotePermissions.any { it.capability == "media.v1" }) {
+            MediaPanel(peer)
+        }
+    }
+
+    /** Why this phone needs notification access to be controlled (R11.4). */
+    @Composable
+    override fun ThisDevice() {
+        ListenerAccessCard(LocalContext.current)
     }
 
     internal fun isOff(peer: String) = peer in off
@@ -126,38 +138,41 @@ object MediaFeature : Feature {
 }
 
 @Composable
-private fun MediaScreen(peer: FfiPeer) {
-    val context = LocalContext.current
+private fun MediaPanel(peer: FfiPeer) {
     val node = Core.node()
     var on by remember(peer.id) { mutableStateOf(!MediaFeature.isOff(peer.id)) }
     var state by remember(peer.id) { mutableStateOf<FfiMediaState?>(null) }
     var selected by remember(peer.id) { mutableStateOf("") }
     val tick by MediaFeature.updateFlow.collectAsStateCompat()
     val refusal by MediaFeature.refusedFlow.collectAsStateCompat()
-    val connected = peer.status == "connected"
     val denied = peer.remotePermissions.any { it.capability == "media.v1" && it.mode == FfiMode.DENY }
 
-    // Turn the player on for this host while the screen is open and the switch is on.
-    LaunchedEffect(peer.id, on, connected) {
-        if (on && connected) runCatching { node?.mediaSubscribe(peer.id, true) }
+    // Turn the player on for this host while the panel is shown and the switch is on.
+    LaunchedEffect(peer.id, on) {
+        if (on) runCatching { node?.mediaSubscribe(peer.id, true) }
     }
     // Read the newest state twice a second, and at once when the core says there is news. The core
     // moves the position of a playing session forward, so the seek bar keeps running.
     LaunchedEffect(peer.id, on, tick) {
         while (true) {
-            state = if (on && connected && !denied) node?.mediaState(peer.id) else null
+            state = if (on && !denied) node?.mediaState(peer.id) else null
             delay(500)
         }
     }
 
-    Column(
-        Modifier.verticalScroll(rememberScrollState()).padding(top = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ListenerAccessCard(context)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.media_player_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(stringResource(R.string.media_active), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp))
             Switch(
-                checked = on,
+                checked = on && !denied,
+                enabled = !denied,
                 onCheckedChange = {
                     on = it
                     MediaFeature.setOff(peer.id, !it)
@@ -165,14 +180,12 @@ private fun MediaScreen(peer: FfiPeer) {
                     if (!it) state = null
                 },
             )
-            Spacer(Modifier.width(12.dp))
-            Text(stringResource(R.string.media_show, peer.name), Modifier.weight(1f))
         }
         val st = state
+        // "Player off" needs no line: the switch says it.
         val message = when {
-            !connected -> stringResource(R.string.media_offline, peer.name)
             denied -> stringResource(R.string.media_denied, peer.name)
-            !on -> stringResource(R.string.media_off)
+            !on -> null
             st == null && refusal != null -> stringResource(R.string.media_refused, peer.name)
             st == null -> stringResource(R.string.media_waiting, peer.name)
             st.unavailable == "listener_permission" -> stringResource(R.string.media_listener_off, peer.name)
@@ -181,24 +194,135 @@ private fun MediaScreen(peer: FfiPeer) {
             else -> null
         }
         if (message != null) {
-            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
-        if (st != null && on && connected && !denied) {
-            if (st.sessions.isNotEmpty()) {
-                val current = st.sessions.firstOrNull { it.id == selected } ?: st.sessions.first()
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    st.sessions.forEach { s ->
-                        FilterChip(
-                            selected = s.id == current.id,
-                            onClick = { selected = s.id },
-                            label = { Text(s.appName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            modifier = Modifier.heightIn(min = 44.dp),
-                        )
+        if (st != null && on && !denied && st.sessions.isNotEmpty()) {
+            val current = st.sessions.firstOrNull { it.id == selected } ?: st.sessions.first()
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                Column {
+                    if (st.sessions.size > 1) {
+                        MediaTabs(st.sessions, current.id) { selected = it }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                    }
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Player(peer, node, current)
+                        if (st.canVolume) VolumeRow(peer, node, st)
                     }
                 }
-                SessionCard(peer, node, current)
             }
-            if (st.canVolume) VolumeCard(peer, node, st)
+        }
+    }
+}
+
+/** One tab per media app, only when the host has more than one. */
+@Composable
+private fun MediaTabs(sessions: List<FfiMediaSession>, currentId: String, onPick: (String) -> Unit) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()).padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        sessions.forEach { s ->
+            val active = s.id == currentId
+            val fg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                Modifier
+                    .heightIn(min = 44.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(if (active) MaterialTheme.colorScheme.primary else Color.Transparent)
+                    .clickable { onPick(s.id) }
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(7.dp).background(fg, CircleShape))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    s.appName,
+                    color = fg,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** The track, the seek bar, and the controls the session supports. */
+@Composable
+private fun Player(peer: FfiPeer, node: UrDeviceNode?, s: FfiMediaSession) {
+    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Artwork(s.artworkPng)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                s.appName,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                s.title.ifEmpty { stringResource(R.string.media_unknown_title) },
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (s.artist.isNotEmpty()) {
+                Text(s.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+    val duration = s.durationMs?.toLong()
+    if (s.canSeek && duration != null && duration > 0) {
+        SeekBar(s, duration) { ms ->
+            runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.SEEK, ms.toULong()) }
+        }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        if (s.canPrev) {
+            IconButton(
+                onClick = { runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.PREV, 0uL) } },
+                modifier = Modifier.size(48.dp),
+            ) { Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_previous)) }
+        }
+        if (s.canPlayPause) {
+            Spacer(Modifier.width(8.dp))
+            val playing = s.state == FfiPlayState.PLAYING
+            FilledIconButton(
+                onClick = { runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.PLAY_PAUSE, 0uL) } },
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    stringResource(if (playing) R.string.media_pause else R.string.media_play),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+        }
+        if (s.canNext) {
+            IconButton(
+                onClick = { runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.NEXT, 0uL) } },
+                modifier = Modifier.size(48.dp),
+            ) { Icon(Icons.Filled.SkipNext, stringResource(R.string.media_next)) }
+        }
+    }
+}
+
+/** The cover, or a music note on the accent colour when there is none. */
+@Composable
+private fun Artwork(png: ByteArray) {
+    val bitmap = remember(png) {
+        if (png.isEmpty()) null else runCatching { BitmapFactory.decodeByteArray(png, 0, png.size) }.getOrNull()
+    }
+    Box(
+        Modifier.size(96.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primary),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(bitmap.asImageBitmap(), null, modifier = Modifier.size(96.dp), contentScale = ContentScale.Crop)
+        } else {
+            Icon(Icons.Filled.MusicNote, null, modifier = Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onPrimary)
         }
     }
 }
@@ -209,85 +333,6 @@ private fun <T> MutableStateFlow<T>.collectAsStateCompat(): androidx.compose.run
     val s = remember(this) { mutableStateOf(value) }
     LaunchedEffect(this) { collect { s.value = it } }
     return s
-}
-
-@Composable
-private fun SessionCard(peer: FfiPeer, node: UrDeviceNode?, s: FfiMediaSession) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Artwork(s.artworkPng)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        s.title.ifEmpty { stringResource(R.string.media_unknown_title) },
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (s.artist.isNotEmpty()) {
-                        Text(s.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    Text(s.appName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            val duration = s.durationMs?.toLong()
-            if (s.canSeek && duration != null && duration > 0) {
-                SeekBar(s, duration) { ms ->
-                    runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.SEEK, ms.toULong()) }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                if (s.canPrev) {
-                    IconButton(
-                        onClick = { runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.PREV, 0uL) } },
-                        modifier = Modifier.size(48.dp),
-                    ) { Icon(Icons.Filled.SkipPrevious, stringResource(R.string.media_previous)) }
-                }
-                if (s.canPlayPause) {
-                    Spacer(Modifier.width(8.dp))
-                    val playing = s.state == FfiPlayState.PLAYING
-                    FilledIconButton(
-                        onClick = { runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.PLAY_PAUSE, 0uL) } },
-                        modifier = Modifier.size(56.dp),
-                    ) {
-                        Icon(
-                            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            stringResource(if (playing) R.string.media_pause else R.string.media_play),
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                }
-                if (s.canNext) {
-                    IconButton(
-                        onClick = { runCatching { node?.mediaCommand(peer.id, s.id, FfiMediaCmd.NEXT, 0uL) } },
-                        modifier = Modifier.size(48.dp),
-                    ) { Icon(Icons.Filled.SkipNext, stringResource(R.string.media_next)) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Artwork(png: ByteArray) {
-    val bitmap = remember(png) {
-        if (png.isEmpty()) null else runCatching { BitmapFactory.decodeByteArray(png, 0, png.size) }.getOrNull()
-    }
-    Box(
-        Modifier.size(96.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (bitmap != null) {
-            Image(
-                bitmap.asImageBitmap(), null,
-                modifier = Modifier.size(96.dp),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
-            Icon(Icons.Outlined.PlayCircle, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-        }
-    }
 }
 
 @Composable
@@ -314,47 +359,46 @@ private fun SeekBar(s: FfiMediaSession, durationMs: Long, onSeek: (Long) -> Unit
     }
 }
 
+/** The host's volume and mute, in the player card. */
 @Composable
-private fun VolumeCard(peer: FfiPeer, node: UrDeviceNode?, st: FfiMediaState) {
+private fun VolumeRow(peer: FfiPeer, node: UrDeviceNode?, st: FfiMediaState) {
     var dragging by remember { mutableStateOf(false) }
     var drag by remember { mutableFloatStateOf(0f) }
     var lastSent by remember { mutableStateOf(0L) }
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = { runCatching { node?.mediaVolume(peer.id, FfiVolumeChange.Mute(!st.muted)) } },
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    if (st.muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                    stringResource(if (st.muted) R.string.media_unmute else R.string.media_mute),
-                )
-            }
-            val shown = if (dragging) drag else if (st.muted) 0f else st.volume
-            Slider(
-                value = shown.coerceIn(0f, 1f),
-                onValueChange = {
-                    dragging = true
-                    drag = it
-                    // At most one message every 150 ms while dragging.
-                    val now = System.currentTimeMillis()
-                    if (now - lastSent >= 150) {
-                        lastSent = now
-                        runCatching { node?.mediaVolume(peer.id, FfiVolumeChange.Set(it)) }
-                    }
-                },
-                onValueChangeFinished = {
-                    dragging = false
-                    runCatching { node?.mediaVolume(peer.id, FfiVolumeChange.Set(drag)) }
-                },
-                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
-            )
-            Text(
-                "${(shown * 100).toInt()}%",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.width(44.dp).padding(end = 8.dp),
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = { runCatching { node?.mediaVolume(peer.id, FfiVolumeChange.Mute(!st.muted)) } },
+            modifier = Modifier.size(48.dp),
+        ) {
+            Icon(
+                if (st.muted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                stringResource(if (st.muted) R.string.media_unmute else R.string.media_mute),
             )
         }
+        val shown = if (dragging) drag else if (st.muted) 0f else st.volume
+        Slider(
+            value = shown.coerceIn(0f, 1f),
+            onValueChange = {
+                dragging = true
+                drag = it
+                // At most one message every 150 ms while dragging.
+                val now = System.currentTimeMillis()
+                if (now - lastSent >= 150) {
+                    lastSent = now
+                    runCatching { node?.mediaVolume(peer.id, FfiVolumeChange.Set(it)) }
+                }
+            },
+            onValueChangeFinished = {
+                dragging = false
+                runCatching { node?.mediaVolume(peer.id, FfiVolumeChange.Set(drag)) }
+            },
+            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+        )
+        Text(
+            "${(shown * 100).toInt()}%",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.width(44.dp).padding(start = 8.dp),
+        )
     }
 }
 
