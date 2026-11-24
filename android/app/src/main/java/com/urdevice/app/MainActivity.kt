@@ -318,8 +318,8 @@ private fun App() {
                             Page.Home -> {
                                 val shown = picked?.takeIf { it == PICK_ME || s.peers.any { p -> p.id == it } }
                                     ?: PICK_ME
-                                HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) {
-                                    val peer = s.peers.firstOrNull { it.id == shown }
+                                HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) { pickedId ->
+                                    val peer = s.peers.firstOrNull { it.id == pickedId }
                                     if (peer == null) {
                                         ThisDeviceScreen()
                                     } else {
