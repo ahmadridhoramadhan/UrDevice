@@ -1,6 +1,7 @@
 //! Media control (#20): the desktop side.
 //!
-//! The view is `ui/features/media.slint` (global `MediaFeature`). The core
+//! The player is a panel on the device page (`MediaPanel` in `ui/features/media.slint`, global
+//! `MediaFeature`), with an Active switch, not a tile. The core
 //! service (`urdevice_core::services::media`) does the protocol; this file
 //! gives it this computer's media adapter (when someone controls this
 //! computer) and draws the state a host sends (when this computer controls
@@ -17,14 +18,14 @@ use slint::{
     VecModel,
 };
 use urdevice_core::identity::DeviceId;
-use urdevice_core::node::{PeerStatus, PeerView};
+use urdevice_core::node::{PeerStatus, Snapshot};
 use urdevice_core::services::media::{
     CmdKind, Media as MediaService, MediaEvents, MediaSession, MediaState, PlayState, VolumeChange,
 };
 use urdevice_core::{Capability, Mode, Node};
 
-use super::{Feature, FeatureCtx, TileSpec};
-use crate::ui::{MainWindow, MediaFeature};
+use super::{Feature, FeatureCtx};
+use crate::ui::{MainWindow, MediaFeature, Page};
 
 pub(crate) struct Media;
 
@@ -55,6 +56,8 @@ struct Ui {
     selected: String,
     /// Hosts the user turned the player off for, until the app closes.
     off: HashSet<String>,
+    /// The host this computer is subscribed to for media updates, if any.
+    subscribed: Option<String>,
     /// The last refusal from the host, until the next state arrives.
     refused: bool,
     tabs: Vec<String>,
@@ -70,6 +73,7 @@ thread_local! {
         svc: None,
         selected: String::new(),
         off: HashSet::new(),
+        subscribed: None,
         refused: false,
         tabs: Vec::new(),
         art: Vec::new(),
@@ -105,17 +109,6 @@ impl Feature for Media {
         "media"
     }
 
-    fn tiles(&self) -> &'static [TileSpec] {
-        &[TileSpec {
-            cap: Capability::Media,
-            key: "media.v1",
-        }]
-    }
-
-    fn has_view(&self) -> bool {
-        true
-    }
-
     fn start(&self, ctx: &FeatureCtx) {
         let Some(w) = ctx.window.upgrade() else {
             return;
@@ -135,44 +128,78 @@ impl Feature for Media {
             let weak = ctx.window.clone();
             u.timer.start(TimerMode::Repeated, TICK, move || {
                 if let Some(w) = weak.upgrade() {
-                    sync(&w);
+                    let snap = UI.with(|u| u.borrow().node.clone()).map(|n| n.snapshot());
+                    match snap {
+                        Some(snap) => follow(&w, &snap),
+                        None => sync(&w),
+                    }
                 }
             });
         });
         wire(&w);
     }
 
-    fn refresh(&self, ctx: &FeatureCtx, _snap: &urdevice_core::node::Snapshot) {
+    fn refresh(&self, ctx: &FeatureCtx, snap: &Snapshot) {
         if let Some(w) = ctx.window.upgrade() {
-            sync(&w);
+            follow(&w, snap);
         }
     }
+}
 
-    fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
-        let Some(w) = ctx.window.upgrade() else {
-            return;
-        };
-        let g = w.global::<MediaFeature>();
-        let previous = g.get_peer_id().to_string();
-        if previous != peer.id {
-            // Leave the other host's updates off while this one is shown.
-            if let (Some(old), Some(svc)) = (DeviceId::from_hex(&previous), service()) {
-                let _ = svc.subscribe(old, false);
-            }
-            g.set_peer_id(peer.id.clone().into());
-            UI.with(|u| {
-                let mut u = u.borrow_mut();
-                u.selected.clear();
-                u.refused = false;
-            });
-        }
-        let on = UI.with(|u| !u.borrow().off.contains(&peer.id));
-        g.set_on(on);
-        if on && let (Some(id), Some(svc)) = (DeviceId::from_hex(&peer.id), service()) {
-            let _ = svc.subscribe(id, true);
-        }
-        sync(&w);
+/// Follow the device page: show the player of the device that is open, and keep the
+/// subscription to that host's media state only while its player can be seen.
+fn follow(w: &MainWindow, snap: &Snapshot) {
+    let g = w.global::<MediaFeature>();
+    let open = (w.get_page() == Page::Peer).then(|| w.get_selected_peer().to_string());
+    let peer = open
+        .as_deref()
+        .and_then(|id| snap.peers.iter().find(|p| p.id == id));
+    let connected = peer.is_some_and(|p| p.status == PeerStatus::Connected);
+    let listed = peer.is_some_and(|p| {
+        p.remote_permissions
+            .iter()
+            .any(|r| r.capability == Capability::Media)
+    });
+    let denied = peer.is_some_and(|p| {
+        p.remote_permissions
+            .iter()
+            .any(|r| r.capability == Capability::Media && r.mode == Mode::Deny)
+    });
+    g.set_available(connected && listed);
+
+    if let Some(p) = peer
+        && g.get_peer_id() != p.id.as_str()
+    {
+        g.set_peer_id(p.id.clone().into());
+        UI.with(|u| {
+            let mut u = u.borrow_mut();
+            u.selected.clear();
+            u.refused = false;
+        });
     }
+    let on = peer.is_some_and(|p| UI.with(|u| !u.borrow().off.contains(&p.id)));
+    g.set_on(on);
+
+    let want = peer
+        .filter(|p| connected && listed && !denied && on && !p.id.is_empty())
+        .map(|p| p.id.clone());
+    let (old, changed) = UI.with(|u| {
+        let mut u = u.borrow_mut();
+        if u.subscribed == want {
+            (None, false)
+        } else {
+            (std::mem::replace(&mut u.subscribed, want.clone()), true)
+        }
+    });
+    if changed && let Some(svc) = service() {
+        if let Some(old) = old.as_deref().and_then(DeviceId::from_hex) {
+            let _ = svc.subscribe(old, false);
+        }
+        if let Some(new) = want.as_deref().and_then(DeviceId::from_hex) {
+            let _ = svc.subscribe(new, true);
+        }
+    }
+    sync(w);
 }
 
 fn service() -> Option<Arc<MediaService>> {
@@ -194,9 +221,7 @@ fn wire(w: &MainWindow) {
         let weak = weak.clone();
         move |on| {
             let Some(w) = weak.upgrade() else { return };
-            let (Some((hex, id)), Some(svc)) = (peer_of(&w), service()) else {
-                return;
-            };
+            let Some((hex, _)) = peer_of(&w) else { return };
             UI.with(|u| {
                 let mut u = u.borrow_mut();
                 if on {
@@ -206,8 +231,10 @@ fn wire(w: &MainWindow) {
                 }
             });
             w.global::<MediaFeature>().set_on(on);
-            let _ = svc.subscribe(id, on);
-            sync(&w);
+            match UI.with(|u| u.borrow().node.clone()) {
+                Some(node) => follow(&w, &node.snapshot()),
+                None => sync(&w),
+            }
         }
     });
 

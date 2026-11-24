@@ -143,7 +143,6 @@ mod tests {
                 "gallery.v1",
                 "input.v1",
                 "keyboard",
-                "media.v1",
                 "screen.h264.v1",
                 "tunnel.v1"
             ]

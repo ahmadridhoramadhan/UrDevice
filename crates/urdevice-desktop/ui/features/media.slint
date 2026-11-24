@@ -1,12 +1,14 @@
 // Media control (#20, design §9.4): the desktop feature view.
 // Rust side: src/features/media.rs. See docs/dev/adding-a-feature.md.
-import { Icon, Btn, Card, Chip, Toggle, Muted } from "../widgets.slint";
+import { Icon, Card, Toggle, Muted, SectionTitle } from "../widgets.slint";
 import { Theme } from "../theme.slint";
 
 // State and callbacks shared with src/features/media.rs.
 export global MediaFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
+    // The device page shows the player: the device is connected and lists media.
+    in property <bool> available;
     // The media player for this host is on (R11.6).
     in-out property <bool> on: true;
     // Why there is nothing to show (0 none, 1 offline, 2 turned off by the
@@ -123,34 +125,84 @@ component RoundButton inherits Rectangle {
     }
 }
 
-export component MediaView inherits VerticalLayout {
-    // The tile that opened the view, for features with more than one tile.
-    in property <string> tile;
-    in property <string> peer-name;
-    spacing: 12px;
-    alignment: start;
-
+// One tab per media app, shown when the host has more than one.
+component MediaTab inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+    height: 34px;
+    border-radius: 17px;
+    background: root.active ? Theme.accent : ta.has-hover ? Theme.surface-2 : transparent;
+    accessible-role: tab;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.active;
     HorizontalLayout {
-        spacing: 10px;
-        Toggle {
-            y: (parent.height - self.height) / 2;
-            checked: MediaFeature.on;
-            toggled(on) => { MediaFeature.set-on(on); }
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 8px;
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 7px;
+                height: 7px;
+                border-radius: 3.5px;
+                background: root.active ? Theme.on-accent : Theme.muted;
+            }
         }
         Text {
-            text: @tr("Show what is playing on {}", root.peer-name);
-            color: Theme.text;
+            text: root.text;
+            color: root.active ? Theme.on-accent : Theme.muted;
             font-size: Theme.font-body;
+            font-weight: root.active ? 700 : 500;
             vertical-alignment: center;
         }
     }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
 
-    if MediaFeature.message-kind != 0: Muted {
+// The media player on the device page (R11): a title with the Active switch, and a card with
+// tabs (only when there is more than one media app), the track, the seek bar, the controls,
+// and the volume. No shuffle or repeat (R11). The page shows it only while `MediaFeature.available`.
+export component MediaPanel inherits VerticalLayout {
+    in property <string> peer-name;
+    spacing: 10px;
+
+    HorizontalLayout {
+        spacing: 10px;
+        SectionTitle {
+            text: @tr("Media player");
+            vertical-alignment: center;
+        }
+        Rectangle { }
+        Text {
+            text: @tr("Active");
+            color: Theme.muted;
+            font-size: Theme.font-body;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+        VerticalLayout {
+            alignment: center;
+            Toggle {
+                checked: MediaFeature.on;
+                enabled: MediaFeature.message-kind != 2;
+                toggled(on) => { MediaFeature.set-on(on); }
+            }
+        }
+    }
+
+    // Why there is nothing to show. "Player off" needs no line: the switch says it.
+    if MediaFeature.message-kind != 0 && MediaFeature.message-kind != 3: Muted {
         text: [
             "",
             @tr("{} is offline.", root.peer-name),
             @tr("Media control is turned off by {}.", root.peer-name),
-            @tr("The media player is off."),
+            "",
             @tr("Waiting for {}…", root.peer-name),
             @tr("Notification access is off on {}. Turn it on in the Android settings so other devices can see and control media.", root.peer-name),
             @tr("{} cannot read its media apps.", root.peer-name),
@@ -159,125 +211,150 @@ export component MediaView inherits VerticalLayout {
         ][MediaFeature.message-kind];
     }
 
-    if MediaFeature.on && MediaFeature.tabs.length > 0: HorizontalLayout {
-        spacing: 8px;
-        alignment: start;
-        for name[i] in MediaFeature.tabs: Btn {
-            text: name;
-            kind: MediaFeature.selected == i ? 0 : 1;
-            clicked => { MediaFeature.pick(i); }
-        }
-    }
-
     if MediaFeature.on && MediaFeature.tabs.length > 0: Card {
         VerticalLayout {
-            padding: 16px;
-            spacing: 12px;
-            HorizontalLayout {
-                spacing: 16px;
-                Rectangle {
-                    width: 112px;
-                    height: 112px;
-                    border-radius: 8px;
-                    background: Theme.icon-bg;
-                    clip: true;
-                    if MediaFeature.has-artwork: Image {
-                        source: MediaFeature.artwork;
-                        image-fit: contain;
-                        width: parent.width;
-                        height: parent.height;
+            if MediaFeature.tabs.length > 1: VerticalLayout {
+                HorizontalLayout {
+                    padding: 10px;
+                    spacing: 6px;
+                    alignment: start;
+                    for name[i] in MediaFeature.tabs: MediaTab {
+                        text: name;
+                        active: MediaFeature.selected == i;
+                        clicked => { MediaFeature.pick(i); }
                     }
-                    if !MediaFeature.has-artwork: Icon {
-                        source: @image-url("../icons/play.svg");
-                        tint: Theme.accent;
-                        width: 40px;
-                        height: 40px;
+                }
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
+                }
+            }
+            HorizontalLayout {
+                padding: 16px;
+                spacing: 18px;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 96px;
+                        height: 96px;
+                        border-radius: 14px;
+                        background: Theme.accent;
+                        clip: true;
+                        if MediaFeature.has-artwork: Image {
+                            source: MediaFeature.artwork;
+                            image-fit: cover;
+                            width: parent.width;
+                            height: parent.height;
+                        }
+                        if !MediaFeature.has-artwork: Icon {
+                            source: @image-url("../icons/music.svg");
+                            tint: Theme.on-accent;
+                            width: 40px;
+                            height: 40px;
+                        }
                     }
                 }
                 VerticalLayout {
-                    spacing: 4px;
+                    spacing: 6px;
                     alignment: center;
-                    Text {
-                        text: MediaFeature.title != "" ? MediaFeature.title : @tr("Unknown title");
-                        font-size: Theme.font-title;
-                        font-weight: 700;
-                        color: Theme.text;
-                        overflow: elide;
+                    VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: MediaFeature.app-name;
+                            font-size: Theme.font-small;
+                            font-weight: 700;
+                            color: Theme.accent;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: MediaFeature.title != "" ? MediaFeature.title : @tr("Unknown title");
+                            font-size: Theme.font-title;
+                            font-weight: 700;
+                            color: Theme.text;
+                            overflow: elide;
+                        }
+                        if MediaFeature.artist != "": Text {
+                            text: MediaFeature.artist;
+                            font-size: Theme.font-body;
+                            color: Theme.muted;
+                            overflow: elide;
+                        }
                     }
-                    if MediaFeature.artist != "": Text {
-                        text: MediaFeature.artist;
-                        font-size: Theme.font-body;
-                        color: Theme.muted;
-                        overflow: elide;
+                    if MediaFeature.can-seek: VerticalLayout {
+                        spacing: 2px;
+                        MediaSlider {
+                            value: MediaFeature.progress;
+                            released(v) => { MediaFeature.seek(v); }
+                        }
+                        HorizontalLayout {
+                            Text { text: MediaFeature.position-text; font-size: Theme.font-small; color: Theme.muted; }
+                            Rectangle { }
+                            Text { text: MediaFeature.duration-text; font-size: Theme.font-small; color: Theme.muted; }
+                        }
                     }
-                    Text {
-                        text: MediaFeature.app-name;
-                        font-size: Theme.font-small;
-                        color: Theme.muted;
-                        overflow: elide;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        if MediaFeature.can-prev: VerticalLayout {
+                            alignment: center;
+                            RoundButton {
+                                icon: @image-url("../icons/media-prev.svg");
+                                label: @tr("Previous");
+                                size: 38px;
+                                clicked => { MediaFeature.prev(); }
+                            }
+                        }
+                        if MediaFeature.can-play-pause: VerticalLayout {
+                            alignment: center;
+                            RoundButton {
+                                icon: MediaFeature.playing ? @image-url("../icons/media-pause.svg") : @image-url("../icons/media-play.svg");
+                                label: MediaFeature.playing ? @tr("Pause") : @tr("Play");
+                                primary: true;
+                                size: 52px;
+                                clicked => { MediaFeature.play-pause(); }
+                            }
+                        }
+                        if MediaFeature.can-next: VerticalLayout {
+                            alignment: center;
+                            RoundButton {
+                                icon: @image-url("../icons/media-next.svg");
+                                label: @tr("Next");
+                                size: 38px;
+                                clicked => { MediaFeature.next(); }
+                            }
+                        }
+                        Rectangle { }
+                        if MediaFeature.can-volume: HorizontalLayout {
+                            spacing: 10px;
+                            VerticalLayout {
+                                alignment: center;
+                                RoundButton {
+                                    size: 32px;
+                                    icon: MediaFeature.muted ? @image-url("../icons/media-mute.svg") : @image-url("../icons/media-volume.svg");
+                                    label: MediaFeature.muted ? @tr("Unmute") : @tr("Mute");
+                                    clicked => { MediaFeature.set-muted(!MediaFeature.muted); }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                MediaSlider {
+                                    width: 120px;
+                                    value: MediaFeature.muted ? 0 : MediaFeature.volume;
+                                    moved(v) => { MediaFeature.set-volume(v, false); }
+                                    released(v) => { MediaFeature.set-volume(v, true); }
+                                }
+                            }
+                        }
                     }
-                }
-            }
-            if MediaFeature.can-seek: VerticalLayout {
-                spacing: 2px;
-                MediaSlider {
-                    value: MediaFeature.progress;
-                    released(v) => { MediaFeature.seek(v); }
-                }
-                HorizontalLayout {
-                    Text { text: MediaFeature.position-text; font-size: Theme.font-small; color: Theme.muted; }
-                    Rectangle { }
-                    Text { text: MediaFeature.duration-text; font-size: Theme.font-small; color: Theme.muted; }
-                }
-            }
-            HorizontalLayout {
-                spacing: 14px;
-                alignment: center;
-                if MediaFeature.can-prev: RoundButton {
-                    icon: @image-url("../icons/media-prev.svg");
-                    label: @tr("Previous");
-                    clicked => { MediaFeature.prev(); }
-                }
-                if MediaFeature.can-play-pause: RoundButton {
-                    icon: MediaFeature.playing ? @image-url("../icons/media-pause.svg") : @image-url("../icons/media-play.svg");
-                    label: MediaFeature.playing ? @tr("Pause") : @tr("Play");
-                    primary: true;
-                    size: 48px;
-                    clicked => { MediaFeature.play-pause(); }
-                }
-                if MediaFeature.can-next: RoundButton {
-                    icon: @image-url("../icons/media-next.svg");
-                    label: @tr("Next");
-                    clicked => { MediaFeature.next(); }
                 }
             }
         }
     }
+}
 
-    if MediaFeature.on && MediaFeature.can-volume: Card {
-        HorizontalLayout {
-            padding: 12px;
-            spacing: 12px;
-            RoundButton {
-                size: 34px;
-                icon: MediaFeature.muted ? @image-url("../icons/media-mute.svg") : @image-url("../icons/media-volume.svg");
-                label: MediaFeature.muted ? @tr("Unmute") : @tr("Mute");
-                clicked => { MediaFeature.set-muted(!MediaFeature.muted); }
-            }
-            MediaSlider {
-                y: (parent.height - self.height) / 2;
-                value: MediaFeature.muted ? 0 : MediaFeature.volume;
-                moved(v) => { MediaFeature.set-volume(v, false); }
-                released(v) => { MediaFeature.set-volume(v, true); }
-            }
-            Text {
-                width: 40px;
-                text: round((MediaFeature.muted ? 0 : MediaFeature.volume) * 100) + "%";
-                color: Theme.muted;
-                font-size: Theme.font-small;
-                vertical-alignment: center;
-                horizontal-alignment: right;
-            }
-        }
-    }
+// Kept so `features.slint` lists every feature. The player has no page of its own now: it is the
+// `MediaPanel` on the device page.
+export component MediaView inherits VerticalLayout {
+    in property <string> tile;
+    in property <string> peer-name;
+    MediaPanel { peer-name: root.peer-name; }
 }

@@ -11,6 +11,7 @@ import { FilesSettings, FilesFeature, TransferCard } from "features/files.slint"
 import { TunnelHostSection, TunnelLanBanner } from "features/tunnel.slint";
 // Bluetooth fallback (#23): the banner while on Bluetooth LE.
 import { BleBanner } from "features/bluetooth.slint";
+import { MediaPanel, MediaFeature } from "features/media.slint";
 
 export { Labels } from "labels.slint";
 // The feature globals, for src/features/*.rs.
@@ -849,7 +850,9 @@ export component MainWindow inherits Window {
                                         Muted { text: root.peer.status == "disconnected" ? @tr("Press Reconnect to connect again.") : @tr("Connects on its own when {} is nearby.", root.peer.name); }
                                     }
                                 }
-                                // File transfers with this device, under the device info.
+                                // The media player of this device, under the device info.
+                                if MediaFeature.available: MediaPanel { peer-name: root.peer.name; }
+                                // File transfers with this device, under the media player.
                                 if FilesFeature.transfers.length > 0: VerticalLayout {
                                     spacing: 8px;
                                     for t in FilesFeature.transfers: TransferCard { t: t; }
