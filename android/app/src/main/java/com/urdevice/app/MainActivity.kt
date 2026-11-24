@@ -11,7 +11,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -87,12 +96,42 @@ sealed interface Page {
     data class Feature(val device: String, val feature: String, val tile: String) : Page
 }
 
+/** A page and how deep it sits in the back stack, so a transition knows whether it goes forward or back. */
+private data class Shown(val page: Page, val depth: Int)
+
+/** Forward: the new page slides in from the right while the old one fades out. Back: the other way. */
+private fun AnimatedContentTransitionScope<Shown>.pageTransition(forward: Boolean): ContentTransform {
+    val slide = { width: Int -> if (forward) width / 6 else -width / 6 }
+    val enter = fadeIn(tween(240, delayMillis = 60)) +
+        slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { slide(it) }
+    val exit = fadeOut(tween(120)) +
+        slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -slide(it) }
+    return (enter togetherWith exit).using(null)
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestHighRefreshRate()
         UrDeviceService.start(this)
         setContent { UrDeviceTheme { App() } }
+    }
+
+    /**
+     * Ask for the display's fastest mode at the screen's current size (120 Hz where the phone has
+     * it). Android may still pick a lower rate to save power; this is a request, not a demand.
+     */
+    private fun requestHighRefreshRate() {
+        runCatching {
+            @Suppress("DEPRECATION")
+            val screen = (if (Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay) ?: return
+            val now = screen.mode
+            val best = screen.supportedModes
+                .filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
+                .maxByOrNull { it.refreshRate } ?: return
+            window.attributes = window.attributes.also { it.preferredDisplayModeId = best.modeId }
+        }
     }
 
     override fun onStart() {
@@ -218,15 +257,19 @@ private fun App() {
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
-                            when (page) {
+                        AnimatedContent(
+                            targetState = page,
+                            transitionSpec = { fadeIn(tween(200, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
+                            label = "title",
+                        ) { titled -> Text(
+                            when (titled) {
                                 Page.Home -> stringResource(R.string.app_name)
                                 Page.Pair -> stringResource(R.string.add_device)
                                 Page.Settings -> stringResource(R.string.settings)
                                 Page.Log -> stringResource(R.string.set_log)
-                                is Page.Feature -> s.peers.firstOrNull { it.id == page.device }?.name ?: ""
+                                is Page.Feature -> s.peers.firstOrNull { it.id == titled.device }?.name ?: ""
                             },
-                        )
+                        ) }
                     },
                     navigationIcon = {
                         if (stack.size > 1) {
@@ -265,74 +308,81 @@ private fun App() {
                             onLater = { notifNeeded = false },
                         )
                     }
-                    when (page) {
-                        Page.Home -> {
-                            val shown = picked?.takeIf { it == PICK_ME || s.peers.any { p -> p.id == it } }
-                                ?: PICK_ME
-                            HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) {
-                                val peer = s.peers.firstOrNull { it.id == shown }
-                                if (peer == null) {
-                                    ThisDeviceScreen()
-                                } else {
-                                    DeviceScreen(
-                                        s, peer,
-                                        onDisconnect = { runCatching { node()?.disconnect(peer.id) } },
-                                        onReconnect = { runCatching { node()?.reconnect(peer.id) } },
-                                        onForget = { runCatching { node()?.forget(peer.id) } },
-                                        onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
-                                        onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
-                                        onSettings = { go(Page.Settings) },
-                                        onStop = { node()?.stopActivity(it) },
-                                    )
+                    AnimatedContent(
+                        targetState = Shown(page, stack.size),
+                        transitionSpec = { pageTransition(forward = targetState.depth >= initialState.depth) },
+                        label = "page",
+                    ) { shown ->
+                    val page = shown.page
+                        when (page) {
+                            Page.Home -> {
+                                val shown = picked?.takeIf { it == PICK_ME || s.peers.any { p -> p.id == it } }
+                                    ?: PICK_ME
+                                HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) {
+                                    val peer = s.peers.firstOrNull { it.id == shown }
+                                    if (peer == null) {
+                                        ThisDeviceScreen()
+                                    } else {
+                                        DeviceScreen(
+                                            s, peer,
+                                            onDisconnect = { runCatching { node()?.disconnect(peer.id) } },
+                                            onReconnect = { runCatching { node()?.reconnect(peer.id) } },
+                                            onForget = { runCatching { node()?.forget(peer.id) } },
+                                            onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
+                                            onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
+                                            onSettings = { go(Page.Settings) },
+                                            onStop = { node()?.stopActivity(it) },
+                                        )
+                                    }
                                 }
                             }
-                        }
-                        Page.Pair -> PairBody(
-                            s, ::scanned,
-                            onPairNearby = ::pairNearby,
-                            onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
-                            compact = true,
-                        )
-                        Page.Settings -> SettingsScreen(
-                            s,
-                            onRename = { runCatching { node()?.setName(it) } },
-                            onHidden = { runCatching { node()?.setHidden(it) } },
-                            onLog = {
-                                log = runCatching { node()?.activityLog(500u) }.getOrNull() ?: emptyList()
-                                go(Page.Log)
-                            },
-                            onExport = {
-                                val text = runCatching { node()?.exportData() }.getOrNull() ?: return@SettingsScreen
-                                ctx.startActivity(
-                                    Intent.createChooser(
-                                        Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
-                                        null,
-                                    ),
-                                )
-                            },
-                            onReset = { runCatching { node()?.resetIdentity() } },
-                            onSetPermission = { c, m, confirmed -> runCatching { node()?.setPermission(c, m, confirmed) } },
-                            onDeleteAll = {
-                                runCatching { node()?.deleteAllData() }
-                                pairedName = null
-                                inOnboarding = true
-                            },
-                            version = coreVersion(),
-                        )
-                        Page.Log -> LogScreen(log)
-                        is Page.Feature -> {
-                            val peer = s.peers.firstOrNull { it.id == page.device }
-                            val f = feature(page.feature)
-                            val modes = peer?.remotePermissions?.associate { it.capability to it.mode } ?: emptyMap()
-                            val cap = f?.tiles(modes)?.firstOrNull { it.key == page.tile }?.cap
-                            // A feature page stays open only while its feature is on.
-                            val denied = cap != null && (modes[cap] ?: FfiMode.DENY) == FfiMode.DENY
-                            if (peer == null || f == null || denied) {
-                                LaunchedEffect(page, denied) { back() }
-                            } else {
-                                CompositionLocalProvider(
-                                    LocalOpenFeaturePage provides { feat, tile -> go(Page.Feature(peer.id, feat, tile)) },
-                                ) { f.Screen(peer, page.tile) }
+                            Page.Pair -> PairBody(
+                                s, ::scanned,
+                                onPairNearby = ::pairNearby,
+                                onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
+                                compact = true,
+                            )
+                            Page.Settings -> SettingsScreen(
+                                s,
+                                onRename = { runCatching { node()?.setName(it) } },
+                                onHidden = { runCatching { node()?.setHidden(it) } },
+                                onLog = {
+                                    log = runCatching { node()?.activityLog(500u) }.getOrNull() ?: emptyList()
+                                    go(Page.Log)
+                                },
+                                onExport = {
+                                    val text = runCatching { node()?.exportData() }.getOrNull() ?: return@SettingsScreen
+                                    ctx.startActivity(
+                                        Intent.createChooser(
+                                            Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
+                                            null,
+                                        ),
+                                    )
+                                },
+                                onReset = { runCatching { node()?.resetIdentity() } },
+                                onSetPermission = { c, m, confirmed -> runCatching { node()?.setPermission(c, m, confirmed) } },
+                                onDeleteAll = {
+                                    runCatching { node()?.deleteAllData() }
+                                    pairedName = null
+                                    inOnboarding = true
+                                },
+                                version = coreVersion(),
+                            )
+                            Page.Log -> LogScreen(log)
+                            is Page.Feature -> {
+                                val peer = s.peers.firstOrNull { it.id == page.device }
+                                val f = feature(page.feature)
+                                val modes = peer?.remotePermissions?.associate { it.capability to it.mode } ?: emptyMap()
+                                val cap = f?.tiles(modes)?.firstOrNull { it.key == page.tile }?.cap
+                                // A feature page stays open only while its feature is on.
+                                val denied = cap != null && (modes[cap] ?: FfiMode.DENY) == FfiMode.DENY
+                                if (peer == null || f == null || denied) {
+                                    LaunchedEffect(page, denied) { back() }
+                                } else {
+                                    CompositionLocalProvider(
+                                        LocalOpenFeaturePage provides { feat, tile -> go(Page.Feature(peer.id, feat, tile)) },
+                                    ) { f.Screen(peer, page.tile) }
+                                }
                             }
                         }
                     }
