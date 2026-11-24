@@ -8,8 +8,10 @@ import android.os.Build
 import android.view.Surface
 import android.view.TextureView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -85,25 +88,27 @@ object ScreenFeature : Feature {
     }
 }
 
-/** A tap on the picture clicks on the host through the input service (#18, R12.5). */
-private const val INPUT_FORWARDING = true
+/** The remote-control session with the host is running, so moves and clicks reach it. */
+private fun controlling(peer: String): Boolean = InputFeature.sessions.value[peer]?.active == true
 
-/**
- * A tap at [x], [y] (fractions of the host's display) clicks there (R12.5). The first tap asks the
- * host for a remote-control session (its user approves it and sees the indicator with Stop); taps
- * before it is allowed are dropped.
- */
-private fun pointer(peer: String, x: Float, y: Float) {
+/** Ask the host for remote control (its user approves it and sees the indicator with Stop). */
+private fun startControl(peer: String) {
     val node = Core.node() ?: return
     val s = InputFeature.sessions.value[peer]
-    if (s?.active != true) {
-        if (s?.connecting != true) InputFeature.connect(node, peer)
-        return
-    }
+    if (s?.active != true && s?.connecting != true) InputFeature.connect(node, peer)
+}
+
+/** Move the host's pointer from where it is, like a touchpad. */
+private fun moveBy(peer: String, dx: Int, dy: Int) {
+    if (controlling(peer)) runCatching { Core.node()?.inputMove(peer, dx, dy) }
+}
+
+/** A left click where the host's pointer is. */
+private fun click(peer: String) {
+    if (!controlling(peer)) return
     runCatching {
-        node.inputAbs(peer, x, y)
-        node.inputButton(peer, 0u, true)
-        node.inputButton(peer, 0u, false)
+        Core.node()?.inputButton(peer, 0u, true)
+        Core.node()?.inputButton(peer, 0u, false)
     }
 }
 
@@ -310,18 +315,6 @@ class VideoDecoder(private val wantKeyframe: () -> Unit) {
     }
 }
 
-/** Map a tap on the zoomed picture back to fractions of the host's display, or null outside it. */
-private fun toHost(tap: Offset, box: IntSize, scale: Float, offset: Offset): Offset? {
-    if (box.width == 0 || box.height == 0) return null
-    val cx = box.width / 2f
-    val cy = box.height / 2f
-    val x = (tap.x - cx - offset.x) / scale + cx
-    val y = (tap.y - cy - offset.y) / scale + cy
-    val fx = x / box.width
-    val fy = y / box.height
-    return if (fx in 0f..1f && fy in 0f..1f) Offset(fx, fy) else null
-}
-
 @Composable
 private fun reasonText(reason: String, name: String): String = when (reason) {
     "declined" -> stringResource(R.string.screen_err_declined, name)
@@ -343,6 +336,8 @@ private fun ScreenScreen(peer: FfiPeer) {
     val size by ScreenViewer.size.collectAsState()
     val ours = ScreenViewer.peer == peer.id
     val shown = if (ours) state else ScreenViewer.IDLE
+    var control by remember(peer.id) { mutableStateOf(false) }
+    val sessions by InputFeature.sessions.collectAsState()
 
     // Leaving the screen ends the session.
     DisposableEffect(peer.id) {
@@ -377,20 +372,50 @@ private fun ScreenScreen(peer: FfiPeer) {
             }
         }
         if (shown >= ScreenViewer.STARTING) {
-            if (!INPUT_FORWARDING) {
-                Text(stringResource(R.string.screen_view_only), style = MaterialTheme.typography.bodySmall)
+            val s = sessions[peer.id]
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                FilterChip(
+                    selected = control,
+                    onClick = {
+                        control = !control
+                        if (control) startControl(peer.id) else Core.node()?.let { InputFeature.end(it, peer.id) }
+                    },
+                    label = { Text(stringResource(R.string.screen_control)) },
+                )
+                val line = when {
+                    !control -> null
+                    s?.refused?.isNotEmpty() == true -> stringResource(R.string.input_declined, peer.name)
+                    s?.connecting == true -> stringResource(R.string.input_waiting, peer.name)
+                    s?.status == "missing" -> when (s.missing) {
+                        "uinput" -> stringResource(R.string.input_missing_uinput, peer.name)
+                        "portal" -> stringResource(R.string.input_missing_portal, peer.name)
+                        "accessibility_service" -> stringResource(R.string.input_missing_accessibility_service, peer.name)
+                        else -> stringResource(R.string.input_missing_accessibility, peer.name)
+                    }
+                    s?.active == true -> stringResource(R.string.screen_control_on)
+                    else -> null
+                }
+                if (line != null) Text(line, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
             }
-            Picture(peer.id, size)
+            Picture(peer.id, size, control)
         }
     }
 }
 
 @Composable
-private fun Picture(peerId: String, size: Pair<Int, Int>) {
+private fun Picture(peerId: String, size: Pair<Int, Int>, control: Boolean) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var box by remember { mutableStateOf(IntSize.Zero) }
+    val controlNow by rememberUpdatedState(control)
     val ratio = if (size.first > 0 && size.second > 0) size.first.toFloat() / size.second else 16f / 9f
+
+    fun pan(by: Offset) {
+        val maxX = (box.width * (scale - 1f)) / 2f
+        val maxY = (box.height * (scale - 1f)) / 2f
+        offset = Offset((offset.x + by.x).coerceIn(-maxX, maxX), (offset.y + by.y).coerceIn(-maxY, maxY))
+    }
+
     Box(
         Modifier
             .fillMaxWidth()
@@ -398,27 +423,64 @@ private fun Picture(peerId: String, size: Pair<Int, Int>) {
             .clipToBounds()
             .background(Color.Black)
             .onSizeChanged { box = it }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    val maxX = (box.width * (scale - 1f)) / 2f
-                    val maxY = (box.height * (scale - 1f)) / 2f
-                    offset = Offset(
-                        (offset.x + pan.x).coerceIn(-maxX, maxX),
-                        (offset.y + pan.y).coerceIn(-maxY, maxY),
-                    )
+            .pointerInput(peerId) {
+                var lastTapAt = 0L
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val slop = viewConfiguration.touchSlop
+                    var last = down.position
+                    var moved = false
+                    var multi = false
+                    var remX = 0f
+                    var remY = 0f
+                    do {
+                        val event = awaitPointerEvent()
+                        val pressed = event.changes.count { it.pressed }
+                        if (pressed >= 2) {
+                            // Two fingers always zoom and pan the picture.
+                            multi = true
+                            scale = (scale * event.calculateZoom()).coerceIn(1f, 5f)
+                            pan(event.calculatePan())
+                            event.changes.forEach { it.consume() }
+                        } else if (pressed == 1 && !multi) {
+                            val c = event.changes.first { it.pressed }
+                            val d = c.position - last
+                            last = c.position
+                            if (!moved && (c.position - down.position).getDistance() > slop) moved = true
+                            if (moved) {
+                                if (controlNow) {
+                                    // Like a touchpad: the pointer goes on from where it is, as far as the
+                                    // finger moved over the picture.
+                                    val g = if (box.width > 0 && size.first > 0) size.first.toFloat() / (box.width * scale) else 1f
+                                    remX += d.x * g
+                                    remY += d.y * g
+                                    val ix = remX.toInt()
+                                    val iy = remY.toInt()
+                                    if (ix != 0 || iy != 0) {
+                                        remX -= ix
+                                        remY -= iy
+                                        moveBy(peerId, ix, iy)
+                                    }
+                                } else {
+                                    pan(d)
+                                }
+                                c.consume()
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
+                    if (!moved && !multi) {
+                        if (controlNow) {
+                            click(peerId)
+                        } else {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapAt < 300) {
+                                scale = 1f
+                                offset = Offset.Zero
+                            }
+                            lastTapAt = now
+                        }
+                    }
                 }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        scale = 1f
-                        offset = Offset.Zero
-                    },
-                    onTap = { pos ->
-                        if (INPUT_FORWARDING) toHost(pos, box, scale, offset)?.let { pointer(peerId, it.x, it.y) }
-                    },
-                )
             },
     ) {
         AndroidView(

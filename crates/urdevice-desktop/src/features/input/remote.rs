@@ -18,8 +18,8 @@ use std::sync::Arc;
 use slint::ComponentHandle as _;
 use urdevice_core::identity::DeviceId;
 use urdevice_core::services::input::{
-    HostStatus, Input as Service, KeyOut, KeyboardCapture, Mods, PermStatus, RelativePointer,
-    button, host_moves_by_distance, normalize, scroll_units,
+    HostStatus, Input as Service, KeyOut, KeyboardCapture, Missing, Mods, PermStatus,
+    RelativePointer, button, host_moves_by_distance, normalize, scroll_units,
 };
 
 use crate::ui::RemoteWindow;
@@ -287,9 +287,25 @@ impl Remote {
                         ),
                         None => format!("Controlling {name}."),
                     },
-                    PermStatus::Missing(_) => format!(
-                        "{name} needs a permission first. Follow the steps on {name}, then start again."
-                    ),
+                    PermStatus::Missing(m) => match m {
+                        Missing::AccessibilityService => format!(
+                            "Turn on the UrDevice accessibility service on {name} (Settings > Accessibility). Taps, Back, Home and Recents need it."
+                        ),
+                        Missing::InputMethod => format!(
+                            "{name} needs the UrDevice keyboard turned on and in use before it can type."
+                        ),
+                        Missing::Portal => format!(
+                            "Approve the remote-control request on the screen of {name}, then try again."
+                        ),
+                        Missing::Uinput => {
+                            format!(
+                                "{name} needs a one-time setup for remote control. It asks on that computer."
+                            )
+                        }
+                        Missing::Accessibility => format!(
+                            "Turn on UrDevice in System Settings > Privacy & Security > Accessibility on {name}."
+                        ),
+                    },
                     PermStatus::Unavailable => {
                         format!("{name} cannot take remote control on this system.")
                     }

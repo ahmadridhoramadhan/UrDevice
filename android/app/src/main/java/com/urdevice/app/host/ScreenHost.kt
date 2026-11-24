@@ -24,6 +24,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
+import android.view.Display
 import android.view.Surface
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -88,16 +89,12 @@ class ScreenHost(private val context: Context) : ScreenHostFfi {
 
 /** The physical screen size in pixels. */
 internal fun screenSize(context: Context): Pair<Int, Int> {
-    val wm = context.getSystemService(WindowManager::class.java)
-    return if (Build.VERSION.SDK_INT >= 30) {
-        val b = wm.maximumWindowMetrics.bounds
-        b.width() to b.height()
-    } else {
-        val m = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        wm.defaultDisplay.getRealMetrics(m)
-        m.widthPixels to m.heightPixels
-    }
+    // The real size of the default display in its current rotation: it swaps when the phone turns.
+    val display = context.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
+    val m = DisplayMetrics()
+    @Suppress("DEPRECATION")
+    display.getRealMetrics(m)
+    return m.widthPixels to m.heightPixels
 }
 
 /** Scale `w` x `h` down to fit the target box, keeping the aspect ratio, in even numbers. */
@@ -299,8 +296,22 @@ class CaptureSession(
         }
     }
 
+    /** The phone turned: the virtual display and the encoder take the new shape (design §10). */
+    private val rotation = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+
+        override fun onDisplayRemoved(displayId: Int) {}
+
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == Display.DEFAULT_DISPLAY && running) setTarget(target)
+        }
+    }
+
     fun start() {
         running = true
+        // On the main thread: the encoder thread is busy draining.
+        context.getSystemService(DisplayManager::class.java)
+            .registerDisplayListener(rotation, Handler(Looper.getMainLooper()))
         // Android 14+: register the callback before creating the virtual display.
         projection.registerCallback(callback, Handler(Looper.getMainLooper()))
         val (w, h) = screenSize(context)
@@ -337,6 +348,8 @@ class CaptureSession(
         return c
     }
 
+    private var pushed = 0L
+
     private fun drain() {
         val info = MediaCodec.BufferInfo()
         val node = Core.node()
@@ -362,6 +375,8 @@ class CaptureSession(
                         val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
                         val data = if (key) (csd ?: ByteArray(0)) + bytes else bytes
                         val (w, h) = if (key) size else 0 to 0
+                        pushed++
+                        if (pushed == 1L || pushed % 600L == 0L) Log.i("UrDeviceScreen", "frames pushed=$pushed key=$key size=$w x $h")
                         node?.screenPushFrame(
                             session,
                             FfiVideoFrame(info.presentationTimeUs.toULong(), key, data, w.toUInt(), h.toUInt()),
@@ -391,6 +406,7 @@ class CaptureSession(
             return
         }
         // A new size needs a new encoder and Surface; the virtual display moves to it.
+        Log.i("UrDeviceScreen", "size ${size.first} x ${size.second} -> ${next.first} x ${next.second}")
         runCatching {
             val c = newCodec(next, t)
             val s = c.createInputSurface()
@@ -414,6 +430,7 @@ class CaptureSession(
     fun stop() {
         if (!running) return
         running = false
+        runCatching { context.getSystemService(DisplayManager::class.java).unregisterDisplayListener(rotation) }
         runCatching { display?.release() }
         display = null
         synchronized(lock) {

@@ -18,7 +18,7 @@
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, TrySendError, sync_channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
@@ -300,6 +300,8 @@ struct Decode {
     current: AtomicU64,
     /// The queue overflowed: drop until the next keyframe.
     drop_until_key: AtomicBool,
+    /// The device and activity the picture is asked from, for keyframe retries while nothing shows.
+    asking: Mutex<Option<(DeviceId, u64)>>,
     /// A picture is waiting for the UI thread.
     pending: Mutex<Option<SharedPixelBuffer<Rgba8Pixel>>>,
     posted: AtomicBool,
@@ -350,11 +352,30 @@ fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
     let mut dec = H264Decoder::new().ok();
     let mut pic = RgbaFrame::default();
     let mut waiting_key = true;
-    while let Ok(item) = rx.recv() {
+    let mut shown_first = false;
+    let mut retries = 0u32;
+    loop {
+        let item = match rx.recv_timeout(Duration::from_millis(700)) {
+            Ok(item) => item,
+            Err(RecvTimeoutError::Timeout) => {
+                // Nothing came and no picture shows yet: the first keyframe may have been lost.
+                if waiting_key && d.current.load(Ordering::Relaxed) != 0 && retries < 12 {
+                    retries += 1;
+                    if let Some((peer, activity)) = *lock(&d.asking) {
+                        tracing::info!(retries, "no screen picture yet; asking for a keyframe");
+                        d.want_keyframe(peer, activity);
+                    }
+                }
+                continue;
+            }
+            Err(RecvTimeoutError::Disconnected) => break,
+        };
         match item {
             DecItem::Reset => {
                 dec = H264Decoder::new().ok();
                 waiting_key = true;
+                shown_first = false;
+                retries = 0;
             }
             DecItem::Frame(peer, activity, f) => {
                 if activity != d.current.load(Ordering::Relaxed) {
@@ -368,10 +389,20 @@ fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
                     continue;
                 };
                 match decoder.decode(&f.data, &mut pic) {
-                    Ok(true) => d.publish(&pic),
+                    Ok(true) => {
+                        if !shown_first {
+                            shown_first = true;
+                            tracing::info!(
+                                width = pic.width,
+                                height = pic.height,
+                                "first screen picture decoded"
+                            );
+                        }
+                        d.publish(&pic);
+                    }
                     Ok(false) => {}
                     Err(e) => {
-                        tracing::debug!(error = %e, "frame did not decode; asking for a keyframe");
+                        tracing::info!(error = %e, "frame did not decode; asking for a keyframe");
                         waiting_key = true;
                         d.want_keyframe(peer, activity);
                     }
@@ -401,7 +432,8 @@ impl ScreenEvents for Events {
         self.ui(move |w| on_displays(w, peer, activity, displays));
     }
 
-    fn stream_started(&self, _peer: DeviceId, activity: u64, _display_id: u32) {
+    fn stream_started(&self, peer: DeviceId, activity: u64, _display_id: u32) {
+        *lock(&self.dec.asking) = Some((peer, activity));
         self.dec.current.store(activity, Ordering::Relaxed);
         self.dec.drop_until_key.store(false, Ordering::Relaxed);
         let _ = self.dec.tx.try_send(DecItem::Reset);
@@ -698,6 +730,7 @@ impl Feature for Screen {
             tx,
             current: AtomicU64::new(0),
             drop_until_key: AtomicBool::new(false),
+            asking: Mutex::new(None),
             pending: Mutex::new(None),
             posted: AtomicBool::new(false),
             svc: Arc::downgrade(&svc),
