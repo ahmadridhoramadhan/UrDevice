@@ -46,6 +46,15 @@ export component RemoteWindow inherits Window {
     in property <bool> show-nav;
     // Width over height of the other device's display.
     in property <float> aspect: 1.6;
+    // Screen sharing (#21): the window shows the other device's screen, and the pad
+    // controls it. `frame` is the newest picture.
+    in property <bool> screen;
+    in property <bool> has-frame;
+    in property <image> frame;
+    // The displays of the other device when it has more than one, and the one shown.
+    in property <[string]> displays;
+    in property <int> display-index;
+    callback pick-display(int);
 
     // Pointer: position and the size of the pad (all in logical pixels).
     callback pointer-move(length, length, length, length);
@@ -63,7 +72,7 @@ export component RemoteWindow inherits Window {
     callback start();
     callback stop();
 
-    title: @tr("UrDevice remote control: {}", root.device-name);
+    title: root.screen ? @tr("UrDevice screen: {}", root.device-name) : @tr("UrDevice remote control: {}", root.device-name);
     preferred-width: 900px;
     preferred-height: 620px;
     min-width: 360px;
@@ -86,8 +95,16 @@ export component RemoteWindow inherits Window {
             if root.active && root.show-nav: Btn { text: @tr("Back"); clicked => { root.nav(0); } }
             if root.active && root.show-nav: Btn { text: @tr("Home"); clicked => { root.nav(1); } }
             if root.active && root.show-nav: Btn { text: @tr("Recents"); clicked => { root.nav(2); } }
-            if !root.active: Btn { text: @tr("Start"); kind: 0; clicked => { root.start(); } }
-            if root.active: Btn { text: @tr("Stop"); kind: 2; clicked => { root.stop(); } }
+            if root.displays.length > 1: HorizontalLayout {
+                spacing: 6px;
+                for name[i] in root.displays: Btn {
+                    text: name;
+                    kind: root.display-index == i ? 0 : 1;
+                    clicked => { root.pick-display(i); }
+                }
+            }
+            if !root.active: Btn { text: root.screen ? @tr("Control") : @tr("Start"); kind: 0; clicked => { root.start(); } }
+            if root.active: Btn { text: root.screen ? @tr("Release control") : @tr("Stop"); kind: 2; clicked => { root.stop(); } }
         }
 
         area := Rectangle {
@@ -101,13 +118,40 @@ export component RemoteWindow inherits Window {
                 y: (parent.height - self.height) / 2;
                 width: parent.pad-w;
                 height: parent.pad-h;
-                background: Theme.surface-2;
+                background: root.has-frame ? #000000 : Theme.surface-2;
                 border-radius: Theme.radius;
                 border-width: root.captured ? 2px : 1px;
                 border-color: root.captured ? Theme.accent : Theme.border;
                 clip: true;
 
+                if root.has-frame: Image {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.frame;
+                    image-fit: fill;
+                }
+
+                // Over the picture the hint is a small pill at the bottom, and gone while captured.
+                if root.has-frame && !root.captured: Rectangle {
+                    x: (parent.width - self.width) / 2;
+                    y: parent.height - self.height - 12px;
+                    width: min(parent.width - 24px, 440px);
+                    height: 30px;
+                    border-radius: 15px;
+                    background: #000000b0;
+                    Text {
+                        text: @tr("Click the screen to control {}. Press Ctrl+Alt+G to let go.", root.device-name);
+                        color: #ffffff;
+                        font-size: Theme.font-small;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
                 Text {
+                    visible: !root.has-frame;
                     text: !root.active ? @tr("Start a session to control {}.", root.device-name)
                         : root.captured ? @tr("Captured. Press Ctrl+Alt+G to release the pointer and keyboard.")
                         : @tr("Click here to capture the pointer and keyboard.");
@@ -139,7 +183,7 @@ export component RemoteWindow inherits Window {
                 }
 
                 TouchArea {
-                    enabled: root.active;
+                    enabled: root.active || root.screen;
                     mouse-cursor: root.captured ? MouseCursor.crosshair : MouseCursor.default;
                     moved => {
                         root.pointer-move(self.mouse-x, self.mouse-y, self.width, self.height);

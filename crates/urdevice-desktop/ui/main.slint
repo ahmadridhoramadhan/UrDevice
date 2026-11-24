@@ -48,6 +48,8 @@ export struct TileItem {
     feature: string,
     // True when the tile opens the feature's view instead of only asking.
     view: bool,
+    // True when the tile opens a window of its own and the page stays (screen sharing).
+    direct: bool,
     label: string,
     icon: image,
     // 0 allow, 1 ask, 2 deny, 3 not available over Bluetooth LE (R6.4)
@@ -893,6 +895,8 @@ export component MainWindow inherits Window {
                                                     root.toggle-tile(root.peer.id, t.feature, !t.on);
                                                 } else if (t.feature == "files") {
                                                     files-menu.show();
+                                                } else if (t.direct) {
+                                                    root.open-feature(root.peer.id, t.feature, t.key);
                                                 } else if (t.view) {
                                                     root.feature = t.feature;
                                                     root.feature-tile = t.key;

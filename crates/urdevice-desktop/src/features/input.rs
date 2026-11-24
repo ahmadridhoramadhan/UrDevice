@@ -43,6 +43,10 @@ use crate::ui::LaserWindow;
 mod laser_win;
 mod remote;
 
+pub(crate) use remote::{
+    open_screen as open_screen_window, screen_clear, screen_displays, screen_frame, screen_note,
+};
+
 pub(crate) struct Input;
 
 thread_local! {

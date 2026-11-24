@@ -39,6 +39,14 @@ struct Remote {
     /// What the host last reported, for the bar.
     host: Option<HostStatus>,
     refused: Option<String>,
+    /// The window shows the other device's screen (#21) and control starts with a click on it.
+    screen: bool,
+    /// A click asked for control before the session was active: capture as soon as it is.
+    grab_when_active: bool,
+    /// The size of the picture the window was last fitted to.
+    fitted: (u32, u32),
+    /// A line about the screen session (asking, starting, ended) that replaces the control line.
+    note: Option<String>,
 }
 
 thread_local! {
@@ -53,7 +61,21 @@ fn with<R>(f: impl FnOnce(&mut Remote) -> R) -> Option<R> {
 /// Open the window for `peer` (or bring the open one forward) and start a
 /// session. Runs on the UI thread.
 pub(super) fn open(svc: Arc<Service>, peer: DeviceId, name: &str) {
-    let same = REMOTE.with(|r| r.borrow().as_ref().is_some_and(|x| x.peer == peer));
+    open_window(svc, peer, name, false);
+}
+
+/// Open the window that shows `peer`'s screen (#21). It starts no control session: the first
+/// click on the picture does.
+pub(crate) fn open_screen(svc: Arc<Service>, peer: DeviceId, name: &str) {
+    open_window(svc, peer, name, true);
+}
+
+fn open_window(svc: Arc<Service>, peer: DeviceId, name: &str, screen: bool) {
+    let same = REMOTE.with(|r| {
+        r.borrow()
+            .as_ref()
+            .is_some_and(|x| x.peer == peer && x.screen == screen)
+    });
     if !same {
         // Another device's window ends its session first.
         close();
@@ -75,15 +97,101 @@ pub(super) fn open(svc: Arc<Service>, peer: DeviceId, name: &str) {
                 buttons: BTreeSet::new(),
                 host: None,
                 refused: None,
+                screen,
+                grab_when_active: false,
+                fitted: (0, 0),
+                note: None,
             });
         });
     }
     with(|r| {
         r.win.set_device_name(r.name.as_str().into());
+        r.win.set_screen(r.screen);
         let _ = r.win.show();
-        r.start();
+        if !r.screen {
+            r.start();
+        }
         r.refresh();
     });
+}
+
+/// The newest picture of the shared screen, `width` by `height` pixels. The first picture (and a
+/// change of size) fits the window to it, never larger than this computer's screen.
+pub(crate) fn screen_frame(frame: slint::Image, width: u32, height: u32) {
+    with(|r| {
+        if !r.screen || width == 0 || height == 0 {
+            return;
+        }
+        r.win.set_frame(frame);
+        r.win.set_has_frame(true);
+        r.win.set_aspect(width as f32 / height as f32);
+        if r.fitted != (width, height) {
+            r.fitted = (width, height);
+            fit_window(&r.win, width, height);
+        }
+    });
+}
+
+/// The picture is gone (the session ended or restarted).
+pub(crate) fn screen_clear() {
+    with(|r| {
+        if r.screen {
+            r.win.set_has_frame(false);
+            r.win.set_frame(slint::Image::default());
+            r.fitted = (0, 0);
+        }
+    });
+}
+
+/// A line about the screen session, or `None` to show the control line again.
+pub(crate) fn screen_note(note: Option<String>) {
+    with(|r| {
+        if r.screen {
+            r.note = note;
+            r.refresh();
+        }
+    });
+}
+
+/// The displays of the other device when it has more than one, and the one shown.
+pub(crate) fn screen_displays(names: &[String], index: i32) {
+    with(|r| {
+        if r.screen {
+            let model: Vec<slint::SharedString> = names.iter().map(|n| n.as_str().into()).collect();
+            r.win
+                .set_displays(slint::ModelRc::new(slint::VecModel::from(model)));
+            r.win.set_display_index(index);
+        }
+    });
+}
+
+/// Room around the picture: the padding of the window, and the bar above the pad.
+const FRAME_W: f64 = 24.0;
+const FRAME_H: f64 = 68.0;
+
+/// Size the window to the picture at 1:1, shrunk (same shape) until it fits this computer's
+/// screen, so it is never larger than that screen.
+fn fit_window(win: &RemoteWindow, width: u32, height: u32) {
+    use slint::winit_030::WinitWindowAccessor;
+    let mut limit = (1600.0_f64, 900.0_f64);
+    win.window().with_winit_window(|w| {
+        if let Some(m) = w.current_monitor().or_else(|| w.primary_monitor()) {
+            let scale = m.scale_factor().max(0.5);
+            limit = (
+                f64::from(m.size().width) / scale,
+                f64::from(m.size().height) / scale,
+            );
+        }
+    });
+    let (fw, fh) = (f64::from(width), f64::from(height));
+    // Leave room for the title bar and the panel of the desktop.
+    let room_w = limit.0 * 0.96 - FRAME_W;
+    let room_h = limit.1 * 0.88 - FRAME_H;
+    let k = (room_w / fw).min(room_h / fh).clamp(0.1, 1.0);
+    win.window().set_size(slint::LogicalSize::new(
+        (fw * k + FRAME_W) as f32,
+        (fh * k + FRAME_H) as f32,
+    ));
 }
 
 /// End the session and close the window. Runs on the UI thread.
@@ -103,6 +211,9 @@ pub(super) fn session(peer: DeviceId, active: bool) {
             if !active {
                 r.release();
                 r.host = None;
+            } else if r.grab_when_active {
+                r.grab_when_active = false;
+                r.set_captured(true);
             }
             r.refresh();
         }
@@ -151,7 +262,9 @@ impl Remote {
     fn refresh(&self) {
         let active = self.active();
         let name = &self.name;
-        let status = if let Some(why) = &self.refused {
+        let status = if let Some(note) = &self.note {
+            note.clone()
+        } else if let Some(why) = &self.refused {
             match why.as_str() {
                 "denied" => format!("Remote control is turned off on {name}."),
                 "declined" => format!("{name} did not allow remote control."),
@@ -161,6 +274,8 @@ impl Remote {
             }
         } else if self.svc.is_connecting(self.peer) {
             format!("Waiting for {name} to allow remote control…")
+        } else if !active && self.screen {
+            format!("Viewing {name}. Click the screen to control it.")
         } else if !active {
             "Remote control is off.".to_owned()
         } else {
@@ -196,9 +311,16 @@ impl Remote {
 
     fn set_captured(&mut self, on: bool) {
         if on && !self.active() {
+            if self.screen {
+                // The click on the picture asks for control; capture starts once it is allowed.
+                self.grab_when_active = true;
+                self.start();
+                self.refresh();
+            }
             return;
         }
         if !on {
+            self.grab_when_active = false;
             self.release_keys();
         }
         self.captured = on;
@@ -321,6 +443,7 @@ fn wire(win: &RemoteWindow) {
             }
         });
     });
+    win.on_pick_display(super::super::screen::pick_display_from_window);
     win.on_capture(|on| {
         with(|r| r.set_captured(on));
     });
@@ -350,6 +473,10 @@ fn wire(win: &RemoteWindow) {
         if let Some(mut r) = old {
             r.release();
             let _ = r.svc.end(r.peer);
+            if r.screen {
+                // Closing the window of a shared screen ends the screen session.
+                super::super::screen::window_closed();
+            }
         }
         slint::CloseRequestResponse::HideWindow
     });

@@ -77,6 +77,12 @@ pub(crate) trait Feature {
         false
     }
 
+    /// True when a tile opens a window of its own: the page does not change, and `open` is
+    /// called at once (screen sharing).
+    fn direct(&self) -> bool {
+        false
+    }
+
     /// Called once after the window and the node exist: wire the Slint
     /// global's callbacks, give the core service its desktop adapters
     /// (`urdevice_platform::features::<id>`), and set its listener.

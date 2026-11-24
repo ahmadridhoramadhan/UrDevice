@@ -143,6 +143,10 @@ impl FrameHandler for Pipe {
 
 fn encode_loop(p: &Pipe) {
     let mut encoder: Option<AutoEncoder> = None;
+    // The last picture sent. A static screen (a Wayland compositor sends frames only when
+    // something changes) makes no new frame, so a viewer that joins late and asks for a
+    // keyframe would see black until something moves. The keyframe is made from this one.
+    let mut last: Option<Frame> = None;
     while !p.stopped.load(Ordering::Relaxed) {
         let frame = {
             let mut g = lock(&p.mailbox);
@@ -154,7 +158,16 @@ fn encode_loop(p: &Pipe) {
             }
             g.take()
         };
-        let Some(frame) = frame else { continue };
+        let frame = match frame {
+            Some(f) => f,
+            None => match last.take() {
+                Some(f) if p.keyframe.load(Ordering::Relaxed) => f,
+                other => {
+                    last = other;
+                    continue;
+                }
+            },
+        };
         let target = *lock(&p.target);
         let (w, h) = target.fit(frame.width, frame.height);
         let settings = EncoderSettings {
@@ -194,7 +207,14 @@ fn encode_loop(p: &Pipe) {
         };
         let pts_us = u64::try_from(p.epoch.elapsed().as_micros()).unwrap_or(u64::MAX);
         let key = p.keyframe.swap(false, Ordering::Relaxed);
-        match enc.encode(&bgra, pts_us, key) {
+        let result = enc.encode(&bgra, pts_us, key);
+        last = Some(Frame {
+            width: bgra.width,
+            height: bgra.height,
+            stride: bgra.stride,
+            data: bgra.data,
+        });
+        match result {
             Ok(units) => {
                 for u in units {
                     p.sink.push(EncodedFrame {
@@ -310,10 +330,18 @@ impl Decode {
             let g = w.global::<ScreenFeature>();
             g.set_frame_width(buf.width() as i32);
             g.set_frame_height(buf.height() as i32);
-            g.set_frame(Image::from_rgba8(buf));
+            let image = Image::from_rgba8(buf);
+            g.set_frame(image.clone());
             if g.get_state() == 2 {
                 g.set_state(3);
             }
+            let (fw, fh) = (g.get_frame_width(), g.get_frame_height());
+            super::input::screen_frame(
+                image,
+                u32::try_from(fw).unwrap_or(0),
+                u32::try_from(fh).unwrap_or(0),
+            );
+            sync_note(&w);
         });
     }
 }
@@ -417,6 +445,9 @@ struct Ui {
     activity: Option<u64>,
     displays: Vec<Display>,
     started: bool,
+    window: Option<slint::Weak<MainWindow>>,
+    /// The other device's name, for the lines in the window.
+    name: String,
 }
 
 thread_local! {
@@ -448,6 +479,37 @@ fn reset(w: &MainWindow, message: i32) {
     g.set_frame(Image::default());
     g.set_frame_width(0);
     g.set_frame_height(0);
+    super::input::screen_clear();
+    super::input::screen_displays(&[], 0);
+    sync_note(w);
+}
+
+/// The line the screen window shows about the session, or `None` when the picture is up.
+fn note_text(state: i32, message: i32, name: &str) -> Option<String> {
+    match state {
+        1 => Some(format!("Waiting for {name} to allow screen sharing…")),
+        2 => Some(format!("Starting the screen of {name}…")),
+        3 => None,
+        _ => Some(match message {
+            kind::DECLINED => format!("{name} did not allow screen sharing."),
+            kind::DENIED => format!("Screen sharing is turned off on {name}."),
+            kind::OFFLINE => format!("{name} is offline."),
+            kind::NO_HOST => format!("{name} cannot share its screen."),
+            kind::CONSENT => {
+                format!("Screen sharing was not allowed in the system dialog on {name}.")
+            }
+            kind::FAILED => format!("The screen of {name} could not be captured."),
+            kind::TIMEOUT => format!("{name} did not answer in time."),
+            _ => "Screen sharing ended.".to_owned(),
+        }),
+    }
+}
+
+/// Tell the screen window how the session is going.
+fn sync_note(w: &MainWindow) {
+    let g = w.global::<ScreenFeature>();
+    let name = UI.with(|u| u.borrow().name.clone());
+    super::input::screen_note(note_text(g.get_state(), g.get_message_kind(), &name));
 }
 
 fn on_opened(w: &MainWindow, peer: DeviceId, activity: u64) {
@@ -468,6 +530,7 @@ fn on_opened(w: &MainWindow, peer: DeviceId, activity: u64) {
         return;
     };
     w.global::<ScreenFeature>().set_state(2);
+    sync_note(w);
     if let Err(e) = svc.list_displays(peer, activity) {
         tracing::debug!(error = %e, "could not ask for displays");
     }
@@ -499,9 +562,12 @@ fn on_displays(w: &MainWindow, peer: DeviceId, activity: u64, displays: Vec<Disp
             }
         })
         .collect();
+    let plain: Vec<String> = names.iter().map(ToString::to_string).collect();
     g.set_displays(ModelRc::new(VecModel::from(names)));
+    super::input::screen_displays(&plain, g.get_display_index());
     if first && let (Some(d), Some(svc)) = (displays.get(index), svc) {
         g.set_display_index(index as i32);
+        super::input::screen_displays(&plain, index as i32);
         let _ = svc.start(peer, activity, d.id, 0, 0, 0);
     }
     if displays.is_empty() {
@@ -532,91 +598,74 @@ fn on_error(w: &MainWindow, peer: DeviceId, activity: u64, message: i32) {
     }
 }
 
-/// Pointer on the picture (R12.5). `x`, `y` are fractions of the host's
-/// display; `event` is 0 for movement, 1 for a button down, 2 for a button up;
-/// `button` is 0 left, 1 right, 2 middle. The first press asks the host for an
-/// `input.v1` activity (the host's user approves it and sees the indicator
-/// with Stop); movement before that is dropped. The host sees `Abs` events,
-/// which a Wayland or `uinput` host cannot place (it ignores them).
-fn pointer(x: f32, y: f32, event: i32, button: i32) {
-    let (input, peer) = UI.with(|u| {
-        let u = u.borrow();
-        (u.input.clone(), u.peer)
-    });
-    let (Some(input), Some(peer)) = (input, peer) else {
+/// Ask the other device to share its screen (state 1). Runs on the UI thread.
+fn begin(w: &MainWindow) {
+    let g = w.global::<ScreenFeature>();
+    let Some(peer) = DeviceId::from_hex(&g.get_peer_id()) else {
         return;
     };
-    if !input.is_active(peer) {
-        if event == 1 && !input.is_connecting(peer) {
-            let _ = input.connect(peer);
-        }
-        return;
-    }
-    let to = |v: f32| (v.clamp(0.0, 1.0) * 65535.0).round() as u32;
-    let _ = input.pointer_abs(peer, to(x), to(y), 0);
-    let b = u32::try_from(button).unwrap_or(0);
-    match event {
-        1 => {
-            let _ = input.button(peer, b, true);
-        }
-        2 => {
-            let _ = input.button(peer, b, false);
-        }
-        _ => {}
+    let svc = UI.with(|u| {
+        let mut u = u.borrow_mut();
+        u.peer = Some(peer);
+        u.activity = None;
+        u.started = false;
+        u.svc.clone()
+    });
+    let Some(svc) = svc else { return };
+    g.set_message_kind(kind::NONE);
+    g.set_state(1);
+    sync_note(w);
+    if svc.request_view(peer).is_err() {
+        reset(w, kind::OFFLINE);
     }
 }
 
-fn wire(w: &MainWindow) {
+/// End the session, if any. Runs on the UI thread.
+fn end_session(w: &MainWindow) {
+    let (peer, act, svc) = UI.with(|u| {
+        let u = u.borrow();
+        (u.peer, u.activity, u.svc.clone())
+    });
+    reset(w, kind::NONE);
+    if let (Some(p), Some(a), Some(s)) = (peer, act, svc) {
+        s.stop(p, a);
+    }
+}
+
+/// Show display `i` of the other device. Runs on the UI thread.
+fn pick(w: &MainWindow, i: i32) {
+    let pick = UI.with(|u| {
+        let u = u.borrow();
+        let d = u.displays.get(usize::try_from(i).ok()?)?.id;
+        Some((u.peer?, u.activity?, d, u.svc.clone()?))
+    });
+    let Some((peer, act, display, svc)) = pick else {
+        return;
+    };
     let g = w.global::<ScreenFeature>();
-    let weak = w.as_weak();
-    g.on_start(move || {
-        let Some(w) = weak.upgrade() else { return };
-        let peer = DeviceId::from_hex(&w.global::<ScreenFeature>().get_peer_id());
-        let Some(peer) = peer else { return };
-        let svc = UI.with(|u| {
-            let mut u = u.borrow_mut();
-            u.peer = Some(peer);
-            u.activity = None;
-            u.started = false;
-            u.svc.clone()
-        });
-        let Some(svc) = svc else { return };
-        let g = w.global::<ScreenFeature>();
-        g.set_message_kind(kind::NONE);
-        g.set_state(1);
-        if svc.request_view(peer).is_err() {
-            reset(&w, kind::OFFLINE);
-        }
-    });
-    let weak = w.as_weak();
-    g.on_stop(move || {
-        let Some(w) = weak.upgrade() else { return };
-        let (peer, act, svc) = UI.with(|u| {
-            let u = u.borrow();
-            (u.peer, u.activity, u.svc.clone())
-        });
-        reset(&w, kind::NONE);
-        if let (Some(p), Some(a), Some(s)) = (peer, act, svc) {
-            s.stop(p, a);
-        }
-    });
-    let weak = w.as_weak();
-    g.on_pick_display(move |i| {
-        let Some(w) = weak.upgrade() else { return };
-        let pick = UI.with(|u| {
-            let u = u.borrow();
-            let d = u.displays.get(usize::try_from(i).ok()?)?.id;
-            Some((u.peer?, u.activity?, d, u.svc.clone()?))
-        });
-        let Some((peer, act, display, svc)) = pick else {
-            return;
-        };
-        let g = w.global::<ScreenFeature>();
-        g.set_display_index(i);
-        g.set_state(2);
-        let _ = svc.start(peer, act, display, 0, 0, 0);
-    });
-    g.on_pointer(pointer);
+    g.set_display_index(i);
+    g.set_state(2);
+    sync_note(w);
+    let _ = svc.start(peer, act, display, 0, 0, 0);
+}
+
+fn window_of_ui() -> Option<MainWindow> {
+    UI.with(|u| u.borrow().window.clone())
+        .and_then(|w| w.upgrade())
+}
+
+/// The user closed the screen window: the session ends with it.
+pub(crate) fn window_closed() {
+    if let Some(w) = window_of_ui() {
+        end_session(&w);
+    }
+}
+
+/// The user picked another display in the screen window.
+pub(crate) fn pick_display_from_window(i: i32) {
+    if let Some(w) = window_of_ui() {
+        pick(&w, i);
+    }
 }
 
 impl Feature for Screen {
@@ -631,14 +680,15 @@ impl Feature for Screen {
         }]
     }
 
-    fn has_view(&self) -> bool {
+    // The tile opens a window of its own, not a page (#21).
+    fn direct(&self) -> bool {
         true
     }
 
     fn start(&self, ctx: &FeatureCtx) {
-        let Some(w) = ctx.window.upgrade() else {
+        if ctx.window.upgrade().is_none() {
             return;
-        };
+        }
         let Some(svc) = ctx.node.service::<ScreenService>() else {
             return;
         };
@@ -669,8 +719,8 @@ impl Feature for Screen {
             u.svc = Some(svc);
             u.input = ctx.node.service::<urdevice_core::services::input::Input>();
             u.dec = Some(dec);
+            u.window = Some(ctx.window.clone());
         });
-        wire(&w);
     }
 
     fn refresh(&self, ctx: &FeatureCtx, snap: &Snapshot) {
@@ -716,5 +766,15 @@ impl Feature for Screen {
         }
         w.global::<ScreenFeature>()
             .set_peer_id(peer.id.clone().into());
+        UI.with(|u| u.borrow_mut().name = peer.name.clone());
+        // The tile starts the session at once, in a window of its own.
+        let running = w.global::<ScreenFeature>().get_state() != 0;
+        if !running {
+            begin(&w);
+        }
+        if let Some(input) = UI.with(|u| u.borrow().input.clone()) {
+            super::input::open_screen_window(input, id, &peer.name);
+        }
+        sync_note(&w);
     }
 }
