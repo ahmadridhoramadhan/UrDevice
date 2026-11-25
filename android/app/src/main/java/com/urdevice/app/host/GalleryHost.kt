@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.database.Cursor
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
@@ -31,8 +32,6 @@ class GalleryHost(context: Context) : GalleryHostFfi {
         if (!hasMediaPermission(app)) return FfiGalleryPage(emptyList(), false, true)
         val args = Bundle().apply {
             putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
-            putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(MediaStore.MediaColumns.DATE_ADDED, MediaStore.MediaColumns._ID))
-            putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
             // One more than asked, to know whether there is a next page.
             putInt(ContentResolver.QUERY_ARG_LIMIT, limit.toInt() + 1)
             putInt(ContentResolver.QUERY_ARG_OFFSET, cursor.toInt())
@@ -49,7 +48,7 @@ class GalleryHost(context: Context) : GalleryHostFfi {
         )
         val items = ArrayList<FfiGalleryItem>()
         var more = false
-        app.contentResolver.query(collection, cols, args, null)?.use { c ->
+        newestFirst(cols, args)?.use { c ->
             while (c.moveToNext()) {
                 if (items.size >= limit.toInt()) {
                     more = true
@@ -70,6 +69,25 @@ class GalleryHost(context: Context) : GalleryHostFfi {
             }
         }
         return FfiGalleryPage(items, more, false)
+    }
+
+    /**
+     * Newest first by the day the picture was taken (the day it was added when the phone does not
+     * say). Sorting by the day it was added put restored or synced old pictures on top. Some Android
+     * versions refuse a sort expression; then the plain taken-date columns are used.
+     */
+    private fun newestFirst(cols: Array<String>, args: Bundle): Cursor? {
+        val taken = MediaStore.MediaColumns.DATE_TAKEN
+        val added = MediaStore.MediaColumns.DATE_ADDED
+        val expression = Bundle(args).apply {
+            putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "COALESCE($taken, $added * 1000) DESC, ${MediaStore.MediaColumns._ID} DESC")
+        }
+        runCatching { app.contentResolver.query(collection, cols, expression, null) }.getOrNull()?.let { return it }
+        val columns = Bundle(args).apply {
+            putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(taken, added, MediaStore.MediaColumns._ID))
+            putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
+        }
+        return app.contentResolver.query(collection, cols, columns, null)
     }
 
     private fun uri(id: Long, video: Boolean) = ContentUris.withAppendedId(

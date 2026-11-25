@@ -6,6 +6,7 @@ import { Icon, IconBox, Btn, Card, Chip, Dot, ModeSwitch, Toggle, SectionTitle, 
 import { Labels } from "labels.slint";
 import { FeatureView } from "features/features.slint";
 import { ClipboardFeature } from "features/clipboard.slint";
+import { GalleryFeature } from "features/gallery.slint";
 import { FilesSettings, FilesFeature, TransferCard } from "features/files.slint";
 // Localhost sharing (#22): this device's shared ports and the LAN indicator.
 import { TunnelHostSection, TunnelLanBanner } from "features/tunnel.slint";
@@ -754,6 +755,9 @@ export component MainWindow inherits Window {
                 content-in := ContentIn {
                     key: root.selected-peer + "|" + root.feature + "|" + root.feature-tile + "|" + (root.page == Page.this-device ? "t" : root.page == Page.peer ? "d" : root.page == Page.feature ? "f" : root.page == Page.pair ? "p" : root.page == Page.settings ? "s" : "l");
                     main-scroll := ScrollView {
+                        // For the gallery: the page is scrolled near its end, so it loads more.
+                        property <bool> near-end: self.content-height + self.content-y - self.height < 500px;
+                        changed near-end => { GalleryFeature.near-end = self.near-end; }
                         x: 0px;
                         y: content-in.offset;
                         width: content-in.width;

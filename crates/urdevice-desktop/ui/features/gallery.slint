@@ -32,6 +32,8 @@ export global GalleryFeature {
     in property <int> queued;
     // The item shown large, or -1 for the grid.
     in-out property <int> detail: -1;
+    // True while the page is scrolled near its end. main.slint sets it.
+    in-out property <bool> near-end;
     callback reload();
     callback load-more();
     callback toggle(int);
@@ -296,6 +298,12 @@ export component GalleryView inherits VerticalLayout {
     in property <string> peer-name;
     spacing: 12px;
 
+    // Load the next page by itself: near the end of the grid, or three pictures from the end of
+    // the big view. It does not retry after an error.
+    property <bool> want-more: (GalleryFeature.detail >= 0 ? GalleryFeature.detail >= GalleryFeature.items.length - 3 : GalleryFeature.near-end)
+        && GalleryFeature.more && !GalleryFeature.loading && GalleryFeature.error == "";
+    changed want-more => { if root.want-more { GalleryFeature.load-more(); } }
+
     if GalleryFeature.detail >= 0 && GalleryFeature.detail < GalleryFeature.items.length: Detail {
         t: GalleryFeature.items[GalleryFeature.detail];
     }
@@ -376,9 +384,11 @@ export component GalleryView inherits VerticalLayout {
                 y: floor(i / grid.cols) * (grid.side + grid.gap);
             }
         }
-        if GalleryFeature.more: HorizontalLayout {
+        if GalleryFeature.more && GalleryFeature.loading && GalleryFeature.items.length > 0: Muted { text: @tr("Loading…"); horizontal-alignment: center; }
+        // Only after an error: the next page is otherwise loaded by itself.
+        if GalleryFeature.more && GalleryFeature.error != "" && GalleryFeature.items.length > 0: HorizontalLayout {
             alignment: center;
-            Btn { text: GalleryFeature.loading ? @tr("Loading…") : @tr("Load more"); enabled: !GalleryFeature.loading; clicked => { GalleryFeature.load-more(); } }
+            Btn { text: @tr("Try again"); clicked => { GalleryFeature.load-more(); } }
         }
     }
 }
