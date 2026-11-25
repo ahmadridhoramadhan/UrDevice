@@ -248,14 +248,29 @@ class VideoDecoder(private val wantKeyframe: () -> Unit) {
         Thread(::loop, "screen-decoder").apply { isDaemon = true }.start()
     }
 
+    @Volatile private var lastAsk = 0L
+
+    /** Ask for a keyframe, at most every 700 ms. */
+    private fun ask() {
+        val now = System.currentTimeMillis()
+        if (now - lastAsk < 700) return
+        lastAsk = now
+        wantKeyframe()
+    }
+
     fun reset() {
         queue.clear()
         waitKey = true
         resetCodec = true
+        ask()
     }
 
     fun offer(f: FfiVideoFrame) {
-        if (waitKey && !f.keyframe) return
+        if (waitKey && !f.keyframe) {
+            // Frames are coming but the picture cannot start: ask again until a keyframe arrives.
+            ask()
+            return
+        }
         if (f.keyframe) waitKey = false
         if (!queue.offer(f)) {
             queue.clear()
