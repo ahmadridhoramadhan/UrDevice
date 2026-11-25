@@ -141,18 +141,32 @@ object ScreenViewer : ScreenListener {
     @Volatile private var started = false
     val decoder = VideoDecoder { requestKeyframe() }
 
+    // Calls into the core run on this one thread, never inside a core callback. A callback that
+    // called back into the core on the same thread made the core call another callback, and
+    // Android aborted the app ("attempting to detach while still running code").
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "screen-core").apply { isDaemon = true }
+    }
+
+    private fun core(call: (UrDeviceNode) -> Unit) {
+        io.execute { Core.node()?.let { n -> runCatching { call(n) } } }
+    }
+
     fun start(peerId: String) {
         stop(null)
         peer = peerId
         reason.value = null
         state.value = ASKING
-        if (runCatching { Core.node()?.screenRequestView(peerId) }.isFailure) finish("offline")
+        io.execute {
+            val ok = runCatching { Core.node()?.screenRequestView(peerId) }.isSuccess
+            if (!ok && peer == peerId) finish("offline")
+        }
     }
 
     fun stop(why: String?) {
         val p = peer
         val a = activity
-        if (p != null && a != null) runCatching { Core.node()?.screenStop(p, a) }
+        if (p != null && a != null) core { it.screenStop(p, a) }
         finish(why)
     }
 
@@ -172,23 +186,23 @@ object ScreenViewer : ScreenListener {
         val d = displays.value.getOrNull(index) ?: return
         selected.value = index
         state.value = STARTING
-        runCatching { Core.node()?.screenStart(p, a, d.id, 0u, 0u, 0u) }
+        core { it.screenStart(p, a, d.id, 0u, 0u, 0u) }
     }
 
     private fun requestKeyframe() {
         val p = peer ?: return
         val a = activity ?: return
-        runCatching { Core.node()?.screenRequestKeyframe(p, a) }
+        core { it.screenRequestKeyframe(p, a) }
     }
 
     override fun onOpened(deviceId: String, activity: ULong) {
         if (deviceId != peer || state.value != ASKING) {
-            runCatching { Core.node()?.screenStop(deviceId, activity) }
+            core { it.screenStop(deviceId, activity) }
             return
         }
         this.activity = activity
         state.value = STARTING
-        runCatching { Core.node()?.screenListDisplays(deviceId, activity) }
+        core { it.screenListDisplays(deviceId, activity) }
     }
 
     override fun onDisplays(deviceId: String, activity: ULong, displays: List<FfiDisplay>) {
