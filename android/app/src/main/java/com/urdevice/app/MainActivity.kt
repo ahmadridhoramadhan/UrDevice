@@ -74,6 +74,7 @@ import com.urdevice.app.ui.Onboarding
 import com.urdevice.app.ui.PairBody
 import com.urdevice.app.ui.SettingsScreen
 import com.urdevice.app.ui.ThisDeviceScreen
+import com.urdevice.app.ui.features.InputFeature
 import com.urdevice.app.ui.features.LocalOpenFeaturePage
 import com.urdevice.app.ui.UrDeviceTheme
 import com.urdevice.app.ui.features.feature
