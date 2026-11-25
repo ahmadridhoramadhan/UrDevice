@@ -1,6 +1,6 @@
 // Android gallery (#17): the desktop feature view.
 // Rust side: src/features/gallery.rs. See docs/dev/adding-a-feature.md.
-import { Btn, Card, Muted } from "../widgets.slint";
+import { Btn, Card, Muted, Icon, IconBtn } from "../widgets.slint";
 import { Theme } from "../theme.slint";
 
 export struct GalleryTile {
@@ -12,6 +12,10 @@ export struct GalleryTile {
     // Video length, empty for photos.
     duration: string,
     selected: bool,
+    video: bool,
+    mime: string,
+    // When it was taken, in local time. Empty when the phone did not say.
+    date-text: string,
 }
 
 // State and callbacks shared with src/features/gallery.rs.
@@ -26,99 +30,355 @@ export global GalleryFeature {
     in property <int> selected;
     // Items just sent to the download list.
     in property <int> queued;
+    // The item shown large, or -1 for the grid.
+    in-out property <int> detail: -1;
     callback reload();
     callback load-more();
     callback toggle(int);
     callback select-all(bool);
     callback download();
+    callback download-one(int);
     callback open-folder();
 }
 
+// One square picture in the grid. A tap opens it; the round mark selects it.
 component Tile inherits Rectangle {
     in property <GalleryTile> t;
-    width: 132px;
-    height: 160px;
+    in property <length> side;
+    width: side;
+    height: side;
     border-radius: 8px;
-    background: t.selected ? Theme.accent.with-alpha(0.25) : Theme.surface-2;
-    border-width: t.selected ? 2px : 0px;
-    border-color: Theme.accent;
-    ta := TouchArea { clicked => { GalleryFeature.toggle(t.index); } }
-    VerticalLayout {
-        padding: 6px;
-        spacing: 4px;
-        Rectangle {
-            height: 120px;
-            clip: true;
-            border-radius: 6px;
-            background: Theme.surface;
-            if t.has-thumb: Image { source: t.thumb; width: parent.width; height: parent.height; image-fit: cover; }
-            if !t.has-thumb: Muted { text: @tr("No preview"); horizontal-alignment: center; vertical-alignment: center; }
-            if t.duration != "": Rectangle {
-                x: parent.width - self.width - 4px;
-                y: parent.height - self.height - 4px;
-                width: dur.preferred-width + 8px;
-                height: 18px;
-                border-radius: 4px;
-                background: #000000a0;
-                dur := Text { text: t.duration; color: white; font-size: 11px; }
+    clip: true;
+    background: Theme.surface-2;
+    accessible-role: button;
+    accessible-label: t.name;
+
+    if t.has-thumb: Image {
+        source: t.thumb;
+        width: parent.width;
+        height: parent.height;
+        image-fit: cover;
+    }
+    if !t.has-thumb: Icon {
+        source: @image-url("../icons/image.svg");
+        tint: Theme.muted;
+        width: 28px;
+        height: 28px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    // A hover or selection tint over the picture.
+    Rectangle {
+        background: t.selected ? Theme.accent.with-alpha(0.28) : open.has-hover ? #00000030 : transparent;
+        border-width: t.selected ? 3px : 0px;
+        border-color: Theme.accent;
+        border-radius: 8px;
+    }
+    open := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { GalleryFeature.detail = t.index; }
+    }
+    if t.duration != "": Rectangle {
+        x: parent.width - self.width - 6px;
+        y: parent.height - self.height - 6px;
+        width: dur.preferred-width + 12px;
+        height: 20px;
+        border-radius: 10px;
+        background: #000000b0;
+        dur := Text {
+            text: t.duration;
+            color: white;
+            font-size: 11px;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+    if t.video && t.duration == "": Icon {
+        source: @image-url("../icons/play.svg");
+        tint: white;
+        x: parent.width - self.width - 6px;
+        y: parent.height - self.height - 6px;
+        width: 20px;
+        height: 20px;
+    }
+    // The selection mark: shown on hover, or while anything is selected.
+    Rectangle {
+        x: 6px;
+        y: 6px;
+        width: 24px;
+        height: 24px;
+        border-radius: 12px;
+        opacity: (open.has-hover || mark.has-hover || t.selected || GalleryFeature.selected > 0) ? 1 : 0;
+        background: t.selected ? Theme.accent : #00000070;
+        border-width: 2px;
+        border-color: t.selected ? Theme.accent : white;
+        accessible-role: checkbox;
+        accessible-label: @tr("Select");
+        accessible-checked: t.selected;
+        if t.selected: Icon {
+            source: @image-url("../icons/check.svg");
+            tint: Theme.on-accent;
+            width: 14px;
+            height: 14px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+        }
+        mark := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { GalleryFeature.toggle(t.index); }
+        }
+    }
+}
+
+// A round arrow over the big picture.
+component Arrow inherits Rectangle {
+    in property <bool> flip;
+    callback clicked();
+    width: 40px;
+    height: 40px;
+    border-radius: 20px;
+    background: ta.has-hover ? #000000c0 : #00000080;
+    Icon {
+        source: @image-url("../icons/back.svg");
+        tint: white;
+        transform-rotation: root.flip ? 180deg : 0deg;
+        width: 20px;
+        height: 20px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component InfoRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 12px;
+    Text { text: root.label; color: Theme.muted; font-size: Theme.font-body; width: 72px; }
+    Text { text: root.value; color: Theme.text; font-size: Theme.font-body; horizontal-stretch: 1; wrap: word-wrap; }
+}
+
+// One picture, large, with its details.
+component Detail inherits VerticalLayout {
+    in property <GalleryTile> t;
+    spacing: 12px;
+
+    // Left and right arrows and Esc move around and close.
+    FocusScope {
+        height: 0px;
+        init => { self.focus(); }
+        key-pressed(e) => {
+            if e.text == Key.LeftArrow {
+                if GalleryFeature.detail > 0 { GalleryFeature.detail -= 1; }
+                return accept;
             }
-            if t.selected: Rectangle {
-                x: 4px; y: 4px; width: 20px; height: 20px; border-radius: 10px;
-                background: Theme.accent;
-                Text { text: "✓"; color: Theme.on-accent; font-size: 12px; }
+            if e.text == Key.RightArrow {
+                if GalleryFeature.detail < GalleryFeature.items.length - 1 { GalleryFeature.detail += 1; }
+                return accept;
+            }
+            if e.text == Key.Escape {
+                GalleryFeature.detail = -1;
+                return accept;
+            }
+            reject
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 10px;
+        IconBtn {
+            icon: @image-url("../icons/back.svg");
+            label: @tr("Back to all");
+            clicked => { GalleryFeature.detail = -1; }
+        }
+        Text {
+            text: t.name;
+            font-size: Theme.font-title;
+            font-weight: 700;
+            color: Theme.text;
+            overflow: elide;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Muted {
+            text: @tr("{} of {}", GalleryFeature.detail + 1, GalleryFeature.items.length);
+            vertical-alignment: center;
+        }
+    }
+
+    Rectangle {
+        height: 380px;
+        border-radius: 12px;
+        clip: true;
+        background: Theme.dark ? #0a120a : #e9e4d8;
+        if t.has-thumb: Image {
+            source: t.thumb;
+            width: parent.width;
+            height: parent.height;
+            image-fit: contain;
+        }
+        if !t.has-thumb: Icon {
+            source: @image-url("../icons/image.svg");
+            tint: Theme.muted;
+            width: 48px;
+            height: 48px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+        }
+        if t.video: Rectangle {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: #000000a0;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            Icon {
+                source: @image-url("../icons/play.svg");
+                tint: white;
+                width: 28px;
+                height: 28px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
             }
         }
-        Text { text: t.name; font-size: 11px; color: Theme.text; overflow: elide; }
-        Text { text: t.size-text; font-size: 10px; color: Theme.muted; }
+        if GalleryFeature.detail > 0: Arrow {
+            x: 12px;
+            y: (parent.height - self.height) / 2;
+            clicked => { GalleryFeature.detail -= 1; }
+        }
+        if GalleryFeature.detail < GalleryFeature.items.length - 1: Arrow {
+            flip: true;
+            x: parent.width - self.width - 12px;
+            y: (parent.height - self.height) / 2;
+            clicked => { GalleryFeature.detail += 1; }
+        }
     }
+
+    Card {
+        VerticalLayout {
+            padding: 14px;
+            spacing: 8px;
+            InfoRow { label: @tr("Type"); value: (t.video ? @tr("Video") : @tr("Photo")) + (t.mime != "" ? " · " + t.mime : ""); }
+            InfoRow { label: @tr("Size"); value: t.size-text; }
+            if t.date-text != "": InfoRow { label: @tr("Taken"); value: t.date-text; }
+            if t.duration != "": InfoRow { label: @tr("Length"); value: t.duration; }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        Btn {
+            text: @tr("Download");
+            kind: 0;
+            has-icon: false;
+            clicked => { GalleryFeature.download-one(t.index); }
+        }
+        Btn {
+            text: t.selected ? @tr("Unselect") : @tr("Select");
+            kind: 1;
+            clicked => { GalleryFeature.toggle(t.index); }
+        }
+    }
+    if GalleryFeature.queued > 0: Muted {
+        text: @tr("Downloading to your download folder.");
+        color: Theme.allow-fg;
+    }
+    Muted { text: @tr("This is a small preview. Download the file to see it in full."); wrap: word-wrap; }
 }
 
 export component GalleryView inherits VerticalLayout {
     // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
     in property <string> peer-name;
-    spacing: 10px;
-    HorizontalLayout {
-        spacing: 8px;
-        alignment: start;
-        Btn { text: GalleryFeature.selected > 0 ? @tr("Download {}", GalleryFeature.selected) : @tr("Download"); kind: 0; enabled: GalleryFeature.selected > 0; clicked => { if (GalleryFeature.selected > 0) { GalleryFeature.download(); } } }
-        Btn { text: @tr("Select all"); clicked => { GalleryFeature.select-all(true); } }
-        if GalleryFeature.selected > 0: Btn { text: @tr("Clear selection"); kind: 3; clicked => { GalleryFeature.select-all(false); } }
-        Btn { text: @tr("Reload"); kind: 3; clicked => { GalleryFeature.reload(); } }
-        Btn { text: @tr("Open download folder"); kind: 3; clicked => { GalleryFeature.open-folder(); } }
+    spacing: 12px;
+
+    if GalleryFeature.detail >= 0 && GalleryFeature.detail < GalleryFeature.items.length: Detail {
+        t: GalleryFeature.items[GalleryFeature.detail];
     }
-    if GalleryFeature.queued > 0: Muted { text: @tr("Downloading {} items to the download folder. Progress shows in Send files.", GalleryFeature.queued); color: Theme.allow-fg; }
-    if GalleryFeature.error != "": Card {
-        VerticalLayout {
-            padding: 14px;
+
+    if GalleryFeature.detail < 0 || GalleryFeature.detail >= GalleryFeature.items.length: VerticalLayout {
+        spacing: 12px;
+
+        // Nothing selected: a count and two small actions. Something selected: the selection bar.
+        if GalleryFeature.selected == 0: HorizontalLayout {
+            spacing: 8px;
             Text {
-                wrap: word-wrap;
-                color: Theme.deny-fg;
-                text: GalleryFeature.error == "permission" ? @tr("Allow UrDevice to read photos and videos on {}, then reload.", root.peer-name)
-                    : GalleryFeature.error == "denied" ? @tr("{} has Gallery turned off.", root.peer-name)
-                    : GalleryFeature.error == "declined" ? @tr("{} declined the request.", root.peer-name)
-                    : GalleryFeature.error == "timeout" ? @tr("{} did not answer in time.", root.peer-name)
-                    : GalleryFeature.error == "offline" ? @tr("{} is not connected.", root.peer-name)
-                    : GalleryFeature.error == "unsupported" ? @tr("{} has no gallery.", root.peer-name)
-                    : @tr("Could not load the gallery.");
+                text: @tr("{} photos and videos", "\{GalleryFeature.items.length}\{GalleryFeature.more ? "+" : ""}");
+                font-size: Theme.font-body;
+                font-weight: 600;
+                color: Theme.text;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            Btn { text: @tr("Select all"); kind: 3; enabled: GalleryFeature.items.length > 0; clicked => { GalleryFeature.select-all(true); } }
+            Btn { text: @tr("Reload"); kind: 3; clicked => { GalleryFeature.reload(); } }
+            IconBtn { icon: @image-url("../icons/folder.svg"); label: @tr("Open download folder"); clicked => { GalleryFeature.open-folder(); } }
+        }
+        if GalleryFeature.selected > 0: Rectangle {
+            height: 48px;
+            border-radius: 24px;
+            background: Theme.icon-bg;
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 8px;
+                spacing: 8px;
+                Text {
+                    text: @tr("{} selected", GalleryFeature.selected);
+                    font-size: Theme.font-body;
+                    font-weight: 700;
+                    color: Theme.text;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Btn { text: @tr("Select all"); kind: 3; y: (parent.height - self.height) / 2; clicked => { GalleryFeature.select-all(true); } }
+                Btn { text: @tr("Clear"); kind: 3; y: (parent.height - self.height) / 2; clicked => { GalleryFeature.select-all(false); } }
+                Btn { text: @tr("Download"); kind: 0; y: (parent.height - self.height) / 2; clicked => { GalleryFeature.download(); } }
             }
         }
-    }
-    if GalleryFeature.loading && GalleryFeature.items.length == 0: Muted { text: @tr("Waiting for {}…", root.peer-name); }
-    if !GalleryFeature.loading && GalleryFeature.error == "" && GalleryFeature.items.length == 0: Muted { text: @tr("No photos or videos."); }
-    // A simple wrapping grid: rows of tiles.
-    grid := Rectangle {
-        property <int> cols: max(1, floor((self.width + 8px) / 140px));
-        property <int> rows: ceil(GalleryFeature.items.length / cols);
-        height: rows * 168px;
-        for t[i] in GalleryFeature.items: Tile {
-            t: t;
-            x: mod(i, grid.cols) * 140px;
-            y: floor(i / grid.cols) * 168px;
+        if GalleryFeature.queued > 0: Muted {
+            text: @tr("Downloading {} to your download folder.", GalleryFeature.queued);
+            color: Theme.allow-fg;
         }
-    }
-    if GalleryFeature.more: HorizontalLayout {
-        alignment: center;
-        Btn { text: GalleryFeature.loading ? @tr("Loading…") : @tr("Load more"); enabled: !GalleryFeature.loading; clicked => { GalleryFeature.load-more(); } }
+        if GalleryFeature.error != "": Card {
+            VerticalLayout {
+                padding: 14px;
+                Text {
+                    wrap: word-wrap;
+                    color: Theme.deny-fg;
+                    text: GalleryFeature.error == "permission" ? @tr("Allow UrDevice to read photos and videos on {}, then reload.", root.peer-name)
+                        : GalleryFeature.error == "denied" ? @tr("{} has Gallery turned off.", root.peer-name)
+                        : GalleryFeature.error == "declined" ? @tr("{} declined the request.", root.peer-name)
+                        : GalleryFeature.error == "timeout" ? @tr("{} did not answer in time.", root.peer-name)
+                        : GalleryFeature.error == "offline" ? @tr("{} is not connected.", root.peer-name)
+                        : GalleryFeature.error == "unsupported" ? @tr("{} has no gallery.", root.peer-name)
+                        : @tr("Could not load the gallery.");
+                }
+            }
+        }
+        if GalleryFeature.loading && GalleryFeature.items.length == 0: Muted { text: @tr("Waiting for {}…", root.peer-name); }
+        if !GalleryFeature.loading && GalleryFeature.error == "" && GalleryFeature.items.length == 0: Muted { text: @tr("No photos or videos."); }
+
+        // A wrapping grid of square pictures that share the width.
+        grid := Rectangle {
+            property <length> gap: 8px;
+            property <int> cols: max(2, floor((self.width + gap) / (160px + gap)));
+            property <length> side: (self.width - (cols - 1) * gap) / cols;
+            property <int> rows: ceil(GalleryFeature.items.length / cols);
+            height: rows > 0 ? rows * (side + gap) - gap : 0px;
+            for t[i] in GalleryFeature.items: Tile {
+                t: t;
+                side: grid.side;
+                x: mod(i, grid.cols) * (grid.side + grid.gap);
+                y: floor(i / grid.cols) * (grid.side + grid.gap);
+            }
+        }
+        if GalleryFeature.more: HorizontalLayout {
+            alignment: center;
+            Btn { text: GalleryFeature.loading ? @tr("Loading…") : @tr("Load more"); enabled: !GalleryFeature.loading; clicked => { GalleryFeature.load-more(); } }
+        }
     }
 }

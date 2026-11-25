@@ -63,6 +63,20 @@ fn duration(ms: u64) -> String {
     }
 }
 
+/// When it was taken, in local time. Empty when the phone did not say.
+fn taken(ms: i64) -> String {
+    if ms <= 0 {
+        return String::new();
+    }
+    jiff::Timestamp::from_millisecond(ms)
+        .map(|t| {
+            t.to_zoned(jiff::tz::TimeZone::system())
+                .strftime("%-d %b %Y, %H:%M")
+                .to_string()
+        })
+        .unwrap_or_default()
+}
+
 #[derive(Default)]
 struct State {
     peer: Option<DeviceId>,
@@ -127,6 +141,7 @@ impl Ui {
         self.global(|g| {
             g.set_more(false);
             g.set_queued(0);
+            g.set_detail(-1);
         });
         self.count();
     }
@@ -154,6 +169,9 @@ impl Ui {
                 size_text: human(it.size).into(),
                 duration: duration(it.duration_ms).into(),
                 selected: false,
+                video: it.mime.starts_with("video/"),
+                mime: it.mime.clone().into(),
+                date_text: taken(it.taken_ms).into(),
             });
             st.items.push(it);
             st.selected.push(false);
@@ -274,6 +292,27 @@ impl Feature for Gallery {
                 }
             });
         });
+        g.on_download_one(|i| {
+            with_ui(|ui| {
+                let (peer, item) = {
+                    let st = ui.st.borrow();
+                    (
+                        st.peer,
+                        usize::try_from(i)
+                            .ok()
+                            .and_then(|i| st.items.get(i))
+                            .cloned(),
+                    )
+                };
+                let (Some(peer), Some(item)) = (peer, item) else {
+                    return;
+                };
+                match ui.svc.download(peer, vec![item]) {
+                    Ok(_) => ui.global(|g| g.set_queued(1)),
+                    Err(e) => tracing::warn!(error = %e, "gallery download not started"),
+                }
+            });
+        });
         g.on_open_folder(|| {
             let host = DesktopFiles::new(&urdevice_platform::data_dir());
             open_folder(&host.dir());
@@ -311,6 +350,13 @@ mod tests {
         assert_eq!(super::duration(0), "");
         assert_eq!(super::duration(65_000), "1:05");
         assert_eq!(super::duration(3_725_000), "1:02:05");
+    }
+
+    #[test]
+    fn dates_are_empty_when_unknown() {
+        assert_eq!(super::taken(0), "");
+        assert_eq!(super::taken(-5), "");
+        assert!(!super::taken(1_700_000_000_000).is_empty());
     }
 
     #[test]
