@@ -5,7 +5,15 @@ package urdevice.gallery;
 // Stream kind 1 (fetch): meta = GalleryFetch. The host answers on the same
 // stream with data frames, as in a file transfer, in the order of the items.
 
-message GalleryList { uint64 cursor = 1; uint32 limit = 2; }
+// Stream kind 2 (preview): meta = GalleryPreview. The host answers with one
+// JPEG (at most 4 MiB) and finishes the stream.
+
+// kind: 0 all, 1 photos, 2 videos. album unset: all albums. tag is echoed in GalleryPage.
+message GalleryList { uint64 cursor = 1; uint32 limit = 2; uint32 kind = 3; optional int64 album = 4; uint64 tag = 5; }
+message GalleryAlbum { int64 id = 1; string name = 2; uint64 count = 3; }
+message GalleryAlbumsReq {}
+message GalleryAlbums { repeated GalleryAlbum albums = 1; string error = 2; }
+message GalleryPreview { uint64 id = 1; uint32 max_side = 2; }
 message GalleryItem {
   uint64 id = 1;
   string name = 2;
@@ -15,7 +23,7 @@ message GalleryItem {
   uint64 duration_ms = 6;
   bytes thumb = 7;
 }
-message GalleryPage { uint64 cursor = 1; repeated GalleryItem items = 2; uint64 next_cursor = 3; string error = 4; }
+message GalleryPage { uint64 cursor = 1; repeated GalleryItem items = 2; uint64 next_cursor = 3; string error = 4; uint64 tag = 5; }
 message FetchItem { uint64 id = 1; uint64 offset = 2; uint64 size = 3; }
 message GalleryFetch { repeated FetchItem items = 1; }
 
@@ -23,5 +31,7 @@ message GalleryMsg {
   oneof msg {
     GalleryList list = 1;
     GalleryPage page = 2;
+    GalleryAlbumsReq albums_req = 3;
+    GalleryAlbums albums = 4;
   }
 }

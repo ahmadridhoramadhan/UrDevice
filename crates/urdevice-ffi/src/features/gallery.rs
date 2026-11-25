@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use urdevice_core::CoreError;
-use urdevice_core::services::gallery::{Gallery, GalleryHost, HostPage};
-use urdevice_proto::features::gallery::GalleryItem;
+use urdevice_core::services::gallery::{Filter, Gallery, GalleryHost, HostPage};
+use urdevice_proto::features::gallery::{GalleryAlbum, GalleryItem};
 
 use crate::{FfiError, UrDeviceNode};
 
@@ -22,6 +22,14 @@ pub struct FfiGalleryItem {
     pub duration_ms: u64,
     /// JPEG, at most 256 px per side; empty when there is none.
     pub thumb: Vec<u8>,
+}
+
+/// One album (a MediaStore bucket).
+#[derive(uniffi::Record)]
+pub struct FfiGalleryAlbum {
+    pub id: i64,
+    pub name: String,
+    pub count: u64,
 }
 
 /// A page, or why there is none.
@@ -45,17 +53,23 @@ pub struct FfiOpened {
 /// MediaStore, in Kotlin. Called on core threads.
 #[uniffi::export(with_foreign)]
 pub trait GalleryHostFfi: Send + Sync {
-    /// Items `cursor..cursor + limit`, newest first.
-    fn page(&self, cursor: u64, limit: u32) -> FfiGalleryPage;
+    /// Items `cursor..cursor + limit` of the filtered list, newest first. `kind` is 0 for
+    /// photos and videos, 1 for photos, 2 for videos. `album` is a bucket id, or null for all.
+    fn page(&self, cursor: u64, limit: u32, kind: u32, album: Option<i64>) -> FfiGalleryPage;
     /// Open item `id`.
     fn open(&self, id: u64) -> FfiOpened;
+    /// The albums, newest first.
+    fn albums(&self) -> Vec<FfiGalleryAlbum>;
+    /// A JPEG of item `id`, at most `max_side` pixels on its longest side; empty when it cannot
+    /// be made.
+    fn preview(&self, id: u64, max_side: u32) -> Vec<u8>;
 }
 
 struct Host(Arc<dyn GalleryHostFfi>);
 
 impl GalleryHost for Host {
-    fn page(&self, cursor: u64, limit: u32) -> urdevice_core::Result<HostPage> {
-        let p = self.0.page(cursor, limit);
+    fn page(&self, cursor: u64, limit: u32, filter: &Filter) -> urdevice_core::Result<HostPage> {
+        let p = self.0.page(cursor, limit, filter.kind, filter.album);
         if p.no_permission {
             return Err(CoreError::Refused("permission".into()));
         }
@@ -80,6 +94,27 @@ impl GalleryHost for Host {
     fn open(&self, id: u64) -> urdevice_core::Result<(std::fs::File, u64)> {
         let o = self.0.open(id);
         Ok((file_from_fd(o.fd)?, o.size))
+    }
+
+    fn albums(&self) -> urdevice_core::Result<Vec<GalleryAlbum>> {
+        Ok(self
+            .0
+            .albums()
+            .into_iter()
+            .map(|a| GalleryAlbum {
+                id: a.id,
+                name: a.name,
+                count: a.count,
+            })
+            .collect())
+    }
+
+    fn preview(&self, id: u64, max_side: u32) -> urdevice_core::Result<Vec<u8>> {
+        let b = self.0.preview(id, max_side);
+        if b.is_empty() {
+            return Err(CoreError::Refused("failed".into()));
+        }
+        Ok(b)
     }
 }
 

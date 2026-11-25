@@ -13,8 +13,9 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use tokio::sync::watch;
 use urdevice_proto::features::gallery::{
-    FetchItem, GalleryFetch, GalleryItem, GalleryList, GalleryMsg, GalleryPage, STREAM_FETCH,
-    gallery_msg,
+    FetchItem, GalleryAlbum, GalleryAlbums, GalleryAlbumsReq, GalleryFetch, GalleryItem,
+    GalleryList, GalleryMsg, GalleryPage, GalleryPreview, KIND_VIDEOS, MAX_ALBUMS, MAX_PREVIEW,
+    MAX_PREVIEW_SIDE, STREAM_FETCH, STREAM_PREVIEW, gallery_msg,
 };
 
 use super::files::{Files, engine};
@@ -35,6 +36,8 @@ pub const MAX_FETCH: usize = 200;
 pub const MAX_THUMB: usize = 64 * 1024;
 /// Encoded page budget, under the 1 MiB control limit.
 const PAGE_BUDGET: usize = 900 * 1024;
+/// How long the viewer waits for a large preview.
+const PREVIEW_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
 /// Bit set in a gallery item's resume id, so it never matches a transfer id
 /// of the same sender by accident.
 const RESUME_BIT: u64 = 1 << 63;
@@ -48,13 +51,39 @@ pub struct HostPage {
     pub more: bool,
 }
 
+/// Which items a list shows.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Filter {
+    /// `KIND_ALL` (0), `KIND_PHOTOS` (1), or `KIND_VIDEOS` (2).
+    pub kind: u32,
+    /// Only this album, or every album.
+    pub album: Option<i64>,
+}
+
+/// What a list asks for: the filter, and a tag that comes back in the page.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Query {
+    /// Which items.
+    pub filter: Filter,
+    /// Echoed in the page, so a viewer can drop an answer to an old list.
+    pub tag: u64,
+}
+
 /// What the phone provides (Kotlin through the FFI: MediaStore).
 pub trait GalleryHost: Send + Sync {
-    /// Items `cursor..cursor + limit`, newest first. Return
+    /// Items `cursor..cursor + limit` of the filtered list, newest first. Return
     /// `CoreError::Refused("permission")` when the app may not read media.
-    fn page(&self, cursor: u64, limit: u32) -> Result<HostPage>;
+    fn page(&self, cursor: u64, limit: u32, filter: &Filter) -> Result<HostPage>;
     /// Open item `id` for reading; returns the file and its size.
     fn open(&self, id: u64) -> Result<(File, u64)>;
+    /// The albums, newest first.
+    fn albums(&self) -> Result<Vec<GalleryAlbum>> {
+        Ok(Vec::new())
+    }
+    /// A JPEG of item `id`, at most `max_side` pixels on its longest side.
+    fn preview(&self, _id: u64, _max_side: u32) -> Result<Vec<u8>> {
+        Err(CoreError::Refused("unsupported".into()))
+    }
 }
 
 /// What the browsing UI listens to. Called on core threads.
@@ -63,6 +92,10 @@ pub trait GalleryEvents: Send + Sync {
     /// `failed`, `busy`, or a refusal reason (`denied`, `declined`,
     /// `timeout`, `offline`, ...).
     fn page(&self, peer: DeviceId, page: &GalleryPage);
+    /// The albums of `peer` arrived, or `albums.error` says why not.
+    fn albums(&self, _peer: DeviceId, _albums: &GalleryAlbums) {}
+    /// The large preview of item `id` arrived (a JPEG), or `None` when it could not be made.
+    fn preview(&self, _peer: DeviceId, _id: u64, _jpeg: Option<Vec<u8>>) {}
 }
 
 /// The gallery service. The UI reaches it with `node.service::<Gallery>()`.
@@ -83,6 +116,10 @@ struct State {
     sessions: HashMap<DeviceId, u64>,
     /// Host: peers with a page being built.
     listing: HashSet<DeviceId>,
+    /// Host: peers with a preview being made (one at a time).
+    making: HashSet<DeviceId>,
+    /// Host: peers with an album list being made.
+    albuming: HashSet<DeviceId>,
     /// Host: running downloads per activity, stopped when it ends.
     fetches: HashMap<(DeviceId, u64), watch::Sender<bool>>,
 }
@@ -100,12 +137,13 @@ fn lock(m: &Mutex<State>) -> std::sync::MutexGuard<'_, State> {
     }
 }
 
-fn error_page(cursor: u64, reason: &str) -> GalleryPage {
+fn error_page(cursor: u64, tag: u64, reason: &str) -> GalleryPage {
     GalleryPage {
         cursor,
         items: Vec::new(),
         next_cursor: 0,
         error: reason.into(),
+        tag,
     }
 }
 
@@ -127,6 +165,7 @@ fn bounded_page(cursor: u64, host: HostPage) -> GalleryPage {
         items: Vec::new(),
         next_cursor: 0,
         error: String::new(),
+        tag: 0,
     };
     let mut used = 0usize;
     let total = host.items.len();
@@ -174,13 +213,18 @@ impl Gallery {
     /// Ask `peer` for the page at `cursor` (0 for the newest). The answer
     /// arrives through [`GalleryEvents::page`].
     pub fn browse(&self, peer: DeviceId, cursor: u64) -> Result<()> {
+        self.browse_with(peer, cursor, Query::default())
+    }
+
+    /// Like [`Gallery::browse`], for the items that match `query`.
+    pub fn browse_with(&self, peer: DeviceId, cursor: u64, query: Query) -> Result<()> {
         let ctx = self.ctx()?.clone();
         let state = self.state.clone();
         let events = self.events.get();
         ctx.clone().spawn(async move {
             let report = |reason: &str| {
                 if let Some(e) = &events {
-                    e.page(peer, &error_page(cursor, reason));
+                    e.page(peer, &error_page(cursor, query.tag, reason));
                 }
             };
             let activity = match session(&ctx, &state, peer).await {
@@ -191,10 +235,78 @@ impl Gallery {
             let msg = GalleryMsg::from(gallery_msg::Msg::List(GalleryList {
                 cursor,
                 limit: MAX_PAGE,
+                kind: query.filter.kind,
+                album: query.filter.album,
+                tag: query.tag,
             }));
             if ctx.send(peer, Direction::ToHost, activity, &msg).is_err() {
                 report("offline");
             }
+        });
+        Ok(())
+    }
+
+    /// Ask `peer` for its albums. The answer arrives through [`GalleryEvents::albums`].
+    pub fn albums(&self, peer: DeviceId) -> Result<()> {
+        let ctx = self.ctx()?.clone();
+        let state = self.state.clone();
+        let events = self.events.get();
+        ctx.clone().spawn(async move {
+            let report = |reason: &str| {
+                if let Some(e) = &events {
+                    e.albums(
+                        peer,
+                        &GalleryAlbums {
+                            albums: Vec::new(),
+                            error: reason.into(),
+                        },
+                    );
+                }
+            };
+            let activity = match session(&ctx, &state, peer).await {
+                Ok(a) => a,
+                Err(CoreError::Refused(r)) => return report(&r),
+                Err(_) => return report("failed"),
+            };
+            let msg = GalleryMsg::from(gallery_msg::Msg::AlbumsReq(GalleryAlbumsReq {}));
+            if ctx.send(peer, Direction::ToHost, activity, &msg).is_err() {
+                report("offline");
+            }
+        });
+        Ok(())
+    }
+
+    /// Ask `peer` for a large preview of item `id` (a JPEG of at most
+    /// [`MAX_PREVIEW_SIDE`] pixels). It arrives through [`GalleryEvents::preview`].
+    pub fn preview(&self, peer: DeviceId, id: u64) -> Result<()> {
+        let ctx = self.ctx()?.clone();
+        let state = self.state.clone();
+        let events = self.events.get();
+        ctx.clone().spawn(async move {
+            let done = |jpeg: Option<Vec<u8>>| {
+                if let Some(e) = &events {
+                    e.preview(peer, id, jpeg);
+                }
+            };
+            let Ok(activity) = session(&ctx, &state, peer).await else {
+                return done(None);
+            };
+            let meta = prost::Message::encode_to_vec(&GalleryPreview {
+                id,
+                max_side: MAX_PREVIEW_SIDE,
+            });
+            let Ok((mut send, mut recv)) = ctx
+                .open_bi(peer, Direction::ToHost, activity, STREAM_PREVIEW, meta)
+                .await
+            else {
+                return done(None);
+            };
+            let _ = send.finish();
+            let read = tokio::time::timeout(PREVIEW_WAIT, recv.read_to_end(MAX_PREVIEW)).await;
+            done(match read {
+                Ok(Ok(bytes)) if !bytes.is_empty() => Some(bytes),
+                _ => None,
+            });
         });
         Ok(())
     }
@@ -260,26 +372,112 @@ impl Gallery {
             let _ = ctx.send(peer, Direction::ToController, activity, &msg);
         };
         let Some(host) = self.host.get() else {
-            return reply(ctx, error_page(l.cursor, "failed"));
+            return reply(ctx, error_page(l.cursor, l.tag, "failed"));
         };
         if !lock(&self.state).listing.insert(peer) {
-            return reply(ctx, error_page(l.cursor, "busy"));
+            return reply(ctx, error_page(l.cursor, l.tag, "busy"));
         }
         let state = self.state.clone();
         let ctx2 = ctx.clone();
         ctx.spawn(async move {
             let cursor = l.cursor;
+            let tag = l.tag;
             let limit = l.limit.clamp(1, MAX_PAGE);
-            let r = tokio::task::spawn_blocking(move || host.page(cursor, limit)).await;
+            // An unknown kind shows everything.
+            let filter = Filter {
+                kind: if l.kind <= KIND_VIDEOS { l.kind } else { 0 },
+                album: l.album,
+            };
+            let r = tokio::task::spawn_blocking(move || host.page(cursor, limit, &filter)).await;
             lock(&state).listing.remove(&peer);
             let page = match r {
-                Ok(Ok(p)) => bounded_page(cursor, p),
-                Ok(Err(CoreError::Refused(r))) if r == "permission" => {
-                    error_page(cursor, "permission")
+                Ok(Ok(p)) => {
+                    let mut page = bounded_page(cursor, p);
+                    page.tag = tag;
+                    page
                 }
-                _ => error_page(cursor, "failed"),
+                Ok(Err(CoreError::Refused(r))) if r == "permission" => {
+                    error_page(cursor, tag, "permission")
+                }
+                _ => error_page(cursor, tag, "failed"),
             };
             reply(&ctx2, page);
+        });
+    }
+
+    fn on_albums_req(&self, ctx: &ServiceCtx, peer: DeviceId, activity: u64) {
+        let reply = move |ctx: &ServiceCtx, error: &str, albums: Vec<GalleryAlbum>| {
+            let msg = GalleryMsg::from(gallery_msg::Msg::Albums(GalleryAlbums {
+                albums,
+                error: error.into(),
+            }));
+            let _ = ctx.send(peer, Direction::ToController, activity, &msg);
+        };
+        let Some(host) = self.host.get() else {
+            return reply(ctx, "failed", Vec::new());
+        };
+        if !lock(&self.state).albuming.insert(peer) {
+            return reply(ctx, "busy", Vec::new());
+        }
+        let state = self.state.clone();
+        let ctx2 = ctx.clone();
+        ctx.spawn(async move {
+            let r = tokio::task::spawn_blocking(move || host.albums()).await;
+            lock(&state).albuming.remove(&peer);
+            match r {
+                Ok(Ok(mut albums)) => {
+                    albums.truncate(MAX_ALBUMS);
+                    for a in &mut albums {
+                        truncate(&mut a.name, 64);
+                    }
+                    reply(&ctx2, "", albums);
+                }
+                Ok(Err(CoreError::Refused(r))) if r == "permission" => {
+                    reply(&ctx2, "permission", Vec::new());
+                }
+                _ => reply(&ctx2, "failed", Vec::new()),
+            }
+        });
+    }
+
+    fn on_preview(&self, ctx: &ServiceCtx, mut stream: Stream) {
+        let refuse = |stream: &mut Stream| {
+            if let Some(s) = stream.send.as_mut() {
+                let _ = s.reset(super::stream_code::REFUSED.into());
+            }
+            let _ = stream.recv.stop(super::stream_code::REFUSED.into());
+        };
+        let Ok(req) = <GalleryPreview as prost::Message>::decode(stream.meta.as_slice()) else {
+            return refuse(&mut stream);
+        };
+        let Some(host) = self.host.get() else {
+            return refuse(&mut stream);
+        };
+        let peer = stream.peer;
+        // One preview or album list at a time per peer.
+        if !lock(&self.state).making.insert(peer) {
+            return refuse(&mut stream);
+        }
+        let side = req.max_side.clamp(64, MAX_PREVIEW_SIDE);
+        let state = self.state.clone();
+        ctx.spawn(async move {
+            let id = req.id;
+            let made = tokio::task::spawn_blocking(move || host.preview(id, side)).await;
+            lock(&state).making.remove(&peer);
+            let Some(mut send) = stream.send.take() else {
+                return;
+            };
+            match made {
+                Ok(Ok(bytes)) if !bytes.is_empty() && bytes.len() <= MAX_PREVIEW => {
+                    if send.write_all(&bytes).await.is_ok() {
+                        let _ = send.finish();
+                    }
+                }
+                _ => {
+                    let _ = send.reset(super::stream_code::REFUSED.into());
+                }
+            }
+            let _ = stream.recv.stop(super::stream_code::REFUSED.into());
         });
     }
 
@@ -383,6 +581,19 @@ impl Service for Gallery {
             (Access::Host(grant), Some(gallery_msg::Msg::List(l))) => {
                 self.on_list(ctx, msg.peer, grant.activity(), l);
             }
+            (Access::Host(grant), Some(gallery_msg::Msg::AlbumsReq(_))) => {
+                self.on_albums_req(ctx, msg.peer, grant.activity());
+            }
+            (Access::Controller { .. }, Some(gallery_msg::Msg::Albums(mut a))) => {
+                a.albums.truncate(MAX_ALBUMS);
+                for al in &mut a.albums {
+                    truncate(&mut al.name, 64);
+                }
+                truncate(&mut a.error, 16);
+                if let Some(e) = self.events.get() {
+                    e.albums(msg.peer, &a);
+                }
+            }
             (Access::Controller { .. }, Some(gallery_msg::Msg::Page(mut p))) => {
                 // Shown only; still keep it to the limits.
                 p.items.retain(|i| i.thumb.len() <= MAX_THUMB);
@@ -402,6 +613,7 @@ impl Service for Gallery {
                 let a = grant.activity();
                 self.on_fetch(ctx, a, stream);
             }
+            (Access::Host(_), STREAM_PREVIEW) => self.on_preview(ctx, stream),
             _ => {
                 if let Some(s) = stream.send.as_mut() {
                     let _ = s.reset(super::stream_code::REFUSED.into());
@@ -422,7 +634,7 @@ impl Service for Gallery {
         };
         let _ = ctx;
         if had || activity == 0 {
-            self.emit(peer, &error_page(0, reason));
+            self.emit(peer, &error_page(0, 0, reason));
         }
     }
 
@@ -441,6 +653,8 @@ impl Service for Gallery {
             let mut st = lock(&self.state);
             st.sessions.remove(&peer);
             st.listing.remove(&peer);
+            st.making.remove(&peer);
+            st.albuming.remove(&peer);
             st.fetches.retain(|(p, _), tx| {
                 if *p == peer {
                     tx.send_replace(true);
