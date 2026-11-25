@@ -11,7 +11,7 @@
 //! written to disk (spike T0.6 notes the token is a secret).
 
 use std::os::fd::OwnedFd;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use ashpd::desktop::PersistMode;
 use ashpd::desktop::screencast::{CursorMode, Screencast, SourceType};
@@ -93,54 +93,73 @@ async fn open() -> std::result::Result<
     Ok((proxy, session, Started { fd, node, size }))
 }
 
+/// The one runtime that runs every portal session, for the life of the process.
+///
+/// ashpd keeps a single D-Bus connection in a static, and with the `tokio` feature that
+/// connection's reader task lives on the runtime that created it. A runtime made per capture
+/// died with its thread, so the second capture talked to a dead connection and waited forever
+/// (a black screen on the viewer). This runtime is made once and never stops.
+fn runtime() -> std::result::Result<tokio::runtime::Handle, &'static str> {
+    static RT: OnceLock<std::result::Result<tokio::runtime::Handle, &'static str>> =
+        OnceLock::new();
+    RT.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::Builder::new()
+            .name("screencast-portal".into())
+            .spawn(move || {
+                match tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                {
+                    Ok(rt) => {
+                        let _ = tx.send(Ok(rt.handle().clone()));
+                        rt.block_on(std::future::pending::<()>());
+                    }
+                    Err(_) => {
+                        let _ = tx.send(Err("capture_failed"));
+                    }
+                }
+            })
+            .map_err(|_| "capture_failed")?;
+        rx.recv().map_err(|_| "capture_failed")?
+    })
+    .clone()
+}
+
 pub(super) fn start(fps: u32, handler: Arc<dyn FrameHandler>) -> Result<CaptureHandle> {
     let (ready_tx, ready_rx) =
         std::sync::mpsc::channel::<std::result::Result<Started, &'static str>>();
     let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
     let ended = handler.clone();
-    std::thread::Builder::new()
-        .name("screencast-portal".into())
-        .spawn(move || {
-            let rt = match tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-            {
-                Ok(rt) => rt,
-                Err(_) => {
-                    let _ = ready_tx.send(Err("capture_failed"));
-                    return;
+    let rt = runtime().map_err(refused)?;
+    rt.spawn(async move {
+        let (proxy, session, started) = match open().await {
+            Ok(v) => v,
+            Err(r) => {
+                let _ = ready_tx.send(Err(r));
+                return;
+            }
+        };
+        let _ = ready_tx.send(Ok(started));
+        drop(proxy);
+        let closed = session.receive_closed().await;
+        let mut user_closed = false;
+        match closed {
+            Ok(mut closed) => {
+                tokio::select! {
+                    _ = stop_rx => {}
+                    _ = closed.next() => user_closed = true,
                 }
-            };
-            rt.block_on(async move {
-                let (proxy, session, started) = match open().await {
-                    Ok(v) => v,
-                    Err(r) => {
-                        let _ = ready_tx.send(Err(r));
-                        return;
-                    }
-                };
-                let _ = ready_tx.send(Ok(started));
-                drop(proxy);
-                let closed = session.receive_closed().await;
-                let mut user_closed = false;
-                match closed {
-                    Ok(mut closed) => {
-                        tokio::select! {
-                            _ = stop_rx => {}
-                            _ = closed.next() => user_closed = true,
-                        }
-                    }
-                    Err(_) => {
-                        let _ = stop_rx.await;
-                    }
-                }
-                let _ = session.close().await;
-                if user_closed {
-                    ended.ended("stopped");
-                }
-            });
-        })
-        .map_err(|_| refused("capture_failed"))?;
+            }
+            Err(_) => {
+                let _ = stop_rx.await;
+            }
+        }
+        let _ = session.close().await;
+        if user_closed {
+            ended.ended("stopped");
+        }
+    });
 
     let started = match ready_rx.recv() {
         Ok(Ok(s)) => s,
