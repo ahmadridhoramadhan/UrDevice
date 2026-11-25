@@ -41,6 +41,10 @@ class InputHost(private val context: Context) : InputHostFfi {
     override fun key(code: UInt, down: Boolean, meta: UInt): Boolean =
         UrDeviceIme.instance?.key(code.toInt(), down, meta.toInt()) ?: false
 
+    override fun cursor(x: UInt, y: UInt, shown: Boolean) {
+        UrDeviceAccessibilityService.instance?.cursor(x.toInt(), y.toInt(), shown)
+    }
+
     companion object {
         private val SERVICE = "com.urdevice.app.host.UrDeviceAccessibilityService"
 

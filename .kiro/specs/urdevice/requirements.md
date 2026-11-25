@@ -149,7 +149,7 @@ Out of scope for v1: iOS, use over the internet or across subnets (no relay or N
 
 1. The system SHALL let a controller send pointer movement, clicks (left, right, middle), scroll, and drag to a desktop host.
 2. On a desktop host, the system SHALL inject input with the native API: SendInput on Windows, CGEvent on macOS (needs the Accessibility permission), XTest on X11, and the RemoteDesktop portal/libei on Wayland. WHERE a Wayland compositor has no RemoteDesktop portal THEN the system SHALL fall back to a `uinput` virtual device and SHALL guide the user through the one-time setup it needs (a udev rule that gives the user access to `/dev/uinput`).
-3. WHERE the controller is a desktop and the host is Android THEN the system SHALL send taps, swipes, and the back/home/recents actions through an Android AccessibilityService that the user has enabled.
+3. WHERE the controller is a desktop and the host is Android THEN the system SHALL send taps, swipes, and the back/home/recents actions through an Android AccessibilityService that the user has enabled. The phone SHALL draw a pointer on its screen that the controller's mouse moves (relative motion, like a touchpad), so the user sees where a click lands. Remote control and Keyboard are one tile and one window on the controller.
 4. IF the host lacks the required OS permission THEN the system SHALL explain which permission is missing and open the settings screen for it.
 5. Input latency from controller to host SHOULD be under 50 ms (95th percentile) on the LAN.
 

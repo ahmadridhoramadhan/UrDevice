@@ -224,7 +224,10 @@ pub(super) fn session(peer: DeviceId, active: bool) {
 pub(super) fn host_status(peer: DeviceId, status: HostStatus) {
     with(|r| {
         if r.peer == peer {
-            r.by_distance = host_moves_by_distance(&status.backend);
+            // A phone shows its own pointer, so its window moves by distance too (like a
+            // touchpad). A screen window shows the picture and keeps absolute positions.
+            r.by_distance = host_moves_by_distance(&status.backend)
+                || (status.backend == "android" && !r.screen);
             r.rel.leave();
             r.host = Some(status);
             r.refused = None;
@@ -389,7 +392,16 @@ impl Remote {
         }
         if self.by_distance {
             if let Some((dx, dy)) = self.rel.moved(x, y) {
-                let _ = self.svc.pointer_move(self.peer, dx, dy);
+                // A phone: the pad is as wide as the phone's screen, so crossing the window
+                // crosses the screen.
+                let k = match &self.host {
+                    Some(h) if h.backend == "android" && w > 0.0 => h
+                        .display
+                        .map_or(1.0, |(dw, _)| (dw as f32 / w).clamp(0.5, 8.0)),
+                    _ => 1.0,
+                };
+                let scaled = |v: i32| (v as f32 * k).round() as i32;
+                let _ = self.svc.pointer_move(self.peer, scaled(dx), scaled(dy));
             }
         } else {
             let _ = self

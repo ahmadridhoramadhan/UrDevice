@@ -17,7 +17,7 @@ export component InputView inherits VerticalLayout {
     in property <string> peer-name;
     spacing: 10px;
     Muted {
-        text: @tr("Remote control of {} opens in its own window. Click inside it to capture your pointer and keyboard. Press Ctrl+Alt+G to release them.", root.peer-name);
+        text: @tr("Opens a window where your mouse and keyboard control {}. Click inside it to start. Press Ctrl+Alt+G to let go.", root.peer-name);
         wrap: word-wrap;
     }
     HorizontalLayout {
@@ -159,9 +159,9 @@ export component RemoteWindow inherits Window {
 
                 Text {
                     visible: !root.has-frame;
-                    text: !root.active ? @tr("Start a session to control {}.", root.device-name)
-                        : root.captured ? @tr("Captured. Press Ctrl+Alt+G to release the pointer and keyboard.")
-                        : @tr("Click here to capture the pointer and keyboard.");
+                    text: !root.active ? @tr("Starting {}…", root.device-name)
+                        : root.captured ? @tr("Your mouse and keyboard now control {}. Press Ctrl+Alt+G to let go.", root.device-name)
+                        : @tr("Click here to move your mouse and keyboard to {}.", root.device-name);
                     color: Theme.text;
                     opacity: 0.6;
                     font-size: Theme.font-body;
@@ -191,7 +191,7 @@ export component RemoteWindow inherits Window {
 
                 TouchArea {
                     enabled: root.active || root.screen;
-                    mouse-cursor: root.captured ? MouseCursor.crosshair : MouseCursor.default;
+                    mouse-cursor: root.captured ? MouseCursor.none : MouseCursor.default;
                     moved => {
                         root.pointer-move(self.mouse-x, self.mouse-y, self.width, self.height);
                     }

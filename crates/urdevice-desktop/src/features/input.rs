@@ -271,16 +271,10 @@ impl Feature for Input {
     }
 
     fn tiles(&self) -> &'static [TileSpec] {
-        &[
-            TileSpec {
-                cap: Capability::Input,
-                key: "input.v1",
-            },
-            TileSpec {
-                cap: Capability::Input,
-                key: "keyboard",
-            },
-        ]
+        &[TileSpec {
+            cap: Capability::Input,
+            key: "input.v1",
+        }]
     }
 
     fn has_view(&self) -> bool {

@@ -52,6 +52,8 @@ pub trait InputHostFfi: Send + Sync {
     fn text(&self, text: String) -> bool;
     /// Send an Android key code to the focused field with `meta` state bits.
     fn key(&self, code: u32, down: bool, meta: u32) -> bool;
+    /// Draw the pointer on the screen at `(x, y)` pixels, or remove it. Cosmetic.
+    fn cursor(&self, x: u32, y: u32, shown: bool);
 }
 
 struct HostAdapter(Arc<dyn InputHostFfi>);
@@ -107,6 +109,11 @@ impl TouchHost for HostAdapter {
             .key(code, down, meta)
             .then_some(())
             .ok_or_else(|| refused("key refused"))
+    }
+
+    fn cursor(&self, _grant: &Grant, x: u32, y: u32, shown: bool) -> Result<()> {
+        self.0.cursor(x, y, shown);
+        Ok(())
     }
 }
 
