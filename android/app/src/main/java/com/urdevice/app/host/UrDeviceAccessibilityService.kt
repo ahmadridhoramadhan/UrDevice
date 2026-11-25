@@ -24,9 +24,12 @@ class UrDeviceAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         instance = this
+        Log.i(TAG, "accessibility service connected")
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        // Android calls this when the user or the system turns the service off while the app lives.
+        Log.i(TAG, "accessibility service unbound (turned off by the system or the user)")
         instance = null
         main.post {
             queue.clear()
@@ -91,6 +94,7 @@ class UrDeviceAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val MAX_QUEUE = 16
+        private const val TAG = "UrDeviceA11y"
 
         /** The connected service, or null while it is off. */
         @Volatile
