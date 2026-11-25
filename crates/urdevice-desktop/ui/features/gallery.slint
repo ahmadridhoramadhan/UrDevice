@@ -1,5 +1,6 @@
 // Android gallery (#17): the desktop feature view.
 // Rust side: src/features/gallery.rs. See docs/dev/adding-a-feature.md.
+import { ComboBox } from "std-widgets.slint";
 import { Btn, Card, Muted, Icon, IconBtn } from "../widgets.slint";
 import { Theme } from "../theme.slint";
 
@@ -32,6 +33,16 @@ export global GalleryFeature {
     in property <int> queued;
     // The item shown large, or -1 for the grid.
     in-out property <int> detail: -1;
+    // Which pictures: 0 all, 1 photos, 2 videos.
+    in-out property <int> kind: 0;
+    // "All albums", then one entry per album. `album-index` is the chosen one.
+    in property <[string]> album-names: ["All albums"];
+    in-out property <int> album-index: 0;
+    // The sharper picture of the item shown large: which item, its state
+    // (0 loading, 1 ready, 2 failed), and the picture.
+    in property <int> preview-index: -1;
+    in property <int> preview-state: 0;
+    in property <image> preview;
     // True while the page is scrolled near its end. main.slint sets it.
     in-out property <bool> near-end;
     callback reload();
@@ -41,6 +52,9 @@ export global GalleryFeature {
     callback download();
     callback download-one(int);
     callback open-folder();
+    callback set-kind(int);
+    callback pick-album(int);
+    callback want-preview(int);
 }
 
 // One square picture in the grid. A tap opens it; the round mark selects it.
@@ -132,6 +146,33 @@ component Tile inherits Rectangle {
     }
 }
 
+// One of the "All / Photos / Videos" choices.
+component FilterChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> on;
+    callback clicked();
+    height: 30px;
+    width: label.preferred-width + 28px;
+    border-radius: 15px;
+    background: on ? Theme.accent : ta.has-hover ? Theme.surface-2 : transparent;
+    border-width: 1px;
+    border-color: on ? Theme.accent : Theme.border;
+    accessible-role: button;
+    accessible-label: root.text;
+    label := Text {
+        text: root.text;
+        color: on ? Theme.on-accent : Theme.text;
+        font-size: Theme.font-body;
+        font-weight: 600;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
 // A round arrow over the big picture.
 component Arrow inherits Rectangle {
     in property <bool> flip;
@@ -166,6 +207,9 @@ component InfoRow inherits HorizontalLayout {
 // One picture, large, with its details.
 component Detail inherits VerticalLayout {
     in property <GalleryTile> t;
+    // The sharper picture is for this item and has arrived.
+    property <bool> sharp: GalleryFeature.preview-index == GalleryFeature.detail && GalleryFeature.preview-state == 1;
+    property <bool> waiting: GalleryFeature.preview-index != GalleryFeature.detail || GalleryFeature.preview-state == 0;
     spacing: 12px;
 
     // Left and right arrows and Esc move around and close.
@@ -212,17 +256,17 @@ component Detail inherits VerticalLayout {
     }
 
     Rectangle {
-        height: 380px;
+        height: 440px;
         border-radius: 12px;
         clip: true;
         background: Theme.dark ? #0a120a : #e9e4d8;
-        if t.has-thumb: Image {
-            source: t.thumb;
+        if t.has-thumb || root.sharp: Image {
+            source: root.sharp ? GalleryFeature.preview : t.thumb;
             width: parent.width;
             height: parent.height;
             image-fit: contain;
         }
-        if !t.has-thumb: Icon {
+        if !t.has-thumb && !root.sharp: Icon {
             source: @image-url("../icons/image.svg");
             tint: Theme.muted;
             width: 48px;
@@ -289,7 +333,8 @@ component Detail inherits VerticalLayout {
         text: @tr("Downloading to your download folder.");
         color: Theme.allow-fg;
     }
-    Muted { text: @tr("This is a small preview. Download the file to see it in full."); wrap: word-wrap; }
+    if root.waiting: Muted { text: @tr("Loading a sharper picture…"); }
+    if !root.waiting && !root.sharp: Muted { text: @tr("Could not load a sharper picture. Download the file to see it in full."); wrap: word-wrap; }
 }
 
 export component GalleryView inherits VerticalLayout {
@@ -303,6 +348,9 @@ export component GalleryView inherits VerticalLayout {
     property <bool> want-more: (GalleryFeature.detail >= 0 ? GalleryFeature.detail >= GalleryFeature.items.length - 3 : GalleryFeature.near-end)
         && GalleryFeature.more && !GalleryFeature.loading && GalleryFeature.error == "";
     changed want-more => { if root.want-more { GalleryFeature.load-more(); } }
+    // Ask for the sharper picture whenever another item is shown large.
+    property <int> shown: GalleryFeature.detail;
+    changed shown => { if root.shown >= 0 { GalleryFeature.want-preview(root.shown); } }
 
     if GalleryFeature.detail >= 0 && GalleryFeature.detail < GalleryFeature.items.length: Detail {
         t: GalleryFeature.items[GalleryFeature.detail];
@@ -310,6 +358,21 @@ export component GalleryView inherits VerticalLayout {
 
     if GalleryFeature.detail < 0 || GalleryFeature.detail >= GalleryFeature.items.length: VerticalLayout {
         spacing: 12px;
+
+        // Which pictures: all, photos or videos, and an album.
+        HorizontalLayout {
+            spacing: 6px;
+            FilterChip { text: @tr("All"); on: GalleryFeature.kind == 0; clicked => { GalleryFeature.set-kind(0); } }
+            FilterChip { text: @tr("Photos"); on: GalleryFeature.kind == 1; clicked => { GalleryFeature.set-kind(1); } }
+            FilterChip { text: @tr("Videos"); on: GalleryFeature.kind == 2; clicked => { GalleryFeature.set-kind(2); } }
+            Rectangle { horizontal-stretch: 1; }
+            if GalleryFeature.album-names.length > 1: ComboBox {
+                width: 220px;
+                model: GalleryFeature.album-names;
+                current-index <=> GalleryFeature.album-index;
+                selected(v) => { GalleryFeature.pick-album(self.current-index); }
+            }
+        }
 
         // Nothing selected: a count and two small actions. Something selected: the selection bar.
         if GalleryFeature.selected == 0: HorizontalLayout {
