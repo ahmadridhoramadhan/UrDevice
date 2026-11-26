@@ -344,6 +344,9 @@ class CaptureSession(
         // A still screen still sends a frame now and then, so a late viewer gets a picture.
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000L)
         if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LATENCY, 1)
+        // The display hands the encoder every frame it draws, 60 to 120 a second here. Without a
+        // cap the phone sends more pictures than the viewer can decode, and the picture stutters.
+        f.setInteger("max-fps-to-encoder", t.fps.toInt())
         val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
         c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         return c
