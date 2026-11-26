@@ -136,8 +136,15 @@ pub(crate) fn screen_frame(frame: slint::Image, width: u32, height: u32) {
         r.win.set_has_frame(true);
         r.win.set_aspect(width as f32 / height as f32);
         if r.fitted != (width, height) {
+            // The window follows the shape of the picture, not its size. The host lowers the
+            // resolution when the link is slow, and the window must not jump with it.
+            let (fw, fh) = (r.fitted.0 as f32, r.fitted.1 as f32);
+            let same_shape = r.fitted != (0, 0)
+                && ((fw / fh) / (width as f32 / height as f32) - 1.0).abs() < 0.02;
             r.fitted = (width, height);
-            fit_window(&r.win, width, height);
+            if !same_shape {
+                fit_window(&r.win, width, height);
+            }
         }
     });
 }

@@ -47,7 +47,7 @@ pub(crate) struct Screen;
 const INPUT_FORWARDING: bool = true;
 
 /// Frames waiting for the decoder before the viewer starts dropping.
-const DECODE_QUEUE: usize = 4;
+const DECODE_QUEUE: usize = 16;
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     match m.lock() {
