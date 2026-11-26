@@ -319,6 +319,7 @@ impl Remote {
         self.win.set_status(status.into());
         self.win.set_active(active);
         self.win.set_captured(self.captured && active);
+        confine_pointer(&self.win, self.captured && active);
         let android = self.host.as_ref().is_some_and(|h| h.backend == "android");
         self.win.set_show_nav(android);
         // In a screen window the picture itself sets the shape (it changes when the phone turns);
@@ -349,6 +350,7 @@ impl Remote {
         self.captured = on;
         self.rel.leave();
         self.win.set_captured(on);
+        confine_pointer(&self.win, on);
     }
 
     /// Let go of the pointer and keyboard: every key and button that is down
@@ -409,6 +411,22 @@ impl Remote {
                 .pointer_abs(self.peer, normalize(x, w), normalize(y, h), 0);
         }
     }
+}
+
+/// Keep the real mouse inside the window while it controls the other device, so it cannot
+/// wander off and click something else. Released with Ctrl+Alt+G. Not every system can
+/// confine the pointer; then it is simply not confined.
+fn confine_pointer(win: &RemoteWindow, on: bool) {
+    use slint::winit_030::WinitWindowAccessor;
+    use slint::winit_030::winit::window::CursorGrabMode;
+    let mode = if on {
+        CursorGrabMode::Confined
+    } else {
+        CursorGrabMode::None
+    };
+    win.window().with_winit_window(|w| {
+        let _ = w.set_cursor_grab(mode);
+    });
 }
 
 fn mods(ctrl: bool, alt: bool, shift: bool, meta: bool) -> Mods {
