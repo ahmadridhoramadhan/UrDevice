@@ -29,16 +29,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     let version = urdevice_core::core_version();
 
     features::select_backend()?;
+    // Lets the desktop match this app to its launcher entry (urdevice.desktop), for its icon.
+    slint::set_xdg_app_id("urdevice")?;
     let window = ui::MainWindow::new()?;
     let app = app::App::start(&window)?;
 
     // Keep the tray alive until the event loop ends. A missing tray (for example
     // GNOME without the AppIndicator extension) must not stop the app.
-    let _tray = tray::install(version);
+    let tray = tray::install(version);
+    // Closing the window hides it to the tray, and the app keeps running. Without a tray there
+    // would be no way back to it, so closing quits then.
+    let to_tray = tray.is_active();
+    window.window().on_close_requested(move || {
+        if !to_tray {
+            let _ = slint::quit_event_loop();
+        }
+        slint::CloseRequestResponse::HideWindow
+    });
 
     app::battery_thread(Arc::downgrade(&app.node()));
 
-    window.run()?;
+    window.show()?;
+    slint::run_event_loop_until_quit()?;
+    drop(tray);
     drop(app);
     Ok(())
 }

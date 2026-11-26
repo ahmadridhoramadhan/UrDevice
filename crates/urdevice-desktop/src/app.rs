@@ -46,6 +46,21 @@ impl EventSink for Sink {
     }
 }
 
+/// Show the main window again and bring it forward, for example from the tray. UI thread only.
+pub(crate) fn show_main_window() {
+    use slint::winit_030::WinitWindowAccessor;
+    with_ui(|ui| {
+        let Some(w) = ui.feature_ctx.window.upgrade() else {
+            return;
+        };
+        let _ = w.show();
+        w.window().with_winit_window(|win| {
+            win.set_minimized(false);
+            win.focus_window();
+        });
+    });
+}
+
 /// Redraw the main window now, for example after a feature window closed. UI thread only.
 pub(crate) fn refresh_now() {
     with_ui(|ui| ui.refresh());

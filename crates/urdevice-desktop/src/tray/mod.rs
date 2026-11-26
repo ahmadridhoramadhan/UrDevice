@@ -1,4 +1,4 @@
-//! Tray icon that shows the core version and a Quit item.
+//! Tray icon with an Open item (shows the main window) and a Quit item.
 //!
 //! Windows and macOS use the `tray-icon` crate. Linux talks the
 //! StatusNotifierItem D-Bus protocol through `ksni`, which works on KDE, most
@@ -48,6 +48,18 @@ pub(crate) struct TrayGuard {
     _inner: Option<linux::Guard>,
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     _inner: Option<native::Guard>,
+}
+
+impl TrayGuard {
+    /// True when a tray icon was made, so the window can hide to it.
+    pub(crate) fn is_active(&self) -> bool {
+        self._inner.is_some()
+    }
+}
+
+/// Bring the main window back (the tray's Open item, or a click on the icon). Any thread.
+pub(crate) fn open_main_window() {
+    let _ = slint::invoke_from_event_loop(crate::app::show_main_window);
 }
 
 /// Show the tray icon. Errors are reported on stderr and do not stop the app.

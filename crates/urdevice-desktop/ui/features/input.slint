@@ -15,6 +15,7 @@ export component InputView inherits VerticalLayout {
 // pointer and keyboard; Ctrl+Alt+G releases them. src/features/input.rs turns the events into
 // input messages (the rules are in urdevice_core::services::input::capture).
 export component RemoteWindow inherits Window {
+    icon: @image-url("../../../../assets/urdevice-icon-512.png");
     // Name of the device being controlled, and a one-line state for the bar.
     in property <string> device-name;
     in property <string> status;

@@ -30,6 +30,11 @@ impl ksni::Tray for UrDeviceTray {
         "UrDevice".into()
     }
 
+    // A click on the icon itself opens the window.
+    fn activate(&mut self, _x: i32, _y: i32) {
+        super::open_main_window();
+    }
+
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
         vec![self.icon.clone()]
     }
@@ -45,8 +50,9 @@ impl ksni::Tray for UrDeviceTray {
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         vec![
             StandardItem {
-                label: format!("Core version {}", self.version),
-                enabled: false,
+                label: "Open".into(),
+                icon_name: "window-new".into(),
+                activate: Box::new(|_| super::open_main_window()),
                 ..Default::default()
             }
             .into(),
