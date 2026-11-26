@@ -81,7 +81,7 @@ class UrDeviceAccessibilityService : AccessibilityService() {
 
     // The pointer the controller's mouse moves. An accessibility overlay needs no extra permission,
     // does not take touches, and sits above other apps.
-    private var cursorView: View? = null
+    private var cursorView: PointerView? = null
     @Volatile private var cursorAt: Pair<Int, Int>? = null
     @Volatile private var cursorPosted = false
 
@@ -104,13 +104,25 @@ class UrDeviceAccessibilityService : AccessibilityService() {
         }
         val wm = getSystemService(WindowManager::class.java)
         val view = cursorView
+        val (flipX, flipY) = edgeFlip(at)
         if (view == null) {
             val v = PointerView(this)
+            v.flip(flipX, flipY)
             cursorView = v
             runCatching { wm.addView(v, cursorParams(at)) }.onFailure { cursorView = null }
         } else {
+            view.flip(flipX, flipY)
             runCatching { wm.updateViewLayout(view, cursorParams(at)) }
         }
+    }
+
+    private fun pointerSize(): Int = (POINTER_DP * resources.displayMetrics.density).toInt()
+
+    /** Near the right or bottom edge the arrow is mirrored, so it stays on screen with its tip on the point. */
+    private fun edgeFlip(at: Pair<Int, Int>): Pair<Boolean, Boolean> {
+        val m = resources.displayMetrics
+        val size = pointerSize()
+        return (at.first > m.widthPixels - size) to (at.second > m.heightPixels - size)
     }
 
     private fun removeCursor() {
@@ -121,7 +133,8 @@ class UrDeviceAccessibilityService : AccessibilityService() {
     }
 
     private fun cursorParams(at: Pair<Int, Int>): WindowManager.LayoutParams {
-        val size = (POINTER_DP * resources.displayMetrics.density).toInt()
+        val size = pointerSize()
+        val (flipX, flipY) = edgeFlip(at)
         return WindowManager.LayoutParams(
             size,
             size,
@@ -133,8 +146,8 @@ class UrDeviceAccessibilityService : AccessibilityService() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = at.first
-            y = at.second
+            x = if (flipX) at.first - size else at.first
+            y = if (flipY) at.second - size else at.second
         }
     }
 
@@ -178,7 +191,7 @@ class UrDeviceAccessibilityService : AccessibilityService() {
 }
 
 /** A mouse pointer: a white arrow with a dark edge. Its tip is the top left corner of the view. */
-private class PointerView(context: Context) : View(context) {
+internal class PointerView(context: Context) : View(context) {
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.FILL
@@ -192,6 +205,12 @@ private class PointerView(context: Context) : View(context) {
 
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    /** Mirror the arrow so its tip is the top right, bottom left or bottom right corner. */
+    fun flip(x: Boolean, y: Boolean) {
+        scaleX = if (x) -1f else 1f
+        scaleY = if (y) -1f else 1f
     }
 
     override fun onDraw(canvas: Canvas) {
