@@ -45,6 +45,7 @@ mod remote;
 
 pub(crate) use remote::{
     open_screen as open_screen_window, screen_clear, screen_displays, screen_frame, screen_note,
+    select_backend,
 };
 
 pub(crate) struct Input;

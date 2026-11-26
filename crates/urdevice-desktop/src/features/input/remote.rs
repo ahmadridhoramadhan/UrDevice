@@ -11,9 +11,10 @@
 //! The rules that turn key events into text, keys, and shortcuts live in
 //! `urdevice_core::services::input` (`KeyboardCapture`), where they are tested.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use slint::ComponentHandle as _;
 use urdevice_core::identity::DeviceId;
@@ -47,6 +48,12 @@ struct Remote {
     fitted: (u32, u32),
     /// A line about the screen session (asking, starting, ended) that replaces the control line.
     note: Option<String>,
+    /// The real pointer is grabbed (confined or locked) right now.
+    grabbed: Cell<bool>,
+    /// The pointer is locked: its raw movement, not window positions, moves the host.
+    locked: Cell<bool>,
+    /// Movement not yet sent because it was less than one pixel.
+    remainder: (f64, f64),
 }
 
 thread_local! {
@@ -101,6 +108,9 @@ fn open_window(svc: Arc<Service>, peer: DeviceId, name: &str, screen: bool) {
                 grab_when_active: false,
                 fitted: (0, 0),
                 note: None,
+                grabbed: Cell::new(false),
+                locked: Cell::new(false),
+                remainder: (0.0, 0.0),
             });
         });
     }
@@ -229,6 +239,10 @@ pub(super) fn host_status(peer: DeviceId, status: HostStatus) {
             r.by_distance = host_moves_by_distance(&status.backend)
                 || (status.backend == "android" && !r.screen);
             r.rel.leave();
+            if r.grabbed.get() {
+                // The way the host moves may have changed: grab again to match.
+                r.grabbed.set(false);
+            }
             r.host = Some(status);
             r.refused = None;
             r.refresh();
@@ -319,7 +333,7 @@ impl Remote {
         self.win.set_status(status.into());
         self.win.set_active(active);
         self.win.set_captured(self.captured && active);
-        confine_pointer(&self.win, self.captured && active);
+        self.apply_grab();
         let android = self.host.as_ref().is_some_and(|h| h.backend == "android");
         self.win.set_show_nav(android);
         // In a screen window the picture itself sets the shape (it changes when the phone turns);
@@ -350,7 +364,7 @@ impl Remote {
         self.captured = on;
         self.rel.leave();
         self.win.set_captured(on);
-        confine_pointer(&self.win, on);
+        self.apply_grab();
     }
 
     /// Let go of the pointer and keyboard: every key and button that is down
@@ -388,20 +402,53 @@ impl Remote {
         }
     }
 
+    /// Grab the real pointer while it controls the other device, and let go otherwise.
+    /// A host that moves by distance gets a locked pointer: it never stops at the window edge.
+    fn apply_grab(&self) {
+        let want = self.captured && self.active();
+        if want == self.grabbed.get() {
+            return;
+        }
+        self.grabbed.set(want);
+        self.locked
+            .set(confine_pointer(&self.win, want, self.by_distance));
+    }
+
+    /// How many pixels on the host one pixel of the pad is worth. A phone: the pad is as wide
+    /// as the phone's screen, so crossing the window crosses the screen.
+    fn gain(&self, pad_w: f32) -> f32 {
+        match &self.host {
+            Some(h) if h.backend == "android" && pad_w > 0.0 => h
+                .display
+                .map_or(1.0, |(dw, _)| (dw as f32 / pad_w).clamp(0.5, 8.0)),
+            _ => 1.0,
+        }
+    }
+
+    /// Raw mouse movement while the pointer is locked.
+    fn raw_move(&mut self, dx: f64, dy: f64) {
+        if !self.captured || !self.locked.get() || !self.by_distance {
+            return;
+        }
+        let size = self.win.window().size();
+        let pad_w = size.width as f32 / self.win.window().scale_factor();
+        let k = f64::from(self.gain(pad_w));
+        let x = dx * k + self.remainder.0;
+        let y = dy * k + self.remainder.1;
+        let (sx, sy) = (x.round(), y.round());
+        self.remainder = (x - sx, y - sy);
+        if sx != 0.0 || sy != 0.0 {
+            let _ = self.svc.pointer_move(self.peer, sx as i32, sy as i32);
+        }
+    }
+
     fn pointer(&mut self, x: f32, y: f32, w: f32, h: f32) {
-        if !self.captured {
+        if !self.captured || self.locked.get() {
             return;
         }
         if self.by_distance {
             if let Some((dx, dy)) = self.rel.moved(x, y) {
-                // A phone: the pad is as wide as the phone's screen, so crossing the window
-                // crosses the screen.
-                let k = match &self.host {
-                    Some(h) if h.backend == "android" && w > 0.0 => h
-                        .display
-                        .map_or(1.0, |(dw, _)| (dw as f32 / w).clamp(0.5, 8.0)),
-                    _ => 1.0,
-                };
+                let k = self.gain(w);
                 let scaled = |v: i32| (v as f32 * k).round() as i32;
                 let _ = self.svc.pointer_move(self.peer, scaled(dx), scaled(dy));
             }
@@ -416,19 +463,69 @@ impl Remote {
 /// Keep the real mouse inside the window while it controls the other device, so it cannot
 /// wander off and click something else. Released with Ctrl+Alt+G. Not every system can
 /// confine the pointer; then it is simply not confined.
-fn confine_pointer(win: &RemoteWindow, on: bool) {
+///
+/// With `lock` the pointer is locked instead of confined, where the system can: it stops
+/// at no edge, and its movement arrives as raw distances ([`RawMotion`]). Returns true when
+/// the pointer is locked.
+fn confine_pointer(win: &RemoteWindow, on: bool, lock: bool) -> bool {
     use slint::winit_030::WinitWindowAccessor;
     use slint::winit_030::winit::window::CursorGrabMode;
-    let mode = if on {
-        CursorGrabMode::Confined
-    } else {
-        CursorGrabMode::None
-    };
-    win.window()
-        .with_winit_window(|w| match w.set_cursor_grab(mode) {
-            Ok(()) => tracing::info!(on, "pointer confined to the window"),
-            Err(e) => tracing::warn!(on, error = %e, "could not confine the pointer"),
-        });
+    let locked = win
+        .window()
+        .with_winit_window(|w| {
+            if !on {
+                let _ = w.set_cursor_grab(CursorGrabMode::None);
+                return false;
+            }
+            if lock && w.set_cursor_grab(CursorGrabMode::Locked).is_ok() {
+                tracing::info!("pointer locked to the window");
+                return true;
+            }
+            match w.set_cursor_grab(CursorGrabMode::Confined) {
+                Ok(()) => tracing::info!("pointer confined to the window"),
+                Err(e) => tracing::warn!(error = %e, "could not confine the pointer"),
+            }
+            false
+        })
+        .unwrap_or(false);
+    LOCKED.store(locked, Ordering::Relaxed);
+    locked
+}
+
+/// True while the real pointer is locked and its raw movement drives the other device.
+static LOCKED: AtomicBool = AtomicBool::new(false);
+
+/// Raw mouse movement is not tied to a window position, so a locked pointer that sits at
+/// the edge of the window still reports how far the hand moved.
+struct RawMotion;
+
+impl slint::winit_030::CustomApplicationHandler for RawMotion {
+    fn device_event(
+        &mut self,
+        _event_loop: &slint::winit_030::winit::event_loop::ActiveEventLoop,
+        _device_id: slint::winit_030::winit::event::DeviceId,
+        event: slint::winit_030::winit::event::DeviceEvent,
+    ) -> slint::winit_030::EventResult {
+        if let slint::winit_030::winit::event::DeviceEvent::MouseMotion { delta } = event
+            && LOCKED.load(Ordering::Relaxed)
+        {
+            REMOTE.with(|r| {
+                if let Ok(mut r) = r.try_borrow_mut()
+                    && let Some(r) = r.as_mut()
+                {
+                    r.raw_move(delta.0, delta.1);
+                }
+            });
+        }
+        slint::winit_030::EventResult::Propagate
+    }
+}
+
+/// Choose the window backend, with [`RawMotion`] attached. Call once, before any window.
+pub(crate) fn select_backend() -> Result<(), slint::PlatformError> {
+    slint::BackendSelector::new()
+        .with_winit_custom_application_handler(RawMotion)
+        .select()
 }
 
 fn mods(ctrl: bool, alt: bool, shift: bool, meta: bool) -> Mods {

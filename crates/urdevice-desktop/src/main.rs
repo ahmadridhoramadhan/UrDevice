@@ -28,6 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     urdevice_core::logging::init("info,quinn=warn,mdns_sd=warn");
     let version = urdevice_core::core_version();
 
+    features::select_backend()?;
     let window = ui::MainWindow::new()?;
     let app = app::App::start(&window)?;
 

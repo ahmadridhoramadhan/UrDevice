@@ -39,6 +39,7 @@ mod terminal;
 mod tunnel;
 mod webcam;
 
+pub(crate) use input::select_backend;
 pub(crate) use list::all;
 
 /// One tile on the paired-device view.
