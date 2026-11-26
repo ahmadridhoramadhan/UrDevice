@@ -188,7 +188,7 @@ impl Ui {
             return;
         }
         // An answer to a list that is no longer shown. Refusals carry no tag.
-        if page.tag != st.generation && !(page.tag == 0 && !page.error.is_empty()) {
+        if page.tag != st.generation && (page.tag != 0 || page.error.is_empty()) {
             return;
         }
         let error = page.error.clone();

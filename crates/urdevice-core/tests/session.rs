@@ -616,11 +616,12 @@ fn unpair_closes_and_blocks() {
     wait_until("both forgot", WAIT, || {
         a.snap().peers.is_empty() && b.snap().peers.is_empty()
     });
-    assert!(
+    // B removes the pairing first and emits the notice just after, so wait for it.
+    wait_until("unpaired notice", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::Notice { code, .. } if code == "unpaired_by"))
             .is_some()
-    );
+    });
 
     // B pairs again, goes offline, and A forgets it while it is away. B still
     // trusts A, but A refuses B from now on.
