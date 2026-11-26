@@ -20,6 +20,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.os.IBinder
 import android.os.Looper
 import android.util.DisplayMetrics
@@ -349,6 +350,11 @@ class CaptureSession(
     }
 
     private var pushed = 0L
+    private var lastPushAt = 0L
+    private var maxGapMs = 0L
+    private var windowStart = 0L
+    private var windowFrames = 0
+    private var windowBytes = 0L
 
     private fun drain() {
         val info = MediaCodec.BufferInfo()
@@ -377,6 +383,19 @@ class CaptureSession(
                         val (w, h) = if (key) size else 0 to 0
                         pushed++
                         if (pushed == 1L || pushed % 600L == 0L) Log.i("UrDeviceScreen", "frames pushed=$pushed key=$key size=$w x $h")
+                        // Timing for the log: frames and bytes in two seconds, and the longest wait.
+                        val now = SystemClock.elapsedRealtime()
+                        if (lastPushAt != 0L) maxGapMs = maxOf(maxGapMs, now - lastPushAt)
+                        lastPushAt = now
+                        windowFrames++
+                        windowBytes += bytes.size
+                        if (now - windowStart >= 2_000) {
+                            Log.i("UrDeviceScreen", "encoded frames=$windowFrames bytes=$windowBytes longest_gap_ms=$maxGapMs")
+                            windowStart = now
+                            windowFrames = 0
+                            windowBytes = 0
+                            maxGapMs = 0
+                        }
                         node?.screenPushFrame(
                             session,
                             FfiVideoFrame(info.presentationTimeUs.toULong(), key, data, w.toUInt(), h.toUInt()),

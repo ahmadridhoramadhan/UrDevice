@@ -305,6 +305,9 @@ struct Decode {
     /// A picture is waiting for the UI thread.
     pending: Mutex<Option<SharedPixelBuffer<Rgba8Pixel>>>,
     posted: AtomicBool,
+    /// Frames that arrived, and frames dropped because the decoder was behind (for the log).
+    rx_frames: AtomicU64,
+    dropped_frames: AtomicU64,
     svc: Weak<ScreenService>,
     window: slint::Weak<MainWindow>,
 }
@@ -348,13 +351,82 @@ impl Decode {
     }
 }
 
+/// Timing of the viewer, written to the log: how many pictures arrive, are dropped and are
+/// shown, how long a decode takes, and the longest wait between two pictures.
+struct Stats {
+    since: Instant,
+    last_shown: Option<Instant>,
+    decoded: u32,
+    decode_total: Duration,
+    decode_max: Duration,
+    gap_max: Duration,
+    last_rx: u64,
+    last_dropped: u64,
+}
+
+impl Stats {
+    fn new() -> Self {
+        Self {
+            since: Instant::now(),
+            last_shown: None,
+            decoded: 0,
+            decode_total: Duration::ZERO,
+            decode_max: Duration::ZERO,
+            gap_max: Duration::ZERO,
+            last_rx: 0,
+            last_dropped: 0,
+        }
+    }
+
+    fn decoded(&mut self, took: Duration) {
+        self.decoded += 1;
+        self.decode_total += took;
+        self.decode_max = self.decode_max.max(took);
+        let now = Instant::now();
+        if let Some(prev) = self.last_shown.replace(now) {
+            self.gap_max = self.gap_max.max(now - prev);
+        }
+    }
+
+    fn report(&mut self, d: &Decode) {
+        let spent = self.since.elapsed();
+        if spent < Duration::from_secs(2) {
+            return;
+        }
+        let (rx, dropped) = (
+            d.rx_frames.load(Ordering::Relaxed),
+            d.dropped_frames.load(Ordering::Relaxed),
+        );
+        if self.decoded > 0 || rx > self.last_rx {
+            tracing::info!(
+                received = rx - self.last_rx,
+                dropped = dropped - self.last_dropped,
+                decoded = self.decoded,
+                decode_avg_ms = self.decode_total.as_millis() as u32 / self.decoded.max(1),
+                decode_max_ms = self.decode_max.as_millis() as u32,
+                longest_gap_ms = self.gap_max.as_millis() as u32,
+                secs = spent.as_secs_f32(),
+                "screen viewer"
+            );
+        }
+        *self = Self {
+            last_rx: rx,
+            last_dropped: dropped,
+            ..Self::new()
+        };
+    }
+}
+
 fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
     let mut dec = H264Decoder::new().ok();
     let mut pic = RgbaFrame::default();
     let mut waiting_key = true;
     let mut shown_first = false;
     let mut retries = 0u32;
+    // Numbers for the log, once every two seconds while a picture is shown.
+    let mut stats = Stats::new();
     loop {
+        stats.report(d);
         let item = match rx.recv_timeout(Duration::from_millis(700)) {
             Ok(item) => item,
             Err(RecvTimeoutError::Timeout) => {
@@ -388,7 +460,10 @@ fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
                 let Some(decoder) = dec.as_mut() else {
                     continue;
                 };
-                match decoder.decode(&f.data, &mut pic) {
+                let began = Instant::now();
+                let decoded = decoder.decode(&f.data, &mut pic);
+                stats.decoded(began.elapsed());
+                match decoded {
                     Ok(true) => {
                         if !shown_first {
                             shown_first = true;
@@ -440,6 +515,7 @@ impl ScreenEvents for Events {
     }
 
     fn frame(&self, peer: DeviceId, activity: u64, frame: VideoFrame) {
+        self.dec.rx_frames.fetch_add(1, Ordering::Relaxed);
         if self.dec.drop_until_key.load(Ordering::Relaxed) {
             if !frame.keyframe {
                 return;
@@ -449,6 +525,7 @@ impl ScreenEvents for Events {
         match self.dec.tx.try_send(DecItem::Frame(peer, activity, frame)) {
             Ok(()) => {}
             Err(TrySendError::Full(_)) => {
+                self.dec.dropped_frames.fetch_add(1, Ordering::Relaxed);
                 self.dec.drop_until_key.store(true, Ordering::Relaxed);
                 self.dec.want_keyframe(peer, activity);
             }
@@ -733,6 +810,8 @@ impl Feature for Screen {
             asking: Mutex::new(None),
             pending: Mutex::new(None),
             posted: AtomicBool::new(false),
+            rx_frames: AtomicU64::new(0),
+            dropped_frames: AtomicU64::new(0),
             svc: Arc::downgrade(&svc),
             window: ctx.window.clone(),
         });
