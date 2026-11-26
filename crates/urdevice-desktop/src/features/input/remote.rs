@@ -432,7 +432,7 @@ impl Remote {
         }
         let size = self.win.window().size();
         let pad_w = size.width as f32 / self.win.window().scale_factor();
-        let k = f64::from(self.gain(pad_w));
+        let k = f64::from(self.gain(pad_w)) * RAW_GAIN;
         let x = dx * k + self.remainder.0;
         let y = dy * k + self.remainder.1;
         let (sx, sy) = (x.round(), y.round());
@@ -491,6 +491,10 @@ fn confine_pointer(win: &RemoteWindow, on: bool, lock: bool) -> bool {
     LOCKED.store(locked, Ordering::Relaxed);
     locked
 }
+
+/// Raw mouse counts are small and unaccelerated, so a locked pointer would feel slow. This
+/// multiplies them. Raise it for a faster pointer, lower it for a slower one.
+const RAW_GAIN: f64 = 3.0;
 
 /// True while the real pointer is locked and its raw movement drives the other device.
 static LOCKED: AtomicBool = AtomicBool::new(false);

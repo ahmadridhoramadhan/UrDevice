@@ -104,26 +104,16 @@ class UrDeviceAccessibilityService : AccessibilityService() {
         }
         val wm = getSystemService(WindowManager::class.java)
         val view = cursorView
-        val (flipX, flipY) = edgeFlip(at)
         if (view == null) {
             val v = PointerView(this)
-            v.flip(flipX, flipY)
             cursorView = v
             runCatching { wm.addView(v, cursorParams(at)) }.onFailure { cursorView = null }
         } else {
-            view.flip(flipX, flipY)
             runCatching { wm.updateViewLayout(view, cursorParams(at)) }
         }
     }
 
     private fun pointerSize(): Int = (POINTER_DP * resources.displayMetrics.density).toInt()
-
-    /** Near the right or bottom edge the arrow is mirrored, so it stays on screen with its tip on the point. */
-    private fun edgeFlip(at: Pair<Int, Int>): Pair<Boolean, Boolean> {
-        val m = resources.displayMetrics
-        val size = pointerSize()
-        return (at.first > m.widthPixels - size) to (at.second > m.heightPixels - size)
-    }
 
     private fun removeCursor() {
         cursorAt = null
@@ -134,7 +124,12 @@ class UrDeviceAccessibilityService : AccessibilityService() {
 
     private fun cursorParams(at: Pair<Int, Int>): WindowManager.LayoutParams {
         val size = pointerSize()
-        val (flipX, flipY) = edgeFlip(at)
+        // The arrow hangs right and down from its tip. Near the right and bottom edges it is
+        // drawn a little inside the screen so most of it stays visible. Taps still land on the
+        // real point.
+        val m = resources.displayMetrics
+        val maxX = m.widthPixels - (EDGE_KEEP_X_DP * m.density).toInt()
+        val maxY = m.heightPixels - (EDGE_KEEP_Y_DP * m.density).toInt()
         return WindowManager.LayoutParams(
             size,
             size,
@@ -146,8 +141,8 @@ class UrDeviceAccessibilityService : AccessibilityService() {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = if (flipX) at.first - size else at.first
-            y = if (flipY) at.second - size else at.second
+            x = minOf(at.first, maxX)
+            y = minOf(at.second, maxY)
         }
     }
 
@@ -183,6 +178,10 @@ class UrDeviceAccessibilityService : AccessibilityService() {
         private const val TAG = "UrDeviceA11y"
         private const val POINTER_DP = 28
 
+        /** How much of the arrow, right and down of its tip, must stay on screen. */
+        private const val EDGE_KEEP_X_DP = 14
+        private const val EDGE_KEEP_Y_DP = 18
+
         /** The connected service, or null while it is off. */
         @Volatile
         var instance: UrDeviceAccessibilityService? = null
@@ -207,11 +206,6 @@ internal class PointerView(context: Context) : View(context) {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
-    /** Mirror the arrow so its tip is the top right, bottom left or bottom right corner. */
-    fun flip(x: Boolean, y: Boolean) {
-        scaleX = if (x) -1f else 1f
-        scaleY = if (y) -1f else 1f
-    }
 
     override fun onDraw(canvas: Canvas) {
         val k = width / 28f
