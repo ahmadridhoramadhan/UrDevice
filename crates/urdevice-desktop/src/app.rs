@@ -46,6 +46,11 @@ impl EventSink for Sink {
     }
 }
 
+/// Redraw the main window now, for example after a feature window closed. UI thread only.
+pub(crate) fn refresh_now() {
+    with_ui(|ui| ui.refresh());
+}
+
 fn with_ui(f: impl FnOnce(&Rc<Ui>)) {
     let ui = UI.with(|u| u.borrow().clone());
     if let Some(ui) = ui {

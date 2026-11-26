@@ -32,10 +32,7 @@ use urdevice_platform::features::input::{
     DesktopInput, install_uinput_rule, open_permission_settings, sink,
 };
 
-use urdevice_core::node::PeerView;
-
 use super::{Feature, FeatureCtx, TileSpec};
-use crate::ui::InputFeature;
 #[cfg(not(windows))]
 use crate::ui::LaserWindow;
 
@@ -51,9 +48,6 @@ pub(crate) use remote::{
 pub(crate) struct Input;
 
 thread_local! {
-    /// The name of the device the view was opened for, for the window title.
-    static LAST_NAME: RefCell<String> = const { RefCell::new(String::new()) };
-
     /// The laser window. Slint windows live on the UI thread.
     #[cfg(not(windows))]
     static LASER: RefCell<Option<LaserWindow>> = const { RefCell::new(None) };
@@ -278,39 +272,35 @@ impl Feature for Input {
         }]
     }
 
-    fn has_view(&self) -> bool {
-        true
+    // The tile is a switch: on while the remote-control window for that device is open. There
+    // is no page. Closing the window turns it off.
+    fn switch(&self, _ctx: &FeatureCtx, peer: &str) -> Option<bool> {
+        Some(DeviceId::from_hex(peer).is_some_and(remote::is_open_for))
     }
 
-    fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
-        let (Some(w), Some(svc), Some(id)) = (
-            ctx.window.upgrade(),
-            ctx.node.service::<Service>(),
-            DeviceId::from_hex(&peer.id),
-        ) else {
+    fn set_switch(&self, ctx: &FeatureCtx, peer: &str, on: bool) {
+        if !on {
+            remote::close();
+            return;
+        }
+        let (Some(svc), Some(id)) = (ctx.node.service::<Service>(), DeviceId::from_hex(peer))
+        else {
             return;
         };
-        w.global::<InputFeature>()
-            .set_peer_id(peer.id.as_str().into());
-        LAST_NAME.with(|n| *n.borrow_mut() = peer.name.clone());
-        remote::open(svc, id, &peer.name);
+        let name = ctx
+            .node
+            .snapshot()
+            .peers
+            .iter()
+            .find(|p| p.id == peer)
+            .map_or_else(String::new, |p| p.name.clone());
+        remote::open(svc, id, &name);
     }
 
     fn start(&self, ctx: &FeatureCtx) {
         let Some(svc) = ctx.node.service::<Service>() else {
             return;
         };
-        if let Some(w) = ctx.window.upgrade() {
-            let (window, svc) = (ctx.window.clone(), svc.clone());
-            w.global::<InputFeature>().on_open_window(move || {
-                let Some(w) = window.upgrade() else { return };
-                let Some(id) = DeviceId::from_hex(&w.global::<InputFeature>().get_peer_id()) else {
-                    return;
-                };
-                let name = LAST_NAME.with(|n| n.borrow().clone());
-                remote::open(svc.clone(), id, &name);
-            });
-        }
         let secrets = Arc::new(urdevice_platform::DesktopSecretStore::new(
             &urdevice_platform::data_dir(),
         ));

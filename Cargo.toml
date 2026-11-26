@@ -122,6 +122,21 @@ dbg_macro = "warn"
 todo = "warn"
 unwrap_used = "warn"
 
+# Debug builds run the video decoder, the QUIC stack and the UI toolkit. At opt-level 0 these are
+# several times too slow for live screen sharing (it stutters), so the dependencies and the
+# core crates are optimised even in debug builds. The desktop and ffi glue stay at 0.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.urdevice-core]
+opt-level = 2
+
+[profile.dev.package.urdevice-media]
+opt-level = 3
+
+[profile.dev.package.urdevice-platform]
+opt-level = 2
+
 [profile.release]
 codegen-units = 1
 lto = "thin"

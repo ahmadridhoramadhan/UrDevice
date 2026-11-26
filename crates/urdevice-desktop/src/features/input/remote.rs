@@ -204,6 +204,15 @@ fn fit_window(win: &RemoteWindow, width: u32, height: u32) {
     ));
 }
 
+/// True while the remote-control window (not a screen window) for `peer` is open.
+pub(super) fn is_open_for(peer: DeviceId) -> bool {
+    REMOTE.with(|r| {
+        r.try_borrow()
+            .ok()
+            .is_some_and(|r| r.as_ref().is_some_and(|r| !r.screen && r.peer == peer))
+    })
+}
+
 /// End the session and close the window. Runs on the UI thread.
 pub(super) fn close() {
     let old = REMOTE.with(|r| r.borrow_mut().take());
@@ -405,7 +414,8 @@ impl Remote {
     /// Grab the real pointer while it controls the other device, and let go otherwise.
     /// A host that moves by distance gets a locked pointer: it never stops at the window edge.
     fn apply_grab(&self) {
-        let want = self.captured && self.active();
+        // A screen window shows the picture and keeps the mouse free; only a pad grabs it.
+        let want = self.captured && self.active() && !self.screen;
         if want == self.grabbed.get() {
             return;
         }
@@ -629,6 +639,9 @@ fn wire(win: &RemoteWindow) {
             if r.screen {
                 // Closing the window of a shared screen ends the screen session.
                 super::super::screen::window_closed();
+            } else {
+                // The remote-control tile is a switch: closing the window turns it off.
+                let _ = slint::invoke_from_event_loop(crate::app::refresh_now);
             }
         }
         slint::CloseRequestResponse::HideWindow

@@ -3,31 +3,11 @@
 import { Theme } from "../theme.slint";
 import { Btn, IconBtn, Muted } from "../widgets.slint";
 
-// State and callbacks shared with src/features/input.rs.
-export global InputFeature {
-    // The paired device the view is open for (Device ID, hex).
-    in-out property <string> peer-id;
-    // Open (or bring back) the remote-control window for that device.
-    callback open-window();
-}
-
+// Remote control has no page: its tile switches the remote-control window on and off
+// (src/features/input.rs). The view stays only so that every feature id has a view.
 export component InputView inherits VerticalLayout {
-    // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
     in property <string> peer-name;
-    spacing: 10px;
-    Muted {
-        text: @tr("Opens a window where your mouse and keyboard control {}. Click inside it to start. Press Ctrl+Alt+G to let go.", root.peer-name);
-        wrap: word-wrap;
-    }
-    HorizontalLayout {
-        alignment: start;
-        Btn {
-            text: @tr("Open remote control");
-            kind: 0;
-            clicked => { InputFeature.open-window(); }
-        }
-    }
 }
 
 // The remote-control window (#19, T4.8, R9.1, R10.2). The pad below the bar stands for the other
@@ -80,11 +60,13 @@ export component RemoteWindow inherits Window {
     background: Theme.surface;
 
     // While the mouse is captured the pad fills the whole window, so the area the mouse is
-    // locked to is exactly the pad: no bar and no empty margin to wander into.
+    // locked to is exactly the pad: no bar and no empty margin to wander into. A screen window
+    // keeps its bar and the picture's shape, and does not lock the mouse.
+    property <bool> pad-full: root.captured && !root.screen;
     VerticalLayout {
-        padding: root.captured ? 0px : 12px;
-        spacing: root.captured ? 0px : 10px;
-        if !root.captured: HorizontalLayout {
+        padding: root.pad-full ? 0px : 12px;
+        spacing: root.pad-full ? 0px : 10px;
+        if !root.pad-full: HorizontalLayout {
             spacing: 8px;
             Text {
                 text: root.status;
@@ -119,8 +101,8 @@ export component RemoteWindow inherits Window {
         area := Rectangle {
             vertical-stretch: 1;
             // The pad keeps the shape of the other display and is centred.
-            property <length> pad-w: root.captured ? self.width : min(self.width, self.height * root.aspect);
-            property <length> pad-h: root.captured ? self.height : self.pad-w / root.aspect;
+            property <length> pad-w: root.pad-full ? self.width : min(self.width, self.height * root.aspect);
+            property <length> pad-h: root.pad-full ? self.height : self.pad-w / root.aspect;
 
             pad := Rectangle {
                 x: (parent.width - self.width) / 2;
@@ -128,7 +110,7 @@ export component RemoteWindow inherits Window {
                 width: parent.pad-w;
                 height: parent.pad-h;
                 background: root.has-frame ? #000000 : Theme.surface-2;
-                border-radius: root.captured ? 0px : Theme.radius;
+                border-radius: root.pad-full ? 0px : Theme.radius;
                 border-width: root.captured ? 2px : 1px;
                 border-color: root.captured ? Theme.accent : Theme.border;
                 clip: true;
