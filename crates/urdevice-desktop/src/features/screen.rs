@@ -17,7 +17,7 @@
 //! Frames are never stored or logged.
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, TrySendError, sync_channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
@@ -307,6 +307,8 @@ struct Decode {
     posted: AtomicBool,
     /// Frames that arrived, and frames dropped because the decoder was behind (for the log).
     rx_frames: AtomicU64,
+    /// Frames queued for the decoder and not taken yet.
+    queued: AtomicI64,
     dropped_frames: AtomicU64,
     svc: Weak<ScreenService>,
     window: slint::Weak<MainWindow>,
@@ -450,6 +452,8 @@ fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
                 retries = 0;
             }
             DecItem::Frame(peer, activity, f) => {
+                // Newer frames wait behind this one: it is decoded, but not converted or shown.
+                let behind = d.queued.fetch_sub(1, Ordering::Relaxed) > 1;
                 if activity != d.current.load(Ordering::Relaxed) {
                     continue;
                 }
@@ -461,7 +465,7 @@ fn decode_loop(d: &Arc<Decode>, rx: &Receiver<DecItem>) {
                     continue;
                 };
                 let began = Instant::now();
-                let decoded = decoder.decode(&f.data, &mut pic);
+                let decoded = decoder.decode_with(&f.data, &mut pic, !behind);
                 stats.decoded(began.elapsed());
                 match decoded {
                     Ok(true) => {
@@ -523,7 +527,9 @@ impl ScreenEvents for Events {
             self.dec.drop_until_key.store(false, Ordering::Relaxed);
         }
         match self.dec.tx.try_send(DecItem::Frame(peer, activity, frame)) {
-            Ok(()) => {}
+            Ok(()) => {
+                self.dec.queued.fetch_add(1, Ordering::Relaxed);
+            }
             Err(TrySendError::Full(_)) => {
                 self.dec.dropped_frames.fetch_add(1, Ordering::Relaxed);
                 self.dec.drop_until_key.store(true, Ordering::Relaxed);
@@ -811,6 +817,7 @@ impl Feature for Screen {
             pending: Mutex::new(None),
             posted: AtomicBool::new(false),
             rx_frames: AtomicU64::new(0),
+            queued: AtomicI64::new(0),
             dropped_frames: AtomicU64::new(0),
             svc: Arc::downgrade(&svc),
             window: ctx.window.clone(),

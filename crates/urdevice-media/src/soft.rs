@@ -127,11 +127,26 @@ impl H264Decoder {
     /// Decode one access unit into `out`. Returns false when the decoder
     /// produced no picture yet (it needs more data).
     pub fn decode(&mut self, au: &[u8], out: &mut RgbaFrame) -> Result<bool, MediaError> {
+        self.decode_with(au, out, true)
+    }
+
+    /// Like [`decode`](Self::decode), but with `convert` false the picture is decoded (the next
+    /// frames need it) and not turned into RGBA: for a frame that a newer one will replace
+    /// before it is shown. Returns false then.
+    pub fn decode_with(
+        &mut self,
+        au: &[u8],
+        out: &mut RgbaFrame,
+        convert: bool,
+    ) -> Result<bool, MediaError> {
         let pic = self
             .dec
             .decode(au)
             .map_err(|e| MediaError::Decoder(e.to_string()))?;
         let Some(pic) = pic else { return Ok(false) };
+        if !convert {
+            return Ok(false);
+        }
         let (w, h) = pic.dimensions();
         if w == 0 || h == 0 || w.saturating_mul(h) > MAX_DECODE_PIXELS {
             return Err(MediaError::BadSize(w as u32, h as u32));

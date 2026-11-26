@@ -347,9 +347,33 @@ class CaptureSession(
         // The display hands the encoder every frame it draws, 60 to 120 a second here. Without a
         // cap the phone sends more pictures than the viewer can decode, and the picture stutters.
         f.setInteger("max-fps-to-encoder", t.fps.toInt())
-        val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        return c
+        // Two temporal layers: every other picture is one that no later picture needs, so the
+        // phone can leave it out when the screen draws faster than the target rate.
+        f.setString("ts-schema", "android.generic.2")
+        return try {
+            val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            c
+        } catch (e: Exception) {
+            Log.i("UrDeviceScreen", "no temporal layers on this encoder: ${e.message}")
+            f.setString("ts-schema", "")
+            val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            c
+        }
+    }
+
+    /** True for a picture no other picture refers to (H.264 nal_ref_idc is 0), so it may be dropped. */
+    private fun unreferenced(data: ByteArray): Boolean {
+        var i = 0
+        while (i + 3 < data.size && i < 16) {
+            if (data[i] == 0.toByte() && data[i + 1] == 0.toByte() && data[i + 2] == 1.toByte()) {
+                val h = data[i + 3].toInt()
+                return (h and 0x1f) == 1 && ((h shr 5) and 3) == 0
+            }
+            i++
+        }
+        return false
     }
 
     private var pushed = 0L
@@ -384,6 +408,12 @@ class CaptureSession(
                         val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
                         val data = if (key) (csd ?: ByteArray(0)) + bytes else bytes
                         val (w, h) = if (key) size else 0 to 0
+                        // Faster than the target and this picture is not needed: leave it out.
+                        val fps = maxOf(1, target.fps.toInt())
+                        if (!key && SystemClock.elapsedRealtime() - lastPushAt < 800L / fps && unreferenced(bytes)) {
+                            c.releaseOutputBuffer(idx, false)
+                            continue
+                        }
                         pushed++
                         if (pushed == 1L || pushed % 600L == 0L) Log.i("UrDeviceScreen", "frames pushed=$pushed key=$key size=$w x $h")
                         // Timing for the log: frames and bytes in two seconds, and the longest wait.
