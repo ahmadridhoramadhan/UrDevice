@@ -472,6 +472,10 @@ class CaptureSession(
                 o
             }
             val dpi = context.resources.displayMetrics.densityDpi
+            // Detach, resize, then attach: some phones keep drawing at the old size when the
+            // display is resized while it still has the old Surface, and the picture ends up
+            // small in a corner of the new one.
+            display?.surface = null
             display?.resize(next.first, next.second, dpi)
             display?.surface = s
             old.first?.let { runCatching { it.stop() }; runCatching { it.release() } }
