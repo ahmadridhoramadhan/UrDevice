@@ -175,7 +175,7 @@ export component RemoteWindow inherits Window {
 
                 TouchArea {
                     enabled: root.active || root.screen;
-                    mouse-cursor: root.captured ? MouseCursor.none : MouseCursor.default;
+                    mouse-cursor: root.pad-full ? MouseCursor.none : MouseCursor.default;
                     moved => {
                         root.pointer-move(self.mouse-x, self.mouse-y, self.width, self.height);
                     }
