@@ -446,7 +446,9 @@ impl super::InputSink for TouchSink {
             (acts, st.pos)
         };
         let result = self.run(grant, acts);
-        if matches!(event, PointerEvent::Move { .. } | PointerEvent::Abs { .. }) {
+        // Only a pointer that moves by distance (the remote-control window) is drawn. A screen
+        // window points straight at the picture, which already shows the screen, so it draws none.
+        if matches!(event, PointerEvent::Move { .. }) {
             let (w, h) = if size.0 > 0 && size.1 > 0 {
                 size
             } else {
@@ -916,7 +918,7 @@ mod tests {
     }
 
     #[test]
-    fn the_pointer_is_drawn_while_it_moves_and_hidden_on_cancel() {
+    fn the_pointer_is_drawn_while_it_moves_by_distance_and_hidden_on_cancel() {
         let host = Host::new(true, true);
         let sink = TouchSink::new(host.clone());
         let g = grant();
@@ -927,13 +929,9 @@ mod tests {
         sink.pointer(&g, &left(true)).unwrap();
         sink.cancel(&g);
         let c = host.cursors.lock().unwrap().clone();
-        assert_eq!(c.len(), 3, "{c:?}");
-        // Half way across a 1000 x 2000 display, a quarter of the way down.
-        assert!(
-            c[0].0.abs_diff(500) <= 1 && c[0].1.abs_diff(500) <= 1 && c[0].2,
-            "{c:?}"
-        );
-        assert!(c[1].0.abs_diff(600) <= 1, "{c:?}");
-        assert_eq!(c[2], (0, 0, false));
+        // The absolute move (a screen window) draws nothing; the relative one does.
+        assert_eq!(c.len(), 2, "{c:?}");
+        assert!(c[0].0.abs_diff(600) <= 1 && c[0].2, "{c:?}");
+        assert_eq!(c[1], (0, 0, false));
     }
 }
