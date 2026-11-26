@@ -424,9 +424,11 @@ fn confine_pointer(win: &RemoteWindow, on: bool) {
     } else {
         CursorGrabMode::None
     };
-    win.window().with_winit_window(|w| {
-        let _ = w.set_cursor_grab(mode);
-    });
+    win.window()
+        .with_winit_window(|w| match w.set_cursor_grab(mode) {
+            Ok(()) => tracing::info!(on, "pointer confined to the window"),
+            Err(e) => tracing::warn!(on, error = %e, "could not confine the pointer"),
+        });
 }
 
 fn mods(ctrl: bool, alt: bool, shift: bool, meta: bool) -> Mods {
