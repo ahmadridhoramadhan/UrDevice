@@ -412,10 +412,13 @@ impl Service for Notify {
 
     fn on_peer(&self, ctx: &ServiceCtx, peer: DeviceId, connected: bool) {
         if connected {
-            // The user left mirroring on: ask again on the new session.
+            // Mirroring the user has already used (the setting is saved) starts again on the
+            // new session. Until then nothing is asked: the host would otherwise prompt for
+            // notifications as soon as it connects, before anyone looked at them.
             self.load(ctx, peer);
+            let used = ctx.setting(&on_key(peer)).as_deref() == Some("1");
             let wanted = lock(&self.shared.recv).wanted.contains(&peer);
-            if wanted && ctx.peer_offers(peer) {
+            if used && wanted && ctx.peer_offers(peer) {
                 let _ = self.send_subscribe(ctx, peer, true);
             }
             return;
