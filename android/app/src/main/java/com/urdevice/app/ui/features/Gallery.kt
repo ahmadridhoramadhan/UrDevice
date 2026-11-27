@@ -37,12 +37,14 @@ object GalleryFeature : Feature {
         )
         val host = GalleryHost(app)
         node.gallerySetHost(object : GalleryHostFfi {
-            override fun page(cursor: ULong, limit: UInt): FfiGalleryPage {
-                val p = host.page(cursor, limit)
+            override fun page(cursor: ULong, limit: UInt, kind: UInt, album: Long?): FfiGalleryPage {
+                val p = host.page(cursor, limit, kind, album)
                 if (p.noPermission) askForAccess(app)
                 return p
             }
             override fun open(id: ULong): FfiOpened = host.open(id)
+            override fun albums() = host.albums()
+            override fun preview(id: ULong, maxSide: UInt) = host.preview(id, maxSide)
         })
     }
 

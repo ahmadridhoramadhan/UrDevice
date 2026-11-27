@@ -16,6 +16,7 @@
 //! user. Keys, text, and positions are never logged.
 
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 use urdevice_core::secret::SecretStore;
 use urdevice_core::services::Grant;
@@ -59,6 +60,36 @@ pub struct DesktopInput {
     // Only the Linux portal back-end keeps a secret.
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     secrets: Arc<dyn SecretStore>,
+    /// Puts the pointer at a position on back-ends that only move it by steps.
+    absolute: Mutex<AbsEmulator>,
+}
+
+/// After this long without a position, the emulated pointer is sent to the
+/// corner again, because something else (a real mouse) may have moved it.
+const ABS_STALE: Duration = Duration::from_millis(1500);
+
+/// A pointer position for hosts that take only relative steps (the Wayland
+/// portal and `uinput`): go to the top-left corner once, then move by the
+/// difference from where this code last put the pointer.
+#[derive(Default)]
+struct AbsEmulator {
+    /// The display size in pixels the compositor moves the pointer in.
+    size: Option<(f64, f64)>,
+    /// Where the pointer is believed to be.
+    at: Option<(f64, f64)>,
+    last: Option<Instant>,
+}
+
+impl AbsEmulator {
+    /// Follow a relative step that went out, so the position stays right.
+    fn follow(&mut self, dx: i32, dy: i32) {
+        if let (Some((x, y)), Some((w, h))) = (self.at, self.size) {
+            self.at = Some((
+                (x + f64::from(dx)).clamp(0.0, w - 1.0),
+                (y + f64::from(dy)).clamp(0.0, h - 1.0),
+            ));
+        }
+    }
 }
 
 /// The input adapter for this OS. `secrets` keeps the Wayland portal's
@@ -67,6 +98,7 @@ pub fn sink(secrets: Arc<dyn SecretStore>) -> Arc<DesktopInput> {
     Arc::new(DesktopInput {
         backend: Mutex::new(None),
         secrets,
+        absolute: Mutex::new(AbsEmulator::default()),
     })
 }
 
@@ -79,6 +111,52 @@ fn not_ready() -> CoreError {
 }
 
 impl DesktopInput {
+    /// Tell the adapter how big the primary display is, in the pixels the
+    /// pointer moves in (logical pixels on a scaled desktop). Used to put the
+    /// pointer at a position where the OS only takes relative steps.
+    pub fn set_display_size(&self, width: f32, height: f32) {
+        let mut a = lock(&self.absolute);
+        let size = (f64::from(width).max(2.0), f64::from(height).max(2.0));
+        if a.size != Some(size) {
+            a.size = Some(size);
+            a.at = None;
+        }
+    }
+
+    /// Put the pointer at `x`, `y` (0 to 65535 across and down) by relative steps.
+    fn emulate_absolute(&self, x: u32, y: u32) -> Result<()> {
+        let mut a = lock(&self.absolute);
+        let Some((w, h)) = a.size else {
+            return Err(CoreError::unsupported("input", "absolute-without-size"));
+        };
+        let now = Instant::now();
+        let fresh = a.last.is_some_and(|t| now.duration_since(t) < ABS_STALE);
+        let from = match a.at {
+            Some(at) if fresh => at,
+            _ => {
+                // A step larger than the display ends in the corner.
+                self.with(|b| {
+                    b.pointer(&PointerEvent::Move {
+                        dx: -(w * 2.0) as i32,
+                        dy: -(h * 2.0) as i32,
+                    })
+                })?;
+                (0.0, 0.0)
+            }
+        };
+        let to = (
+            (f64::from(x.min(65_535)) / 65_535.0 * (w - 1.0)).round(),
+            (f64::from(y.min(65_535)) / 65_535.0 * (h - 1.0)).round(),
+        );
+        let (dx, dy) = ((to.0 - from.0) as i32, (to.1 - from.1) as i32);
+        if dx != 0 || dy != 0 {
+            self.with(|b| b.pointer(&PointerEvent::Move { dx, dy }))?;
+        }
+        a.at = Some(to);
+        a.last = Some(now);
+        Ok(())
+    }
+
     #[cfg_attr(not(target_os = "linux"), allow(clippy::unused_self))]
     fn open(&self, prompt: bool) -> std::result::Result<Box<dyn Backend>, Fail> {
         #[cfg(target_os = "windows")]
@@ -162,7 +240,18 @@ impl InputSink for DesktopInput {
     }
 
     fn pointer(&self, _grant: &Grant, e: &PointerEvent) -> Result<()> {
-        self.with(|b| b.pointer(e))
+        let r = self.with(|b| b.pointer(e));
+        match (e, &r) {
+            // The Wayland portal and `uinput` cannot take a position.
+            (PointerEvent::Abs { x, y, .. }, Err(CoreError::Unsupported { .. })) => {
+                self.emulate_absolute(*x, *y)
+            }
+            (PointerEvent::Move { dx, dy }, Ok(())) => {
+                lock(&self.absolute).follow(*dx, *dy);
+                r
+            }
+            _ => r,
+        }
     }
 
     fn key(&self, _grant: &Grant, e: &KeyEvent) -> Result<()> {
@@ -271,6 +360,19 @@ pub fn forget_saved_tokens(secrets: &dyn SecretStore) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn emulated_pointer_follows_steps_and_stays_on_the_display() {
+        let mut a = AbsEmulator {
+            size: Some((100.0, 50.0)),
+            at: Some((10.0, 10.0)),
+            last: None,
+        };
+        a.follow(30, -40);
+        assert_eq!(a.at, Some((40.0, 0.0)));
+        a.follow(500, 500);
+        assert_eq!(a.at, Some((99.0, 49.0)));
+    }
 
     #[test]
     fn scroll_collects_small_steps() {

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- screen (#21): viewer -->
+    <string name="screen_control">Control</string>
+    <string name="screen_control_on">Drag to move the pointer. Tap to click. Use two fingers to zoom.</string>
     <string name="screen_view">View screen</string>
     <string name="screen_stop">Stop</string>
     <string name="screen_asking">Waiting for %1$s to allow screen sharing…</string>

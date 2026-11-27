@@ -5,4 +5,5 @@ Comment=Pair your devices and share clipboard, files, screen and input on your l
 Exec=urdevice
 Icon=urdevice
 Terminal=false
+StartupWMClass=urdevice
 Categories=Utility;Network;

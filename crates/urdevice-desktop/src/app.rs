@@ -46,6 +46,26 @@ impl EventSink for Sink {
     }
 }
 
+/// Show the main window again and bring it forward, for example from the tray. UI thread only.
+pub(crate) fn show_main_window() {
+    use slint::winit_030::WinitWindowAccessor;
+    with_ui(|ui| {
+        let Some(w) = ui.feature_ctx.window.upgrade() else {
+            return;
+        };
+        let _ = w.show();
+        w.window().with_winit_window(|win| {
+            win.set_minimized(false);
+            win.focus_window();
+        });
+    });
+}
+
+/// Redraw the main window now, for example after a feature window closed. UI thread only.
+pub(crate) fn refresh_now() {
+    with_ui(|ui| ui.refresh());
+}
+
 fn with_ui(f: impl FnOnce(&Rc<Ui>)) {
     let ui = UI.with(|u| u.borrow().clone());
     if let Some(ui) = ui {
@@ -510,6 +530,9 @@ impl Ui {
                         key: t.key.into(),
                         feature: f.id().into(),
                         view: f.has_view(),
+                        direct: f.direct(),
+                        toggle: f.switch(&self.feature_ctx, &sp.id).is_some(),
+                        on: f.switch(&self.feature_ctx, &sp.id).unwrap_or(false),
                         label: l.invoke_tile_label(t.key.into()),
                         icon: icon(t.key),
                         // On Bluetooth LE only a few features work (R6.4).
@@ -521,6 +544,13 @@ impl Ui {
                             mode_index(rp.mode)
                         },
                     });
+                }
+            }
+            // A feature page stays open only while its feature is on.
+            if w.get_page() == crate::ui::Page::Feature {
+                let open = w.get_feature_tile();
+                if tiles.iter().any(|t| t.key == open && t.mode >= 2) {
+                    w.set_page(crate::ui::Page::Peer);
                 }
             }
             sync(&self.models.tiles, tiles);
@@ -571,6 +601,17 @@ impl Ui {
                 .collect(),
         );
 
+        // Another device asked to pair and the user accepted: show the code.
+        if !snap.code_pairings.is_empty() {
+            if w.get_onboarding() {
+                if w.get_onboarding_step() < 3 {
+                    w.set_onboarding_step(3);
+                }
+            } else if w.get_page() != crate::ui::Page::Pair {
+                w.set_page(crate::ui::Page::Pair);
+            }
+        }
+
         match &snap.pair_screen {
             Some(p) => {
                 if *self.qr_uri.borrow() != p.qr_uri {
@@ -611,7 +652,7 @@ impl Ui {
                     self.toast(l.invoke_paired_with(name.clone().into()));
                     if w.get_onboarding() {
                         w.set_paired_name(name.into());
-                        w.set_onboarding_step(6);
+                        w.set_onboarding_step(4);
                     }
                 } else {
                     self.toast(l.invoke_pairing_failed(reason.into()));
@@ -651,6 +692,7 @@ impl Ui {
         };
         let Ok(win) = PromptWindow::new() else { return };
         win.set_device(p.device_name.into());
+        win.set_pairing(p.capability == "pair");
         win.set_feature(Self::labels(&w).invoke_cap_label(p.capability.into()));
         win.set_seconds_left(i32::try_from(p.timeout_secs).unwrap_or(30));
         let id = p.id;
@@ -747,10 +789,22 @@ impl Ui {
         let m2 = me.clone();
         w.on_pair_nearby(move |key| {
             let failed = n.pair_nearby(&key).is_err();
-            if let (true, Some(ui)) = (failed, m2.upgrade())
+            let name = n
+                .snapshot()
+                .nearby
+                .iter()
+                .find(|d| d.key == key.as_str())
+                .map(|d| d.name.clone())
+                .unwrap_or_default();
+            if let Some(ui) = m2.upgrade()
                 && let Some(w) = ui.window.upgrade()
             {
-                ui.toast(Self::labels(&w).invoke_pairing_failed("unreachable".into()));
+                let l = Self::labels(&w);
+                ui.toast(if failed {
+                    l.invoke_pairing_failed("unreachable".into())
+                } else {
+                    l.invoke_pairing_waiting(name.into())
+                });
             }
         });
         let n = node.clone();
@@ -796,6 +850,16 @@ impl Ui {
                 };
                 if let Some(f) = ui.features.iter().find(|f| f.id() == feature.as_str()) {
                     f.open(&ui.feature_ctx, p, &tile);
+                }
+            });
+        }
+        {
+            let me = me.clone();
+            w.on_toggle_tile(move |peer, feature, on| {
+                let Some(ui) = me.upgrade() else { return };
+                if let Some(f) = ui.features.iter().find(|f| f.id() == feature.as_str()) {
+                    f.set_switch(&ui.feature_ctx, &peer, on);
+                    ui.refresh();
                 }
             });
         }

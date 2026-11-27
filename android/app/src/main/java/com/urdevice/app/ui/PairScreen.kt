@@ -63,6 +63,8 @@ fun PairBody(
     onScanned: (String) -> Unit,
     onPairNearby: (String) -> Unit,
     onConfirm: (String, Boolean) -> Unit,
+    /** Onboarding: fewer words and no IP addresses. */
+    compact: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val hasCamera = remember { ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY) }
@@ -92,7 +94,10 @@ fun PairBody(
             }
         } else {
             val screen = snap.pairScreen
-            Text(stringResource(R.string.pair_qr_body), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(if (compact) R.string.ob_pair_qr_body else R.string.pair_qr_body),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 when {
                     screen == null -> {}
@@ -100,11 +105,13 @@ fun PairBody(
                     screen.lockedSecs > 0u -> Text(stringResource(R.string.pair_locked, screen.lockedSecs.toInt()))
                     else -> {
                         QrCode(screen.qrUri)
-                        Text(
-                            stringResource(R.string.pair_valid_for, screen.expiresInSecs.toInt()),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
+                        if (!compact) {
+                            Text(
+                                stringResource(R.string.pair_valid_for, screen.expiresInSecs.toInt()),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -115,12 +122,21 @@ fun PairBody(
             }
         }
 
-        Text(stringResource(R.string.pair_nearby), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-        Text(stringResource(R.string.pair_nearby_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(if (compact) R.string.ob_pair_nearby else R.string.pair_nearby),
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        if (!compact) {
+            Text(stringResource(R.string.pair_nearby_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         snap.codePairings.forEach { CodeCard(it, onConfirm) }
         val nearby = snap.nearby.filter { n -> snap.codePairings.none { it.key.startsWith(n.key) } }
         if (nearby.isEmpty() && snap.codePairings.isEmpty()) {
-            Text(stringResource(R.string.pair_none), style = MaterialTheme.typography.bodySmall)
+            Text(
+                stringResource(if (compact) R.string.ob_pair_none else R.string.pair_none),
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         nearby.forEach { n ->
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -129,7 +145,10 @@ fun PairBody(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(n.name, fontWeight = FontWeight.SemiBold)
-                        Text("${platformName(n.platform)} · ${n.address}", style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            if (compact) platformName(n.platform) else "${platformName(n.platform)} · ${n.address}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                     Button(onClick = { onPairNearby(n.key) }, modifier = Modifier.heightIn(min = 44.dp)) {
                         Text(stringResource(R.string.pair_button))

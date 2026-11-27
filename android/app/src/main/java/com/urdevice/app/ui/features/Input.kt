@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -91,6 +92,16 @@ object InputFeature : Feature, InputListener {
 
     override val hasScreen get() = true
 
+    /** The Mousepad fills the page; the other screens scroll. */
+    override fun fullScreen(tile: String) = tile != "keyboard" && tile != MOUSEPAD_SETTINGS && tile != PRESENTER_SETTINGS
+
+    /** The settings icon of the Mousepad tile opens the Mousepad settings page. */
+    override fun settingsPage(tile: String): String? = when (tile) {
+        "input.v1" -> MOUSEPAD_SETTINGS
+        "presenter" -> PRESENTER_SETTINGS
+        else -> null
+    }
+
     override fun onCoreStarted(context: Context, node: UrDeviceNode) {
         node.inputSetListener(this)
         appContext = context.applicationContext
@@ -98,6 +109,38 @@ object InputFeature : Feature, InputListener {
     }
 
     private var appContext: Context? = null
+
+    /** Intent extra that asks the app to guide the user to a setting: `service` or `keyboard`. */
+    const val EXTRA_GUIDE = "urdevice.guide"
+
+    /** The setting the user is being guided to now (`service`, `keyboard`), or empty. */
+    val guide = MutableStateFlow("")
+
+    /**
+     * The dialog behind a controlled phone's missing setting. "Agree" (the Play disclosure for the
+     * accessibility service) goes straight to Android's settings page for it.
+     */
+    @Composable
+    fun HostGuideDialog() {
+        val which by guide.collectAsState()
+        val context = LocalContext.current
+        if (which.isEmpty()) return
+        val service = which == "service"
+        AlertDialog(
+            onDismissRequest = { guide.value = "" },
+            title = { Text(stringResource(if (service) R.string.input_disclosure_title else R.string.input_host_notif_title)) },
+            text = { Text(stringResource(if (service) R.string.input_disclosure_body else R.string.input_host_notif_keyboard)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    guide.value = ""
+                    if (service) InputHost.openAccessibilitySettings(context) else InputHost.openKeyboardSettings(context)
+                }) { Text(stringResource(if (service) R.string.input_disclosure_agree else R.string.input_host_enable_keyboard)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { guide.value = "" }) { Text(stringResource(R.string.input_disclosure_not_now)) }
+            },
+        )
+    }
 
     private const val HOST_CHANNEL = "input_host"
     private const val HOST_NOTIFICATION = 4190
@@ -112,11 +155,18 @@ object InputFeature : Feature, InputListener {
         val text = ctx.getString(
             if (missing == "input_method") R.string.input_host_notif_keyboard else R.string.input_host_notif_service,
         )
-        val open = PendingIntent.getActivity(
-            ctx, 0,
-            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
+        // The accessibility service gates the whole control, so the app opens at once and offers
+        // to go straight to Android's settings. The keyboard only matters for typing: the
+        // notification offers it when tapped.
+        val which = if (missing == "input_method") "keyboard" else "service"
+        val intent = Intent(ctx, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(EXTRA_GUIDE, which)
+        if (which == "service") {
+            guide.value = which
+            runCatching { ctx.startActivity(intent) }
+        }
+        val open = PendingIntent.getActivity(ctx, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = Notification.Builder(ctx, HOST_CHANNEL)
             .setSmallIcon(R.drawable.ic_urdevice_symbol)
             .setContentTitle(ctx.getString(R.string.input_host_notif_title))
@@ -176,17 +226,33 @@ object InputFeature : Feature, InputListener {
         val node = Core.node() ?: return
         val all by sessions.collectAsState()
         val session = all[peer.id] ?: Session()
-        // Open the session with the screen and end it when the screen closes.
-        DisposableEffect(peer.id) {
-            connect(node, peer.id)
-            onDispose { end(node, peer.id) }
+        // A settings page opened from the device page needs no session, so it does not ask the
+        // other device. Opened from the pad, it keeps the session the pad started.
+        val needsSession = remember { tile != MOUSEPAD_SETTINGS && tile != PRESENTER_SETTINGS }
+        if (needsSession) {
+            // Open the session with the screen and end it when the screen closes.
+            DisposableEffect(peer.id) {
+                connect(node, peer.id)
+                onDispose { end(node, peer.id) }
+            }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (tile == MOUSEPAD_SETTINGS) {
+            MousepadSettings()
+            return
+        }
+        if (tile == PRESENTER_SETTINGS) {
+            PresenterSettings()
+            return
+        }
+        Column(
+            if (fullScreen(tile)) Modifier.fillMaxSize() else Modifier,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             SessionStatus(peer, session, onStart = { connect(node, peer.id) }, onStop = { end(node, peer.id) })
             when (tile) {
-                "presenter" -> PresenterPad(node, peer.id, session.active)
+                "presenter" -> PresenterPad(node, peer.id, session.active, Modifier.weight(1f))
                 "keyboard" -> KeyboardPad(node, peer.id, session.active)
-                else -> MousepadPad(node, peer.id, session.active)
+                else -> MousepadPad(node, peer.id, session.active, Modifier.weight(1f))
             }
         }
     }

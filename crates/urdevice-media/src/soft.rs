@@ -34,11 +34,19 @@ impl SoftEncoder {
             ))
             .adaptive_quantization(false)
             .background_detection(false)
-            .skip_frames(true);
+            .skip_frames(true)
+            .max_slice_len(4000)
+            .num_threads(threads());
         let enc = Encoder::with_api_config(OpenH264API::from_source(), config)
             .map_err(|e| MediaError::Encoder(e.to_string()))?;
         Ok(Self { enc, settings })
     }
+}
+
+/// Slices encoded in parallel: the encoder is the slowest part of sharing this computer's
+/// screen, and the picture splits into slices that need no data from each other.
+fn threads() -> u16 {
+    std::thread::available_parallelism().map_or(1, |n| n.get().min(4)) as u16
 }
 
 impl VideoEncoder for SoftEncoder {
@@ -119,11 +127,26 @@ impl H264Decoder {
     /// Decode one access unit into `out`. Returns false when the decoder
     /// produced no picture yet (it needs more data).
     pub fn decode(&mut self, au: &[u8], out: &mut RgbaFrame) -> Result<bool, MediaError> {
+        self.decode_with(au, out, true)
+    }
+
+    /// Like [`decode`](Self::decode), but with `convert` false the picture is decoded (the next
+    /// frames need it) and not turned into RGBA: for a frame that a newer one will replace
+    /// before it is shown. Returns false then.
+    pub fn decode_with(
+        &mut self,
+        au: &[u8],
+        out: &mut RgbaFrame,
+        convert: bool,
+    ) -> Result<bool, MediaError> {
         let pic = self
             .dec
             .decode(au)
             .map_err(|e| MediaError::Decoder(e.to_string()))?;
         let Some(pic) = pic else { return Ok(false) };
+        if !convert {
+            return Ok(false);
+        }
         let (w, h) = pic.dimensions();
         if w == 0 || h == 0 || w.saturating_mul(h) > MAX_DECODE_PIXELS {
             return Err(MediaError::BadSize(w as u32, h as u32));
@@ -207,6 +230,45 @@ mod tests {
         assert!(u[0].keyframe);
         assert!(dec.decode(&u[0].data, &mut pic).unwrap());
         assert_eq!((pic.width, pic.height), (160, 90));
+    }
+
+    #[test]
+    #[ignore = "timing probe: cargo test -p urdevice-media bench_1080p -- --ignored --nocapture"]
+    fn bench_1080p() {
+        let settings = EncoderSettings {
+            width: 1920,
+            height: 1080,
+            fps: 30,
+            bitrate_bps: 8_000_000,
+        };
+        let mut enc = AutoEncoder::open(settings, Backend::Software).unwrap();
+        let mut dec = H264Decoder::new().unwrap();
+        let mut pic = RgbaFrame::default();
+        let (mut te, mut td) = (std::time::Duration::ZERO, std::time::Duration::ZERO);
+        let n = 60u32;
+        for i in 0..n {
+            let f = gradient(1920, 1080, i * 7);
+            let t = std::time::Instant::now();
+            let units = enc.encode(&f, u64::from(i) * 33_333, i == 0).unwrap();
+            te += t.elapsed();
+            for u in units {
+                let t = std::time::Instant::now();
+                let _ = dec.decode(&u.data, &mut pic).unwrap();
+                td += t.elapsed();
+            }
+        }
+        let f = gradient(1920, 1080, 3);
+        let mut yuv = Vec::new();
+        let t = std::time::Instant::now();
+        for _ in 0..n {
+            bgra_to_i420(&f, 1920, 1080, &mut yuv).unwrap();
+        }
+        println!("convert only {:?}/frame", t.elapsed() / n);
+        println!(
+            "encode {:?}/frame, decode+convert {:?}/frame",
+            te / n,
+            td / n
+        );
     }
 
     #[test]

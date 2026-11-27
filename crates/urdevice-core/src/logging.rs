@@ -15,8 +15,29 @@ use tracing_subscriber::fmt::format::Writer;
 
 /// Field names that may appear in logs with their values.
 pub const ALLOWED_FIELDS: &[&str] = &[
-    "message", "peer", "addr", "cap", "mode", "error", "port", "reason", "rtt_ms", "count",
-    "version", "code", "via", "path", "created",
+    "message",
+    "peer",
+    "addr",
+    "cap",
+    "mode",
+    "error",
+    "port",
+    "reason",
+    "rtt_ms",
+    "count",
+    "version",
+    "code",
+    "via",
+    "path",
+    "created",
+    // Counters and timings of the screen viewer: numbers only.
+    "received",
+    "dropped",
+    "decoded",
+    "decode_avg_ms",
+    "decode_max_ms",
+    "longest_gap_ms",
+    "secs",
 ];
 
 /// Field formatter that redacts every field not on the allow-list.

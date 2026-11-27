@@ -20,10 +20,12 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.os.IBinder
 import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
+import android.view.Display
 import android.view.Surface
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -88,16 +90,12 @@ class ScreenHost(private val context: Context) : ScreenHostFfi {
 
 /** The physical screen size in pixels. */
 internal fun screenSize(context: Context): Pair<Int, Int> {
-    val wm = context.getSystemService(WindowManager::class.java)
-    return if (Build.VERSION.SDK_INT >= 30) {
-        val b = wm.maximumWindowMetrics.bounds
-        b.width() to b.height()
-    } else {
-        val m = DisplayMetrics()
-        @Suppress("DEPRECATION")
-        wm.defaultDisplay.getRealMetrics(m)
-        m.widthPixels to m.heightPixels
-    }
+    // The real size of the default display in its current rotation: it swaps when the phone turns.
+    val display = context.getSystemService(DisplayManager::class.java).getDisplay(Display.DEFAULT_DISPLAY)
+    val m = DisplayMetrics()
+    @Suppress("DEPRECATION")
+    display.getRealMetrics(m)
+    return m.widthPixels to m.heightPixels
 }
 
 /** Scale `w` x `h` down to fit the target box, keeping the aspect ratio, in even numbers. */
@@ -299,8 +297,22 @@ class CaptureSession(
         }
     }
 
+    /** The phone turned: the virtual display and the encoder take the new shape (design §10). */
+    private val rotation = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+
+        override fun onDisplayRemoved(displayId: Int) {}
+
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == Display.DEFAULT_DISPLAY && running) setTarget(target)
+        }
+    }
+
     fun start() {
         running = true
+        // On the main thread: the encoder thread is busy draining.
+        context.getSystemService(DisplayManager::class.java)
+            .registerDisplayListener(rotation, Handler(Looper.getMainLooper()))
         // Android 14+: register the callback before creating the virtual display.
         projection.registerCallback(callback, Handler(Looper.getMainLooper()))
         val (w, h) = screenSize(context)
@@ -332,10 +344,44 @@ class CaptureSession(
         // A still screen still sends a frame now and then, so a late viewer gets a picture.
         f.setLong(MediaFormat.KEY_REPEAT_PREVIOUS_FRAME_AFTER, 100_000L)
         if (Build.VERSION.SDK_INT >= 30) f.setInteger(MediaFormat.KEY_LATENCY, 1)
-        val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-        c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-        return c
+        // The display hands the encoder every frame it draws, 60 to 120 a second here. Without a
+        // cap the phone sends more pictures than the viewer can decode, and the picture stutters.
+        f.setInteger("max-fps-to-encoder", t.fps.toInt())
+        // Two temporal layers: every other picture is one that no later picture needs, so the
+        // phone can leave it out when the screen draws faster than the target rate.
+        f.setString("ts-schema", "android.generic.2")
+        return try {
+            val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            c
+        } catch (e: Exception) {
+            Log.i("UrDeviceScreen", "no temporal layers on this encoder: ${e.message}")
+            f.setString("ts-schema", "")
+            val c = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+            c.configure(f, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            c
+        }
     }
+
+    /** True for a picture no other picture refers to (H.264 nal_ref_idc is 0), so it may be dropped. */
+    private fun unreferenced(data: ByteArray): Boolean {
+        var i = 0
+        while (i + 3 < data.size && i < 16) {
+            if (data[i] == 0.toByte() && data[i + 1] == 0.toByte() && data[i + 2] == 1.toByte()) {
+                val h = data[i + 3].toInt()
+                return (h and 0x1f) == 1 && ((h shr 5) and 3) == 0
+            }
+            i++
+        }
+        return false
+    }
+
+    private var pushed = 0L
+    private var lastPushAt = 0L
+    private var maxGapMs = 0L
+    private var windowStart = 0L
+    private var windowFrames = 0
+    private var windowBytes = 0L
 
     private fun drain() {
         val info = MediaCodec.BufferInfo()
@@ -362,6 +408,27 @@ class CaptureSession(
                         val key = info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
                         val data = if (key) (csd ?: ByteArray(0)) + bytes else bytes
                         val (w, h) = if (key) size else 0 to 0
+                        // Faster than the target and this picture is not needed: leave it out.
+                        val fps = maxOf(1, target.fps.toInt())
+                        if (!key && SystemClock.elapsedRealtime() - lastPushAt < 800L / fps && unreferenced(bytes)) {
+                            c.releaseOutputBuffer(idx, false)
+                            continue
+                        }
+                        pushed++
+                        if (pushed == 1L || pushed % 600L == 0L) Log.i("UrDeviceScreen", "frames pushed=$pushed key=$key size=$w x $h")
+                        // Timing for the log: frames and bytes in two seconds, and the longest wait.
+                        val now = SystemClock.elapsedRealtime()
+                        if (lastPushAt != 0L) maxGapMs = maxOf(maxGapMs, now - lastPushAt)
+                        lastPushAt = now
+                        windowFrames++
+                        windowBytes += bytes.size
+                        if (now - windowStart >= 2_000) {
+                            Log.i("UrDeviceScreen", "encoded frames=$windowFrames bytes=$windowBytes longest_gap_ms=$maxGapMs")
+                            windowStart = now
+                            windowFrames = 0
+                            windowBytes = 0
+                            maxGapMs = 0
+                        }
                         node?.screenPushFrame(
                             session,
                             FfiVideoFrame(info.presentationTimeUs.toULong(), key, data, w.toUInt(), h.toUInt()),
@@ -391,6 +458,7 @@ class CaptureSession(
             return
         }
         // A new size needs a new encoder and Surface; the virtual display moves to it.
+        Log.i("UrDeviceScreen", "size ${size.first} x ${size.second} -> ${next.first} x ${next.second}")
         runCatching {
             val c = newCodec(next, t)
             val s = c.createInputSurface()
@@ -404,6 +472,10 @@ class CaptureSession(
                 o
             }
             val dpi = context.resources.displayMetrics.densityDpi
+            // Detach, resize, then attach: some phones keep drawing at the old size when the
+            // display is resized while it still has the old Surface, and the picture ends up
+            // small in a corner of the new one.
+            display?.surface = null
             display?.resize(next.first, next.second, dpi)
             display?.surface = s
             old.first?.let { runCatching { it.stop() }; runCatching { it.release() } }
@@ -414,6 +486,7 @@ class CaptureSession(
     fun stop() {
         if (!running) return
         running = false
+        runCatching { context.getSystemService(DisplayManager::class.java).unregisterDisplayListener(rotation) }
         runCatching { display?.release() }
         display = null
         synchronized(lock) {

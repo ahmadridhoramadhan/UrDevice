@@ -57,7 +57,7 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Linux x86_64 (deb + AppImage + tar.gz)
+    name: Linux x86_64 (deb + rpm + AppImage + tar.gz)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -72,7 +72,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deb
+          tool: cargo-deb,cargo-generate-rpm
 
       - run: cargo build --release --locked -p urdevice-desktop
 
@@ -80,6 +80,9 @@ jobs:
         run: |
           mkdir -p dist
           cargo deb -p urdevice-desktop --no-build -o dist/urdevice-linux-amd64.deb
+
+      - name: RPM package (Fedora)
+        run: cargo generate-rpm -p crates/urdevice-desktop -o dist/urdevice-linux-x86_64.rpm
 
       - name: tar.gz
         run: |

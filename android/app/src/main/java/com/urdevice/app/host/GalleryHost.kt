@@ -4,12 +4,15 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
+import android.database.Cursor
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Size
+import com.urdevice.core.FfiGalleryAlbum
 import com.urdevice.core.FfiGalleryItem
 import com.urdevice.core.FfiGalleryPage
 import com.urdevice.core.FfiOpened
@@ -24,15 +27,25 @@ import java.io.ByteArrayOutputStream
 class GalleryHost(context: Context) : GalleryHostFfi {
     private val app = context.applicationContext
     private val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
-    private val selection = "${MediaStore.Files.FileColumns.MEDIA_TYPE} IN (" +
-        "${MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE}, ${MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO})"
+    private val mediaType = MediaStore.Files.FileColumns.MEDIA_TYPE
+    private val typeImage = MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE
+    private val typeVideo = MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO
 
-    override fun page(cursor: ULong, limit: UInt): FfiGalleryPage {
+    /** The WHERE part for a kind (0 all, 1 photos, 2 videos) and an optional album. */
+    private fun selection(kind: UInt, album: Long?): String {
+        val types = when (kind) {
+            1u -> "$mediaType = $typeImage"
+            2u -> "$mediaType = $typeVideo"
+            else -> "$mediaType IN ($typeImage, $typeVideo)"
+        }
+        return if (album != null) "$types AND ${MediaStore.MediaColumns.BUCKET_ID} = ?" else types
+    }
+
+    override fun page(cursor: ULong, limit: UInt, kind: UInt, album: Long?): FfiGalleryPage {
         if (!hasMediaPermission(app)) return FfiGalleryPage(emptyList(), false, true)
         val args = Bundle().apply {
-            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
-            putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(MediaStore.MediaColumns.DATE_ADDED, MediaStore.MediaColumns._ID))
-            putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection(kind, album))
+            if (album != null) putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf(album.toString()))
             // One more than asked, to know whether there is a next page.
             putInt(ContentResolver.QUERY_ARG_LIMIT, limit.toInt() + 1)
             putInt(ContentResolver.QUERY_ARG_OFFSET, cursor.toInt())
@@ -49,7 +62,7 @@ class GalleryHost(context: Context) : GalleryHostFfi {
         )
         val items = ArrayList<FfiGalleryItem>()
         var more = false
-        app.contentResolver.query(collection, cols, args, null)?.use { c ->
+        newestFirst(cols, args)?.use { c ->
             while (c.moveToNext()) {
                 if (items.size >= limit.toInt()) {
                     more = true
@@ -70,6 +83,70 @@ class GalleryHost(context: Context) : GalleryHostFfi {
             }
         }
         return FfiGalleryPage(items, more, false)
+    }
+
+    override fun albums(): List<FfiGalleryAlbum> {
+        if (!hasMediaPermission(app)) return emptyList()
+        val args = Bundle().apply {
+            putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection(0u, null))
+        }
+        val cols = arrayOf(MediaStore.MediaColumns.BUCKET_ID, MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+        val names = LinkedHashMap<Long, String>()
+        val counts = HashMap<Long, Long>()
+        // Newest first, so the album with the newest picture comes first.
+        newestFirst(cols, args)?.use { c ->
+            while (c.moveToNext()) {
+                if (c.isNull(0)) continue
+                val id = c.getLong(0)
+                if (id !in names) names[id] = c.getString(1) ?: "?"
+                counts[id] = (counts[id] ?: 0L) + 1
+            }
+        }
+        return names.map { (id, name) -> FfiGalleryAlbum(id, name, (counts[id] ?: 0L).toULong()) }
+    }
+
+    override fun preview(id: ULong, maxSide: UInt): ByteArray = runCatching {
+        val side = maxSide.toInt().coerceIn(64, 2048)
+        val fileUri = ContentUris.withAppendedId(collection, id.toLong())
+        val type = app.contentResolver.query(fileUri, arrayOf(mediaType), null, null, null)
+            ?.use { if (it.moveToFirst()) it.getInt(0) else null } ?: return@runCatching ByteArray(0)
+        val isVideo = type == typeVideo
+        val u = uri(id.toLong(), isVideo)
+        val bmp: Bitmap = if (isVideo) {
+            app.contentResolver.loadThumbnail(u, Size(side, side), null)
+        } else {
+            // Decodes at most `side` pixels, and turns the picture upright.
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(app.contentResolver, u)) { decoder, info, _ ->
+                val longest = maxOf(info.size.width, info.size.height)
+                if (longest > side) {
+                    decoder.setTargetSize(info.size.width * side / longest, info.size.height * side / longest)
+                }
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
+        }
+        val out = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.JPEG, 88, out)
+        bmp.recycle()
+        out.toByteArray()
+    }.getOrDefault(ByteArray(0))
+
+    /**
+     * Newest first by the day the picture was taken (the day it was added when the phone does not
+     * say). Sorting by the day it was added put restored or synced old pictures on top. Some Android
+     * versions refuse a sort expression; then the plain taken-date columns are used.
+     */
+    private fun newestFirst(cols: Array<String>, args: Bundle): Cursor? {
+        val taken = MediaStore.MediaColumns.DATE_TAKEN
+        val added = MediaStore.MediaColumns.DATE_ADDED
+        val expression = Bundle(args).apply {
+            putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "COALESCE($taken, $added * 1000) DESC, ${MediaStore.MediaColumns._ID} DESC")
+        }
+        runCatching { app.contentResolver.query(collection, cols, expression, null) }.getOrNull()?.let { return it }
+        val columns = Bundle(args).apply {
+            putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(taken, added, MediaStore.MediaColumns._ID))
+            putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
+        }
+        return app.contentResolver.query(collection, cols, columns, null)
     }
 
     private fun uri(id: Long, video: Boolean) = ContentUris.withAppendedId(

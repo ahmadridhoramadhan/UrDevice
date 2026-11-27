@@ -39,6 +39,7 @@ mod terminal;
 mod tunnel;
 mod webcam;
 
+pub(crate) use input::select_backend;
 pub(crate) use list::all;
 
 /// One tile on the paired-device view.
@@ -77,6 +78,12 @@ pub(crate) trait Feature {
         false
     }
 
+    /// True when a tile opens a window of its own: the page does not change, and `open` is
+    /// called at once (screen sharing).
+    fn direct(&self) -> bool {
+        false
+    }
+
     /// Called once after the window and the node exist: wire the Slint
     /// global's callbacks, give the core service its desktop adapters
     /// (`urdevice_platform::features::<id>`), and set its listener.
@@ -87,6 +94,18 @@ pub(crate) trait Feature {
     /// Called on every redraw with a fresh snapshot.
     fn refresh(&self, ctx: &FeatureCtx, snap: &Snapshot) {
         let _ = (ctx, snap);
+    }
+
+    /// For a tile that is a plain switch (no view, no settings icon): its state
+    /// for `peer` (Device ID, hex). `None` for a normal tile.
+    fn switch(&self, ctx: &FeatureCtx, peer: &str) -> Option<bool> {
+        let _ = (ctx, peer);
+        None
+    }
+
+    /// The user flipped the switch tile of `peer`.
+    fn set_switch(&self, ctx: &FeatureCtx, peer: &str, on: bool) {
+        let _ = (ctx, peer, on);
     }
 
     /// A tile opened the view for `peer`. `tile` is the [`TileSpec::key`].
@@ -130,8 +149,6 @@ mod tests {
                 "files.v1",
                 "gallery.v1",
                 "input.v1",
-                "keyboard",
-                "media.v1",
                 "screen.h264.v1",
                 "tunnel.v1"
             ]

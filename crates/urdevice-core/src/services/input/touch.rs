@@ -126,6 +126,14 @@ pub trait TouchHost: Send + Sync {
     /// Send a key event to the focused field. `code` is an Android
     /// `KeyEvent.KEYCODE_*`, `meta` the [`meta`] bits held.
     fn key(&self, grant: &Grant, code: u32, down: bool, meta: u32) -> Result<()>;
+
+    /// Show the pointer on the phone's screen at `(x, y)` pixels, or hide it. The controller's
+    /// mouse moves this pointer, so the user sees where a click will land. Cosmetic: a host
+    /// that cannot draw it does nothing.
+    fn cursor(&self, grant: &Grant, x: u32, y: u32, shown: bool) -> Result<()> {
+        let _ = (grant, x, y, shown);
+        Ok(())
+    }
 }
 
 /// An Android key code for a USB HID usage, or `None` for a key the phone has
@@ -432,8 +440,24 @@ impl super::InputSink for TouchSink {
         self.need_gestures()?;
         let size = self.host.display_size();
         let now = self.now_ms();
-        let acts = lock(&self.state).apply(event, now, size);
-        self.run(grant, acts)
+        let (acts, at) = {
+            let mut st = lock(&self.state);
+            let acts = st.apply(event, now, size);
+            (acts, st.pos)
+        };
+        let result = self.run(grant, acts);
+        // Only a pointer that moves by distance (the remote-control window) is drawn. A screen
+        // window points straight at the picture, which already shows the screen, so it draws none.
+        if matches!(event, PointerEvent::Move { .. }) {
+            let (w, h) = if size.0 > 0 && size.1 > 0 {
+                size
+            } else {
+                FALLBACK_SIZE
+            };
+            let (x, y) = px(at, (w, h));
+            let _ = self.host.cursor(grant, x, y, true);
+        }
+        result
     }
 
     fn key(&self, grant: &Grant, event: &KeyEvent) -> Result<()> {
@@ -490,8 +514,10 @@ impl super::InputSink for TouchSink {
         self.host.nav(grant, action)
     }
 
-    fn cancel(&self, _grant: &Grant) {
+    fn cancel(&self, grant: &Grant) {
         lock(&self.state).stroke = None;
+        // The session is over: the pointer leaves the screen.
+        let _ = self.host.cursor(grant, 0, 0, false);
     }
 }
 
@@ -727,6 +753,7 @@ mod tests {
         gestures: Mutex<bool>,
         text: Mutex<bool>,
         log: Mutex<Vec<Did>>,
+        cursors: Mutex<Vec<(u32, u32, bool)>>,
     }
 
     impl Host {
@@ -735,6 +762,7 @@ mod tests {
                 gestures: Mutex::new(gestures),
                 text: Mutex::new(text),
                 log: Mutex::default(),
+                cursors: Mutex::default(),
             })
         }
         fn take(&self) -> Vec<Did> {
@@ -766,6 +794,10 @@ mod tests {
         }
         fn key(&self, _: &Grant, c: u32, d: bool, m: u32) -> Result<()> {
             self.log.lock().unwrap().push(Did::Key(c, d, m));
+            Ok(())
+        }
+        fn cursor(&self, _: &Grant, x: u32, y: u32, shown: bool) -> Result<()> {
+            self.cursors.lock().unwrap().push((x, y, shown));
             Ok(())
         }
     }
@@ -883,5 +915,23 @@ mod tests {
                 Did::Nav(nav::BACK),
             ]
         );
+    }
+
+    #[test]
+    fn the_pointer_is_drawn_while_it_moves_by_distance_and_hidden_on_cancel() {
+        let host = Host::new(true, true);
+        let sink = TouchSink::new(host.clone());
+        let g = grant();
+        sink.pointer(&g, &abs(0.5, 0.25)).unwrap();
+        sink.pointer(&g, &PointerEvent::Move { dx: 100, dy: 0 })
+            .unwrap();
+        // A button does not move the pointer.
+        sink.pointer(&g, &left(true)).unwrap();
+        sink.cancel(&g);
+        let c = host.cursors.lock().unwrap().clone();
+        // The absolute move (a screen window) draws nothing; the relative one does.
+        assert_eq!(c.len(), 2, "{c:?}");
+        assert!(c[0].0.abs_diff(600) <= 1 && c[0].2, "{c:?}");
+        assert_eq!(c[1], (0, 0, false));
     }
 }

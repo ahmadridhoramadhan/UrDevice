@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="media_player_title">Media player</string>
+    <string name="media_active">Active</string>
     <string name="media_show">Show what is playing on %1$s</string>
     <string name="media_off">The media player is off.</string>
     <string name="media_offline">%1$s is offline.</string>

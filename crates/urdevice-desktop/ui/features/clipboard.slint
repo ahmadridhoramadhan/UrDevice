@@ -1,19 +1,14 @@
-// Clipboard sharing (#16): the desktop feature view.
+// Clipboard sharing (#16). The per-device switch is a tile on the paired-device
+// page (see main.slint); this view only reports the global pause.
 // Rust side: src/features/clipboard.rs. See docs/dev/adding-a-feature.md.
-import { Theme } from "../theme.slint";
-import { Card, Muted, Toggle } from "../widgets.slint";
+import { Muted } from "../widgets.slint";
 
 // State and callbacks shared with src/features/clipboard.rs.
 export global ClipboardFeature {
-    // The paired device the view is open for (Device ID, hex).
-    in-out property <string> peer-id;
-    // Clipboard sync with that device is on (R7.6).
-    in-out property <bool> peer-enabled: true;
     // "Pause clipboard on all devices" is on (R7.6, Settings).
     in-out property <bool> paused;
     // The last thing that happened, without any content.
     in-out property <string> status;
-    callback set-peer-enabled(bool);
     callback set-paused(bool);
 }
 
@@ -22,23 +17,6 @@ export component ClipboardView inherits VerticalLayout {
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
-    Card {
-        height: 84px;
-        HorizontalLayout {
-            padding: 16px;
-            spacing: 12px;
-            VerticalLayout {
-                alignment: center;
-                Text { text: @tr("Share clipboard with {}", root.peer-name); font-weight: 600; color: Theme.text; }
-                Muted { text: @tr("Text, rich text, and images you copy here show up on that device, and the other way round. Content marked as sensitive is never sent."); }
-            }
-            Toggle {
-                checked: ClipboardFeature.peer-enabled;
-                toggled(v) => { ClipboardFeature.set-peer-enabled(v); }
-                y: (parent.height - self.height) / 2;
-            }
-        }
-    }
     if ClipboardFeature.paused: Muted {
         text: @tr("Clipboard sharing is paused for all devices. Turn it back on in Settings.");
     }

@@ -1,33 +1,13 @@
 // Remote control: pointer, keyboard, text, and presenter (#18, #19): the desktop feature view.
 // Rust side: src/features/input.rs. See docs/dev/adding-a-feature.md.
 import { Theme } from "../theme.slint";
-import { Btn, Muted } from "../widgets.slint";
+import { Btn, IconBtn, Muted } from "../widgets.slint";
 
-// State and callbacks shared with src/features/input.rs.
-export global InputFeature {
-    // The paired device the view is open for (Device ID, hex).
-    in-out property <string> peer-id;
-    // Open (or bring back) the remote-control window for that device.
-    callback open-window();
-}
-
+// Remote control has no page: its tile switches the remote-control window on and off
+// (src/features/input.rs). The view stays only so that every feature id has a view.
 export component InputView inherits VerticalLayout {
-    // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
     in property <string> peer-name;
-    spacing: 10px;
-    Muted {
-        text: @tr("Remote control of {} opens in its own window. Click inside it to capture your pointer and keyboard. Press Ctrl+Alt+G to release them.", root.peer-name);
-        wrap: word-wrap;
-    }
-    HorizontalLayout {
-        alignment: start;
-        Btn {
-            text: @tr("Open remote control");
-            kind: 0;
-            clicked => { InputFeature.open-window(); }
-        }
-    }
 }
 
 // The remote-control window (#19, T4.8, R9.1, R10.2). The pad below the bar stands for the other
@@ -35,6 +15,7 @@ export component InputView inherits VerticalLayout {
 // pointer and keyboard; Ctrl+Alt+G releases them. src/features/input.rs turns the events into
 // input messages (the rules are in urdevice_core::services::input::capture).
 export component RemoteWindow inherits Window {
+    icon: @image-url("../../../../assets/urdevice-icon-512.png");
     // Name of the device being controlled, and a one-line state for the bar.
     in property <string> device-name;
     in property <string> status;
@@ -46,6 +27,15 @@ export component RemoteWindow inherits Window {
     in property <bool> show-nav;
     // Width over height of the other device's display.
     in property <float> aspect: 1.6;
+    // Screen sharing (#21): the window shows the other device's screen, and the pad
+    // controls it. `frame` is the newest picture.
+    in property <bool> screen;
+    in property <bool> has-frame;
+    in property <image> frame;
+    // The displays of the other device when it has more than one, and the one shown.
+    in property <[string]> displays;
+    in property <int> display-index;
+    callback pick-display(int);
 
     // Pointer: position and the size of the pad (all in logical pixels).
     callback pointer-move(length, length, length, length);
@@ -63,17 +53,21 @@ export component RemoteWindow inherits Window {
     callback start();
     callback stop();
 
-    title: @tr("UrDevice remote control: {}", root.device-name);
+    title: root.screen ? @tr("UrDevice screen: {}", root.device-name) : @tr("UrDevice remote control: {}", root.device-name);
     preferred-width: 900px;
     preferred-height: 620px;
     min-width: 360px;
     min-height: 260px;
     background: Theme.surface;
 
+    // While the mouse is captured the pad fills the whole window, so the area the mouse is
+    // locked to is exactly the pad: no bar and no empty margin to wander into. A screen window
+    // keeps its bar and the picture's shape, and does not lock the mouse.
+    property <bool> pad-full: root.captured && !root.screen;
     VerticalLayout {
-        padding: 12px;
-        spacing: 10px;
-        HorizontalLayout {
+        padding: root.pad-full ? 0px : 12px;
+        spacing: root.pad-full ? 0px : 10px;
+        if !root.pad-full: HorizontalLayout {
             spacing: 8px;
             Text {
                 text: root.status;
@@ -83,34 +77,76 @@ export component RemoteWindow inherits Window {
                 horizontal-stretch: 1;
                 overflow: elide;
             }
-            if root.active && root.show-nav: Btn { text: @tr("Back"); clicked => { root.nav(0); } }
-            if root.active && root.show-nav: Btn { text: @tr("Home"); clicked => { root.nav(1); } }
-            if root.active && root.show-nav: Btn { text: @tr("Recents"); clicked => { root.nav(2); } }
-            if !root.active: Btn { text: @tr("Start"); kind: 0; clicked => { root.start(); } }
-            if root.active: Btn { text: @tr("Stop"); kind: 2; clicked => { root.stop(); } }
+            if root.active && root.show-nav: IconBtn { icon: @image-url("../icons/back.svg"); label: @tr("Back"); clicked => { root.nav(0); } }
+            if root.active && root.show-nav: IconBtn { icon: @image-url("../icons/home.svg"); label: @tr("Home"); clicked => { root.nav(1); } }
+            if root.active && root.show-nav: IconBtn { icon: @image-url("../icons/recents.svg"); label: @tr("Recents"); clicked => { root.nav(2); } }
+            if root.displays.length > 1: HorizontalLayout {
+                spacing: 6px;
+                for name[i] in root.displays: Btn {
+                    text: name;
+                    kind: root.display-index == i ? 0 : 1;
+                    clicked => { root.pick-display(i); }
+                }
+            }
+            // Icons only, as on Android: the mouse turns control on and off in a screen window.
+            if root.screen: IconBtn {
+                icon: @image-url("../icons/mouse.svg");
+                label: root.active ? @tr("Release control") : @tr("Control");
+                kind: root.active ? 0 : 1;
+                clicked => { if (root.active) { root.stop(); } else { root.start(); } }
+            }
+            if !root.screen && !root.active: IconBtn { icon: @image-url("../icons/play.svg"); label: @tr("Start"); kind: 0; clicked => { root.start(); } }
+            if !root.screen && root.active: IconBtn { icon: @image-url("../icons/close.svg"); label: @tr("Stop"); kind: 2; clicked => { root.stop(); } }
         }
 
         area := Rectangle {
             vertical-stretch: 1;
             // The pad keeps the shape of the other display and is centred.
-            property <length> pad-w: min(self.width, self.height * root.aspect);
-            property <length> pad-h: self.pad-w / root.aspect;
+            property <length> pad-w: root.pad-full ? self.width : min(self.width, self.height * root.aspect);
+            property <length> pad-h: root.pad-full ? self.height : self.pad-w / root.aspect;
 
             pad := Rectangle {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: parent.pad-w;
                 height: parent.pad-h;
-                background: Theme.surface-2;
-                border-radius: Theme.radius;
+                background: root.has-frame ? #000000 : Theme.surface-2;
+                border-radius: root.pad-full ? 0px : Theme.radius;
                 border-width: root.captured ? 2px : 1px;
                 border-color: root.captured ? Theme.accent : Theme.border;
                 clip: true;
 
+                if root.has-frame: Image {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.frame;
+                    image-fit: fill;
+                }
+
+                // Over the picture the hint is a small pill at the bottom, and gone while captured.
+                if root.has-frame && !root.captured: Rectangle {
+                    x: (parent.width - self.width) / 2;
+                    y: parent.height - self.height - 12px;
+                    width: min(parent.width - 24px, 440px);
+                    height: 30px;
+                    border-radius: 15px;
+                    background: #000000b0;
+                    Text {
+                        text: @tr("Click the screen to control {}.", root.device-name);
+                        color: #ffffff;
+                        font-size: Theme.font-small;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
                 Text {
-                    text: !root.active ? @tr("Start a session to control {}.", root.device-name)
-                        : root.captured ? @tr("Captured. Press Ctrl+Alt+G to release the pointer and keyboard.")
-                        : @tr("Click here to capture the pointer and keyboard.");
+                    visible: !root.has-frame;
+                    text: !root.active ? @tr("Starting {}…", root.device-name)
+                        : root.captured ? @tr("Your mouse and keyboard now control {}. Press Ctrl+Alt+G to let go.", root.device-name)
+                        : @tr("Click here to move your mouse and keyboard to {}.", root.device-name);
                     color: Theme.text;
                     opacity: 0.6;
                     font-size: Theme.font-body;
@@ -139,8 +175,8 @@ export component RemoteWindow inherits Window {
                 }
 
                 TouchArea {
-                    enabled: root.active;
-                    mouse-cursor: root.captured ? MouseCursor.crosshair : MouseCursor.default;
+                    enabled: root.active || root.screen;
+                    mouse-cursor: root.pad-full ? MouseCursor.none : MouseCursor.default;
                     moved => {
                         root.pointer-move(self.mouse-x, self.mouse-y, self.width, self.height);
                     }

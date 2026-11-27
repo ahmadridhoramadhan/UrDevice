@@ -239,6 +239,12 @@ struct State {
     paused: HashMap<DeviceId, Instant>,
     nearby: HashMap<[u8; 8], Nearby>,
     pair_screen: Option<PairScreen>,
+    /// A "wants to pair" question is open on this device.
+    pair_ask_pending: bool,
+    /// When recent "wants to pair" questions started (rate limit).
+    pair_ask_log: Vec<Instant>,
+    /// Devices whose request was declined or ignored, and until when to refuse them.
+    pair_ask_cooldown: HashMap<DeviceId, Instant>,
     lockout: Lockout,
     code_pairings: HashMap<DeviceId, CodePairing>,
     activities: Vec<Activity>,
@@ -520,22 +526,11 @@ impl Node {
         Ok(())
     }
 
-    /// Open the Pair screen: pairing is accepted only while it is open (R3.8).
+    /// Open the Pair screen: QR pairing is accepted only while it is open (R3.8).
+    /// A code pairing asked for by another device while it is closed needs the
+    /// user's answer first (see `code_host`).
     pub fn open_pair_screen(&self) {
-        {
-            let mut st = lock(&self.inner.state);
-            if st.pair_screen.is_none() {
-                match self.inner.new_pair_screen(&st) {
-                    Ok(s) => st.pair_screen = Some(s),
-                    Err(e) => tracing::warn!(error = %e, "could not create a pairing token"),
-                }
-            }
-        }
-        self.inner.update_policy();
-        if let Some(d) = lock(&self.inner.discovery).as_ref() {
-            d.announce_now();
-        }
-        self.inner.changed();
+        self.inner.open_pair_screen();
     }
 
     /// Close the Pair screen. Cancels code pairings that are still open.
@@ -891,6 +886,52 @@ impl Inner {
         addrs
     }
 
+    fn open_pair_screen(&self) {
+        {
+            let mut st = lock(&self.state);
+            if st.pair_screen.is_none() {
+                match self.new_pair_screen(&st) {
+                    Ok(s) => st.pair_screen = Some(s),
+                    Err(e) => tracing::warn!(error = %e, "could not create a pairing token"),
+                }
+            }
+        }
+        self.update_policy();
+        if let Some(d) = lock(&self.discovery).as_ref() {
+            d.announce_now();
+        }
+        self.changed();
+    }
+
+    /// Start asking the user whether `peer` may pair. False when that must not
+    /// happen now: one question at a time, five a minute, and a minute of quiet
+    /// for a device whose request was declined or ignored.
+    fn pair_ask_begin(&self, peer: DeviceId) -> bool {
+        let mut st = lock(&self.state);
+        let now = Instant::now();
+        st.pair_ask_log
+            .retain(|t| now.duration_since(*t) < Duration::from_secs(60));
+        st.pair_ask_cooldown.retain(|_, until| *until > now);
+        if st.pair_ask_pending
+            || st.pair_ask_log.len() >= 5
+            || st.pair_ask_cooldown.contains_key(&peer)
+        {
+            return false;
+        }
+        st.pair_ask_pending = true;
+        st.pair_ask_log.push(now);
+        true
+    }
+
+    fn pair_ask_end(&self, peer: DeviceId, accepted: bool) {
+        let mut st = lock(&self.state);
+        st.pair_ask_pending = false;
+        if !accepted {
+            st.pair_ask_cooldown
+                .insert(peer, Instant::now() + Duration::from_secs(60));
+        }
+    }
+
     fn new_pair_screen(&self, st: &State) -> Result<PairScreen> {
         let token_v = crate::crypto::random_bytes(TOKEN_LEN)?;
         let mut token = [0; TOKEN_LEN];
@@ -930,12 +971,14 @@ impl Inner {
     fn update_policy(&self) {
         let mut st = lock(&self.state);
         let locked = st.lockout.remaining(Instant::now()).is_some();
-        let open = st.pair_screen.is_some() && !locked && !st.hidden;
+        // Unknown devices may connect unless hidden or locked. Without an open
+        // Pair screen they can only ask to pair, and the user must answer.
+        let open = !locked && !st.hidden;
         self.policy.set_pairing_open(open);
         self.policy.set_paired(st.paired.iter().map(|d| d.id));
     }
 
-    fn pairing_allowed(&self) -> std::result::Result<(), &'static str> {
+    fn pairing_allowed(&self, need_screen: bool) -> std::result::Result<(), &'static str> {
         let mut st = lock(&self.state);
         if st.hidden {
             return Err("hidden");
@@ -943,7 +986,7 @@ impl Inner {
         if st.lockout.remaining(Instant::now()).is_some() {
             return Err("locked");
         }
-        if st.pair_screen.is_none() {
+        if need_screen && st.pair_screen.is_none() {
             return Err("closed");
         }
         Ok(())

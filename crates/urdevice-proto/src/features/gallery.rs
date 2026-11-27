@@ -15,6 +15,24 @@ use prost::Message;
 /// Stream kind of a download. `meta` is a [`GalleryFetch`].
 pub const STREAM_FETCH: u32 = 1;
 
+/// Stream kind of a large preview. `meta` is a [`GalleryPreview`]. The host
+/// answers with one JPEG (at most [`MAX_PREVIEW`] bytes) and finishes the stream.
+pub const STREAM_PREVIEW: u32 = 2;
+
+/// Largest preview the controller accepts, in bytes.
+pub const MAX_PREVIEW: usize = 4 * 1024 * 1024;
+/// Largest preview side the host makes, in pixels.
+pub const MAX_PREVIEW_SIDE: u32 = 2048;
+/// Most albums in one answer.
+pub const MAX_ALBUMS: usize = 200;
+
+/// Which items a list shows: [`KIND_ALL`], [`KIND_PHOTOS`], or [`KIND_VIDEOS`].
+pub const KIND_ALL: u32 = 0;
+/// Photos only.
+pub const KIND_PHOTOS: u32 = 1;
+/// Videos only.
+pub const KIND_VIDEOS: u32 = 2;
+
 /// Controller → host (`ToHost`): one page of items, newest first.
 #[derive(Clone, PartialEq, Message)]
 pub struct GalleryList {
@@ -24,6 +42,56 @@ pub struct GalleryList {
     /// Items wanted; the host may send fewer.
     #[prost(uint32, tag = "2")]
     pub limit: u32,
+    /// [`KIND_ALL`], [`KIND_PHOTOS`], or [`KIND_VIDEOS`].
+    #[prost(uint32, tag = "3")]
+    pub kind: u32,
+    /// Only items of this album ([`GalleryAlbum::id`]); all albums when unset.
+    #[prost(int64, optional, tag = "4")]
+    pub album: Option<i64>,
+    /// Echoed in [`GalleryPage::tag`], so the viewer can drop an answer to a
+    /// list it no longer shows.
+    #[prost(uint64, tag = "5")]
+    pub tag: u64,
+}
+
+/// One album (a folder of pictures on the phone).
+#[derive(Clone, PartialEq, Message)]
+pub struct GalleryAlbum {
+    /// The host's id for the album.
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    /// Display name. Untrusted.
+    #[prost(string, tag = "2")]
+    pub name: String,
+    /// Photos and videos in it.
+    #[prost(uint64, tag = "3")]
+    pub count: u64,
+}
+
+/// Controller → host: list the albums.
+#[derive(Clone, PartialEq, Message)]
+pub struct GalleryAlbumsReq {}
+
+/// Host → controller: the albums, newest first, or why there are none.
+#[derive(Clone, PartialEq, Message)]
+pub struct GalleryAlbums {
+    /// The albums.
+    #[prost(message, repeated, tag = "1")]
+    pub albums: Vec<GalleryAlbum>,
+    /// Empty, or `permission` / `failed` / `busy`.
+    #[prost(string, tag = "2")]
+    pub error: String,
+}
+
+/// The `meta` of a [`STREAM_PREVIEW`] stream.
+#[derive(Clone, PartialEq, Message)]
+pub struct GalleryPreview {
+    /// [`GalleryItem::id`].
+    #[prost(uint64, tag = "1")]
+    pub id: u64,
+    /// Longest side wanted, in pixels. The host clamps it to [`MAX_PREVIEW_SIDE`].
+    #[prost(uint32, tag = "2")]
+    pub max_side: u32,
 }
 
 /// One photo or video.
@@ -68,6 +136,9 @@ pub struct GalleryPage {
     /// given UrDevice access to its photos, `failed` otherwise.
     #[prost(string, tag = "4")]
     pub error: String,
+    /// The [`GalleryList::tag`] this page answers.
+    #[prost(uint64, tag = "5")]
+    pub tag: u64,
 }
 
 /// One item to download.
@@ -97,7 +168,7 @@ pub struct GalleryFetch {
 #[derive(Clone, PartialEq, Message)]
 pub struct GalleryMsg {
     /// The message.
-    #[prost(oneof = "gallery_msg::Msg", tags = "1, 2")]
+    #[prost(oneof = "gallery_msg::Msg", tags = "1, 2, 3, 4")]
     pub msg: Option<gallery_msg::Msg>,
 }
 
@@ -112,6 +183,12 @@ pub mod gallery_msg {
         /// See [`super::GalleryPage`].
         #[prost(message, tag = "2")]
         Page(super::GalleryPage),
+        /// See [`super::GalleryAlbumsReq`].
+        #[prost(message, tag = "3")]
+        AlbumsReq(super::GalleryAlbumsReq),
+        /// See [`super::GalleryAlbums`].
+        #[prost(message, tag = "4")]
+        Albums(super::GalleryAlbums),
     }
 }
 
@@ -140,7 +217,29 @@ mod tests {
             }],
             next_cursor: 0,
             error: String::new(),
+            tag: 7,
         }));
         assert_eq!(GalleryMsg::decode(m.encode_to_vec().as_slice()).unwrap(), m);
+    }
+
+    #[test]
+    fn list_and_albums_round_trip() {
+        let l = GalleryMsg::from(gallery_msg::Msg::List(GalleryList {
+            cursor: 3,
+            limit: 60,
+            kind: KIND_VIDEOS,
+            album: Some(-42),
+            tag: 9,
+        }));
+        assert_eq!(GalleryMsg::decode(l.encode_to_vec().as_slice()).unwrap(), l);
+        let a = GalleryMsg::from(gallery_msg::Msg::Albums(GalleryAlbums {
+            albums: vec![GalleryAlbum {
+                id: -1,
+                name: "Camera".into(),
+                count: 4,
+            }],
+            error: String::new(),
+        }));
+        assert_eq!(GalleryMsg::decode(a.encode_to_vec().as_slice()).unwrap(), a);
     }
 }

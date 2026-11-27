@@ -10,7 +10,7 @@
 
 use std::ffi::{c_char, c_int, c_void};
 use std::os::fd::{IntoRawFd, OwnedFd};
-use std::sync::{Arc, Once};
+use std::sync::{Arc, Once, OnceLock};
 
 use libloading::Library;
 use urdevice_core::Result;
@@ -160,6 +160,21 @@ unsafe impl Send for Capture {}
 
 static INIT: Once = Once::new();
 
+/// The loaded library, kept for the whole run. Unloading it after a capture reset pipewire's own
+/// state while `INIT` still said `pw_init` had run, so the second capture failed with "pw_init()
+/// was not called".
+fn shared_api() -> Result<Arc<Api>> {
+    static API: OnceLock<Option<Arc<Api>>> = OnceLock::new();
+    API.get_or_init(|| {
+        Api::load()
+            .map_err(|e| tracing::warn!(error = %e, "libpipewire not available"))
+            .ok()
+            .map(Arc::new)
+    })
+    .clone()
+    .ok_or_else(|| refused("capture_failed"))
+}
+
 unsafe extern "C" fn on_state(data: Ptr, _old: c_int, state: c_int, _err: *const c_char) {
     // SAFETY: `data` is the `Shared` registered with the listener.
     let s = unsafe { &mut *(data as *mut Shared) };
@@ -241,10 +256,7 @@ impl Capture {
         _size: Option<(u32, u32)>,
         handler: Arc<dyn FrameHandler>,
     ) -> Result<Self> {
-        let api = Arc::new(Api::load().map_err(|e| {
-            tracing::warn!(error = %e, "libpipewire not available");
-            refused("capture_failed")
-        })?);
+        let api = shared_api()?;
         // SAFETY: the calls follow pipewire's documented order; every
         // pointer is checked before use and freed in `drop`.
         unsafe {

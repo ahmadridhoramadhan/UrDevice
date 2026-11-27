@@ -31,6 +31,15 @@ urdevice-proto.workspace = true
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
 tray-icon.workspace = true
 
+# The laser dot is a small Win32 layered window (src/features/input/laser_win.rs).
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
 # Linux uses the StatusNotifierItem D-Bus protocol directly, so no GTK is needed.
 [target.'cfg(target_os = "linux")'.dependencies]
 ksni.workspace = true
@@ -55,3 +64,19 @@ assets = [
     ["../../assets/urdevice-icon-512.png", "usr/share/icons/hicolor/512x512/apps/urdevice.png", "644"],
     ["../../LICENSE", "usr/share/doc/urdevice/copyright", "644"],
 ]
+
+# RPM package for Fedora, built with `cargo generate-rpm -p crates/urdevice-desktop` (see .github/workflows/release.yml).
+[package.metadata.generate-rpm]
+name = "urdevice"
+summary = "Pair your phone and computers and share the clipboard, files, screen and input over your local network."
+assets = [
+    { source = "target/release/urdevice", dest = "/usr/bin/urdevice", mode = "755" },
+    { source = "../../packaging/linux/urdevice.desktop", dest = "/usr/share/applications/urdevice.desktop", mode = "644" },
+    { source = "../../assets/urdevice-icon-512.png", dest = "/usr/share/icons/hicolor/512x512/apps/urdevice.png", mode = "644" },
+    { source = "../../LICENSE", dest = "/usr/share/doc/urdevice/LICENSE", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.requires]
+fontconfig = "*"
+dbus-libs = "*"
+

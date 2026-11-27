@@ -22,10 +22,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -48,7 +54,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.urdevice.app.R
@@ -70,23 +75,78 @@ private const val LASER_EVERY_MS = 16L
 /** Turning the phone this far (radians) from where the laser button went down moves the dot across the screen. */
 private const val GYRO_RANGE = 0.35f
 
+/** Desktop-cursor mode: pixels the cursor moves per pixel the finger moves on the touch area. */
+private const val CURSOR_GAIN = 2.5f
+
+/** Desktop-cursor mode: pixels the cursor moves per radian the phone turns (a full screen is about 0.7 rad). */
+private const val GYRO_CURSOR_PX_PER_RAD = 2500f
+
+/** The Presenter's own settings: the pointer is the laser dot (false) or the desktop cursor (true). */
+private const val PRESENTER_PREFS = "presenter"
+private const val PREF_CURSOR = "cursor"
+
+/**
+ * Point at `x`, `y` (0.0 to 1.0 of the host's display), or stop pointing with `on = false`. As a
+ * laser the host draws the red dot. As a cursor the host's own mouse pointer moves there, and
+ * there is nothing to hide when the finger lifts.
+ */
+private fun pointAt(node: UrDeviceNode, device: String, cursor: Boolean, x: Float, y: Float, on: Boolean) {
+    if (!cursor) {
+        runCatching { node.inputLaser(device, x, y, on) }
+    } else if (on) {
+        runCatching { node.inputAbs(device, x.coerceIn(0f, 1f), y.coerceIn(0f, 1f)) }
+    }
+}
+
 private fun tap(node: UrDeviceNode, device: String, usage: UInt) {
     runCatching { node.inputTapKey(device, usage, 0u) }
 }
 
+/** The tile key of the Presenter settings page. */
+const val PRESENTER_SETTINGS = "presenter.settings"
+
 /**
- * The Presenter (R9b): Previous and Next (also the volume keys while this screen is open), Blank,
- * Start, End, a laser pointer that follows the gyroscope or a finger, and a timer that runs on the
- * phone.
+ * The Presenter (R9b), top to bottom: the timer, the laser pointer (touch, or turn the phone),
+ * Start, Blank and End, and Previous and Next under the thumb. The volume keys also go to the
+ * next and previous slide while this screen is open. Timer length lives on its own page.
  */
 @Composable
-fun PresenterPad(node: UrDeviceNode, device: String, enabled: Boolean) {
+fun PresenterPad(node: UrDeviceNode, device: String, enabled: Boolean, modifier: Modifier = Modifier) {
     KeepScreenOn()
     val next = rememberUpdatedState { tap(node, device, KEY_RIGHT) }
     val previous = rememberUpdatedState { tap(node, device, KEY_LEFT) }
     VolumeKeys(enabled = enabled, onPrevious = { previous.value() }, onNext = { next.value() })
+    val openPage = LocalOpenFeaturePage.current
+    val prefs = LocalContext.current.getSharedPreferences(PRESENTER_PREFS, Context.MODE_PRIVATE)
+    val useCursor = { prefs.getBoolean(PREF_CURSOR, false) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.tile_presenter), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            IconButton(onClick = { openPage("input", PRESENTER_SETTINGS) }) {
+                Icon(Icons.Outlined.Settings, stringResource(R.string.input_presenter_settings))
+            }
+        }
+        SlideTimer()
+        LaserTouch(node, device, enabled, useCursor, Modifier.weight(1f))
+        LaserGyro(node, device, enabled, useCursor)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = { tap(node, device, KEY_F5) },
+                enabled = enabled,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.input_start_show)) }
+            OutlinedButton(
+                onClick = { tap(node, device, KEY_B) },
+                enabled = enabled,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.input_blank)) }
+            OutlinedButton(
+                onClick = { tap(node, device, KEY_ESCAPE) },
+                enabled = enabled,
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.input_end_show)) }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = { previous.value() },
@@ -99,27 +159,6 @@ fun PresenterPad(node: UrDeviceNode, device: String, enabled: Boolean) {
                 modifier = Modifier.weight(1f).heightIn(min = 72.dp),
             ) { Text(stringResource(R.string.input_next), fontSize = 18.sp) }
         }
-        Text(stringResource(R.string.input_volume_hint), style = MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(
-                onClick = { tap(node, device, KEY_B) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            ) { Text(stringResource(R.string.input_blank)) }
-            OutlinedButton(
-                onClick = { tap(node, device, KEY_F5) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            ) { Text(stringResource(R.string.input_start_show)) }
-            OutlinedButton(
-                onClick = { tap(node, device, KEY_ESCAPE) },
-                enabled = enabled,
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-            ) { Text(stringResource(R.string.input_end_show)) }
-        }
-        LaserTouch(node, device, enabled)
-        LaserGyro(node, device, enabled)
-        SlideTimer()
     }
 }
 
@@ -164,12 +203,17 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 
 /** The laser by touch: the dot follows the finger on this area and goes away when it lifts (R9b.3). */
 @Composable
-private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean) {
-    Text(stringResource(R.string.input_laser_touch), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+private fun LaserTouch(
+    node: UrDeviceNode,
+    device: String,
+    enabled: Boolean,
+    useCursor: () -> Boolean,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .height(180.dp)
+            .heightIn(min = 140.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .pointerInput(device, enabled) {
@@ -177,10 +221,29 @@ private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var last = 0L
+                    var px = down.position.x
+                    var py = down.position.y
+                    var rx = 0f
+                    var ry = 0f
                     fun send(x: Float, y: Float) {
-                        val w = size.width.coerceAtLeast(1)
-                        val h = size.height.coerceAtLeast(1)
-                        runCatching { node.inputLaser(device, x / w, y / h, true) }
+                        if (useCursor()) {
+                            // Like a touchpad: the cursor goes on from where it is, by how far the finger moved.
+                            rx += (x - px) * CURSOR_GAIN
+                            ry += (y - py) * CURSOR_GAIN
+                            px = x
+                            py = y
+                            val ix = rx.toInt()
+                            val iy = ry.toInt()
+                            if (ix != 0 || iy != 0) {
+                                rx -= ix
+                                ry -= iy
+                                runCatching { node.inputMove(device, ix, iy) }
+                            }
+                        } else {
+                            val w = size.width.coerceAtLeast(1)
+                            val h = size.height.coerceAtLeast(1)
+                            pointAt(node, device, false, x / w, y / h, true)
+                        }
                     }
                     send(down.position.x, down.position.y)
                     while (true) {
@@ -193,12 +256,15 @@ private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean) {
                             send(change.position.x, change.position.y)
                         }
                     }
-                    runCatching { node.inputLaser(device, 0f, 0f, false) }
+                    pointAt(node, device, useCursor(), 0f, 0f, false)
                 }
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(stringResource(R.string.input_laser_touch_hint), style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(if (useCursor()) R.string.input_cursor_touch_hint else R.string.input_laser_touch_hint),
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -207,7 +273,7 @@ private fun LaserTouch(node: UrDeviceNode, device: String, enabled: Boolean) {
  * screen and follows the rotation (R9b.3). It goes away when the button is released.
  */
 @Composable
-private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
+private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean, useCursor: () -> Boolean) {
     val ctx = LocalContext.current
     val sensors = remember { ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager }
     val sensor = remember { sensors.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) }
@@ -221,6 +287,10 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
             private var yaw0 = 0f
             private var pitch0 = 0f
             private var started = false
+            private var prevYaw = 0f
+            private var prevPitch = 0f
+            private var rx = 0f
+            private var ry = 0f
             private var last = 0L
 
             override fun onSensorChanged(e: SensorEvent) {
@@ -232,17 +302,37 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
                     started = true
                     yaw0 = yaw
                     pitch0 = pitch
+                    prevYaw = yaw
+                    prevPitch = pitch
                 }
                 val now = e.timestamp / 1_000_000
                 if (now - last < LASER_EVERY_MS) return
                 last = now
+                if (useCursor()) {
+                    // The cursor goes on from where it is, by how far the phone turned since the last step.
+                    var stepYaw = yaw - prevYaw
+                    if (stepYaw > PI.toFloat()) stepYaw -= 2 * PI.toFloat()
+                    if (stepYaw < -PI.toFloat()) stepYaw += 2 * PI.toFloat()
+                    rx += stepYaw * GYRO_CURSOR_PX_PER_RAD
+                    ry += (pitch - prevPitch) * GYRO_CURSOR_PX_PER_RAD
+                    prevYaw = yaw
+                    prevPitch = pitch
+                    val ix = rx.toInt()
+                    val iy = ry.toInt()
+                    if (ix != 0 || iy != 0) {
+                        rx -= ix
+                        ry -= iy
+                        runCatching { node.inputMove(device, ix, iy) }
+                    }
+                    return
+                }
                 var dYaw = yaw - yaw0
                 // The compass heading wraps around at half a turn.
                 if (dYaw > PI.toFloat()) dYaw -= 2 * PI.toFloat()
                 if (dYaw < -PI.toFloat()) dYaw += 2 * PI.toFloat()
                 val x = 0.5f + dYaw / (2 * GYRO_RANGE)
                 val y = 0.5f + (pitch - pitch0) / (2 * GYRO_RANGE)
-                runCatching { node.inputLaser(device, x, y, true) }
+                pointAt(node, device, useCursor(), x, y, true)
             }
 
             override fun onAccuracyChanged(s: Sensor?, accuracy: Int) {}
@@ -250,15 +340,14 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
         sensors.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
         onDispose {
             sensors.unregisterListener(listener)
-            runCatching { node.inputLaser(device, 0f, 0f, false) }
+            pointAt(node, device, useCursor(), 0f, 0f, false)
         }
     }
 
-    Text(stringResource(R.string.input_laser_gyro), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     Box(
         Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
+            .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(if (held) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
             .pointerInput(enabled) {
@@ -279,75 +368,119 @@ private fun LaserGyro(node: UrDeviceNode, device: String, enabled: Boolean) {
     }
 }
 
+/** The slide timer's state, kept here so it survives a visit to the settings page (R9b.4). */
+private object PresenterTimer {
+    var totalMin by mutableIntStateOf(20)
+    var warnMin by mutableIntStateOf(5)
+    var running by mutableStateOf(false)
+        private set
+    var warned = false
+    var ended = false
+    private var accumulated by mutableLongStateOf(0L)
+    private var startedAt = 0L
+
+    fun elapsed(now: Long): Long = accumulated + if (running) now - startedAt else 0L
+
+    fun toggle() {
+        val now = System.currentTimeMillis()
+        if (running) accumulated += now - startedAt else startedAt = now
+        running = !running
+    }
+
+    fun reset() {
+        running = false
+        accumulated = 0
+        warned = false
+        ended = false
+    }
+}
+
 /**
- * The slide timer (R9b.4). It runs on the phone: elapsed and remaining time, with a short
- * vibration when the warning time is reached and a long one when the time is up.
+ * The slide timer (R9b.4), one line: the time left, then Start or Pause and Reset. It runs on the
+ * phone, with a short vibration at the warning time and a long one when the time is up.
  */
 @Composable
 private fun SlideTimer() {
     val ctx = LocalContext.current
-    var totalMin by remember { mutableIntStateOf(20) }
-    var warnMin by remember { mutableIntStateOf(5) }
-    var running by remember { mutableStateOf(false) }
-    var elapsedMs by remember { mutableLongStateOf(0L) }
-    var warned by remember { mutableStateOf(false) }
-    var ended by remember { mutableStateOf(false) }
-
-    LaunchedEffect(running) {
-        if (!running) return@LaunchedEffect
-        var last = System.currentTimeMillis()
-        while (true) {
+    val t = PresenterTimer
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(t.running) {
+        while (t.running) {
             delay(250)
-            val now = System.currentTimeMillis()
-            elapsedMs += now - last
-            last = now
-            val leftMs = totalMin * 60_000L - elapsedMs
-            if (!warned && warnMin > 0 && leftMs <= warnMin * 60_000L && leftMs > 0) {
-                warned = true
+            now = System.currentTimeMillis()
+            val leftMs = t.totalMin * 60_000L - t.elapsed(now)
+            if (!t.warned && t.warnMin > 0 && leftMs <= t.warnMin * 60_000L && leftMs > 0) {
+                t.warned = true
                 vibrate(ctx, 250)
             }
-            if (!ended && leftMs <= 0) {
-                ended = true
+            if (!t.ended && leftMs <= 0) {
+                t.ended = true
                 vibrate(ctx, 900)
             }
         }
     }
-
-    val leftMs = totalMin * 60_000L - elapsedMs
-    Text(stringResource(R.string.input_timer), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-    Text(
-        (if (leftMs < 0) "-" else "") + clock(abs(leftMs)),
-        fontSize = 44.sp,
-        fontFamily = FontFamily.Monospace,
-        color = if (leftMs < 0) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onSurface,
-    )
-    Text(
-        stringResource(R.string.input_timer_elapsed, clock(elapsedMs)),
-        style = MaterialTheme.typography.bodySmall,
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-        Button(onClick = { running = !running }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-            Text(stringResource(if (running) R.string.input_timer_pause else R.string.input_timer_start))
+    val leftMs = t.totalMin * 60_000L - t.elapsed(now)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            (if (leftMs < 0) "-" else "") + clock(abs(leftMs)),
+            fontSize = 32.sp,
+            fontFamily = FontFamily.Monospace,
+            color = if (leftMs < 0) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = { t.toggle(); now = System.currentTimeMillis() }) {
+            Icon(
+                if (t.running) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                stringResource(if (t.running) R.string.input_timer_pause else R.string.input_timer_start),
+            )
         }
-        OutlinedButton(
-            onClick = {
-                running = false
-                elapsedMs = 0
-                warned = false
-                ended = false
-            },
-            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-        ) { Text(stringResource(R.string.input_timer_reset)) }
+        IconButton(onClick = { t.reset(); now = System.currentTimeMillis() }) {
+            Icon(Icons.Outlined.Refresh, stringResource(R.string.input_timer_reset))
+        }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.input_timer_length, totalMin), modifier = Modifier.weight(1f))
-        OutlinedButton(onClick = { totalMin = (totalMin - 5).coerceAtLeast(5) }) { Text("-5") }
-        OutlinedButton(onClick = { totalMin = (totalMin + 5).coerceAtMost(240) }) { Text("+5") }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.input_timer_warn, warnMin), modifier = Modifier.weight(1f))
-        OutlinedButton(onClick = { warnMin = (warnMin - 1).coerceAtLeast(0) }) { Text("-1") }
-        OutlinedButton(onClick = { warnMin = (warnMin + 1).coerceAtMost(30) }) { Text("+1") }
+}
+
+/** The timer length and the warning time, on their own page. */
+@Composable
+fun PresenterSettings() {
+    val t = PresenterTimer
+    val prefs = LocalContext.current.getSharedPreferences(PRESENTER_PREFS, Context.MODE_PRIVATE)
+    var cursor by remember { mutableStateOf(prefs.getBoolean(PREF_CURSOR, false)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.input_presenter_settings), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.input_pointer_style))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            val pick = { value: Boolean ->
+                cursor = value
+                prefs.edit().putBoolean(PREF_CURSOR, value).apply()
+            }
+            val choice = Modifier.weight(1f).heightIn(min = 48.dp)
+            if (cursor) {
+                OutlinedButton(onClick = { pick(false) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_laser))
+                }
+                Button(onClick = { pick(true) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_cursor))
+                }
+            } else {
+                Button(onClick = { pick(false) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_laser))
+                }
+                OutlinedButton(onClick = { pick(true) }, modifier = choice) {
+                    Text(stringResource(R.string.input_pointer_cursor))
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.input_timer_length, t.totalMin), modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { t.totalMin = (t.totalMin - 5).coerceAtLeast(5) }) { Text("-5") }
+            OutlinedButton(onClick = { t.totalMin = (t.totalMin + 5).coerceAtMost(240) }) { Text("+5") }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.input_timer_warn, t.warnMin), modifier = Modifier.weight(1f))
+            OutlinedButton(onClick = { t.warnMin = (t.warnMin - 1).coerceAtLeast(0) }) { Text("-1") }
+            OutlinedButton(onClick = { t.warnMin = (t.warnMin + 1).coerceAtMost(30) }) { Text("+1") }
+        }
     }
 }
 

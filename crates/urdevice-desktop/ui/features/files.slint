@@ -54,7 +54,7 @@ component ProgressBar inherits Rectangle {
     }
 }
 
-component Row inherits Card {
+export component TransferCard inherits Card {
     in property <TransferRow> t;
     VerticalLayout {
         padding: 12px;
@@ -98,6 +98,11 @@ component Row inherits Card {
 
 // The download-folder setting, shown in Settings.
 export component FilesSettings inherits Card {
+    // Flashes the card, for example after the settings icon of Send files jumped here.
+    in property <bool> highlight: false;
+    border-width: root.highlight ? 2px : 1px;
+    border-color: root.highlight ? Theme.accent : Theme.border;
+    animate border-color { duration: 300ms; }
     VerticalLayout {
         padding: 16px;
         spacing: 10px;
@@ -137,5 +142,5 @@ export component FilesView inherits VerticalLayout {
         if FilesFeature.transfers.length > 0: Btn { text: @tr("Clear finished"); kind: 3; clicked => { FilesFeature.clear(); } }
     }
     if FilesFeature.transfers.length == 0: Muted { text: @tr("No transfers yet."); }
-    for t in FilesFeature.transfers: Row { t: t; }
+    for t in FilesFeature.transfers: TransferCard { t: t; }
 }

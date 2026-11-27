@@ -8,8 +8,10 @@ import android.os.Build
 import android.view.Surface
 import android.view.TextureView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,10 +21,15 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Mouse
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -31,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -72,6 +80,9 @@ object ScreenFeature : Feature {
 
     override val hasScreen get() = true
 
+    /** The picture fills the page, in either orientation. */
+    override fun fullScreen(tile: String) = true
+
     override fun onCoreStarted(context: Context, node: UrDeviceNode) {
         val app = context.applicationContext
         ScreenCaptures.channel(app)
@@ -85,25 +96,27 @@ object ScreenFeature : Feature {
     }
 }
 
-/** A tap on the picture clicks on the host through the input service (#18, R12.5). */
-private const val INPUT_FORWARDING = true
+/** The remote-control session with the host is running, so moves and clicks reach it. */
+private fun controlling(peer: String): Boolean = InputFeature.sessions.value[peer]?.active == true
 
-/**
- * A tap at [x], [y] (fractions of the host's display) clicks there (R12.5). The first tap asks the
- * host for a remote-control session (its user approves it and sees the indicator with Stop); taps
- * before it is allowed are dropped.
- */
-private fun pointer(peer: String, x: Float, y: Float) {
+/** Ask the host for remote control (its user approves it and sees the indicator with Stop). */
+private fun startControl(peer: String) {
     val node = Core.node() ?: return
     val s = InputFeature.sessions.value[peer]
-    if (s?.active != true) {
-        if (s?.connecting != true) InputFeature.connect(node, peer)
-        return
-    }
+    if (s?.active != true && s?.connecting != true) InputFeature.connect(node, peer)
+}
+
+/** Move the host's pointer from where it is, like a touchpad. */
+private fun moveBy(peer: String, dx: Int, dy: Int) {
+    if (controlling(peer)) runCatching { Core.node()?.inputMove(peer, dx, dy) }
+}
+
+/** A left click where the host's pointer is. */
+private fun click(peer: String) {
+    if (!controlling(peer)) return
     runCatching {
-        node.inputAbs(peer, x, y)
-        node.inputButton(peer, 0u, true)
-        node.inputButton(peer, 0u, false)
+        Core.node()?.inputButton(peer, 0u, true)
+        Core.node()?.inputButton(peer, 0u, false)
     }
 }
 
@@ -128,18 +141,32 @@ object ScreenViewer : ScreenListener {
     @Volatile private var started = false
     val decoder = VideoDecoder { requestKeyframe() }
 
+    // Calls into the core run on this one thread, never inside a core callback. A callback that
+    // called back into the core on the same thread made the core call another callback, and
+    // Android aborted the app ("attempting to detach while still running code").
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "screen-core").apply { isDaemon = true }
+    }
+
+    private fun core(call: (UrDeviceNode) -> Unit) {
+        io.execute { Core.node()?.let { n -> runCatching { call(n) } } }
+    }
+
     fun start(peerId: String) {
         stop(null)
         peer = peerId
         reason.value = null
         state.value = ASKING
-        if (runCatching { Core.node()?.screenRequestView(peerId) }.isFailure) finish("offline")
+        io.execute {
+            val ok = runCatching { Core.node()?.screenRequestView(peerId) }.isSuccess
+            if (!ok && peer == peerId) finish("offline")
+        }
     }
 
     fun stop(why: String?) {
         val p = peer
         val a = activity
-        if (p != null && a != null) runCatching { Core.node()?.screenStop(p, a) }
+        if (p != null && a != null) core { it.screenStop(p, a) }
         finish(why)
     }
 
@@ -159,23 +186,23 @@ object ScreenViewer : ScreenListener {
         val d = displays.value.getOrNull(index) ?: return
         selected.value = index
         state.value = STARTING
-        runCatching { Core.node()?.screenStart(p, a, d.id, 0u, 0u, 0u) }
+        core { it.screenStart(p, a, d.id, 0u, 0u, 0u) }
     }
 
     private fun requestKeyframe() {
         val p = peer ?: return
         val a = activity ?: return
-        runCatching { Core.node()?.screenRequestKeyframe(p, a) }
+        core { it.screenRequestKeyframe(p, a) }
     }
 
     override fun onOpened(deviceId: String, activity: ULong) {
         if (deviceId != peer || state.value != ASKING) {
-            runCatching { Core.node()?.screenStop(deviceId, activity) }
+            core { it.screenStop(deviceId, activity) }
             return
         }
         this.activity = activity
         state.value = STARTING
-        runCatching { Core.node()?.screenListDisplays(deviceId, activity) }
+        core { it.screenListDisplays(deviceId, activity) }
     }
 
     override fun onDisplays(deviceId: String, activity: ULong, displays: List<FfiDisplay>) {
@@ -235,14 +262,29 @@ class VideoDecoder(private val wantKeyframe: () -> Unit) {
         Thread(::loop, "screen-decoder").apply { isDaemon = true }.start()
     }
 
+    @Volatile private var lastAsk = 0L
+
+    /** Ask for a keyframe, at most every 700 ms. */
+    private fun ask() {
+        val now = System.currentTimeMillis()
+        if (now - lastAsk < 700) return
+        lastAsk = now
+        wantKeyframe()
+    }
+
     fun reset() {
         queue.clear()
         waitKey = true
         resetCodec = true
+        ask()
     }
 
     fun offer(f: FfiVideoFrame) {
-        if (waitKey && !f.keyframe) return
+        if (waitKey && !f.keyframe) {
+            // Frames are coming but the picture cannot start: ask again until a keyframe arrives.
+            ask()
+            return
+        }
         if (f.keyframe) waitKey = false
         if (!queue.offer(f)) {
             queue.clear()
@@ -310,18 +352,6 @@ class VideoDecoder(private val wantKeyframe: () -> Unit) {
     }
 }
 
-/** Map a tap on the zoomed picture back to fractions of the host's display, or null outside it. */
-private fun toHost(tap: Offset, box: IntSize, scale: Float, offset: Offset): Offset? {
-    if (box.width == 0 || box.height == 0) return null
-    val cx = box.width / 2f
-    val cy = box.height / 2f
-    val x = (tap.x - cx - offset.x) / scale + cx
-    val y = (tap.y - cy - offset.y) / scale + cy
-    val fx = x / box.width
-    val fy = y / box.height
-    return if (fx in 0f..1f && fy in 0f..1f) Offset(fx, fy) else null
-}
-
 @Composable
 private fun reasonText(reason: String, name: String): String = when (reason) {
     "declined" -> stringResource(R.string.screen_err_declined, name)
@@ -343,6 +373,8 @@ private fun ScreenScreen(peer: FfiPeer) {
     val size by ScreenViewer.size.collectAsState()
     val ours = ScreenViewer.peer == peer.id
     val shown = if (ours) state else ScreenViewer.IDLE
+    var control by remember(peer.id) { mutableStateOf(false) }
+    val sessions by InputFeature.sessions.collectAsState()
 
     // Leaving the screen ends the session.
     DisposableEffect(peer.id) {
@@ -353,14 +385,12 @@ private fun ScreenScreen(peer: FfiPeer) {
         }
     }
 
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (shown == ScreenViewer.IDLE) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (shown == ScreenViewer.IDLE) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { ScreenViewer.start(peer.id) }, enabled = peer.status == "connected") {
                     Text(stringResource(R.string.screen_view))
                 }
-            } else {
-                OutlinedButton(onClick = { ScreenViewer.stop(null) }) { Text(stringResource(R.string.screen_stop)) }
             }
         }
         when {
@@ -369,56 +399,125 @@ private fun ScreenScreen(peer: FfiPeer) {
             shown == ScreenViewer.IDLE && ours && reason != null ->
                 Text(reasonText(reason!!, peer.name), color = MaterialTheme.colorScheme.error)
         }
-        if (shown >= ScreenViewer.STARTING && displays.size > 1) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                displays.forEachIndexed { i, d ->
-                    FilterChip(selected = i == selected, onClick = { ScreenViewer.pick(i) }, label = { Text(d.name) })
-                }
-            }
-        }
         if (shown >= ScreenViewer.STARTING) {
-            if (!INPUT_FORWARDING) {
-                Text(stringResource(R.string.screen_view_only), style = MaterialTheme.typography.bodySmall)
+            val s = sessions[peer.id]
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                // Icons only, so the bar stays small when the phone is turned sideways.
+                FilledIconToggleButton(
+                    checked = control,
+                    onCheckedChange = {
+                        control = it
+                        if (it) startControl(peer.id) else Core.node()?.let { n -> InputFeature.end(n, peer.id) }
+                    },
+                ) { Icon(Icons.Outlined.Mouse, stringResource(R.string.screen_control)) }
+                if (displays.size > 1) {
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        displays.forEachIndexed { i, d ->
+                            FilterChip(selected = i == selected, onClick = { ScreenViewer.pick(i) }, label = { Text(d.name) })
+                        }
+                    }
+                }
+                val line = when {
+                    !control -> null
+                    s?.refused?.isNotEmpty() == true -> stringResource(R.string.input_declined, peer.name)
+                    s?.connecting == true -> stringResource(R.string.input_waiting, peer.name)
+                    s?.status == "missing" -> when (s.missing) {
+                        "uinput" -> stringResource(R.string.input_missing_uinput, peer.name)
+                        "portal" -> stringResource(R.string.input_missing_portal, peer.name)
+                        "accessibility_service" -> stringResource(R.string.input_missing_accessibility_service, peer.name)
+                        else -> stringResource(R.string.input_missing_accessibility, peer.name)
+                    }
+                    else -> null
+                }
+                Text(line ?: "", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f), maxLines = 2)
+                IconButton(onClick = { ScreenViewer.stop(null) }) { Icon(Icons.Outlined.Close, stringResource(R.string.screen_stop)) }
             }
-            Picture(peer.id, size)
+            // The picture takes what is left of the page, in its own shape, whichever way the phone is held.
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Picture(peer.id, size, control)
+            }
         }
     }
 }
 
 @Composable
-private fun Picture(peerId: String, size: Pair<Int, Int>) {
+private fun Picture(peerId: String, size: Pair<Int, Int>, control: Boolean) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var box by remember { mutableStateOf(IntSize.Zero) }
+    val controlNow by rememberUpdatedState(control)
     val ratio = if (size.first > 0 && size.second > 0) size.first.toFloat() / size.second else 16f / 9f
+
+    fun pan(by: Offset) {
+        val maxX = (box.width * (scale - 1f)) / 2f
+        val maxY = (box.height * (scale - 1f)) / 2f
+        offset = Offset((offset.x + by.x).coerceIn(-maxX, maxX), (offset.y + by.y).coerceIn(-maxY, maxY))
+    }
+
     Box(
         Modifier
-            .fillMaxWidth()
             .aspectRatio(ratio)
             .clipToBounds()
             .background(Color.Black)
             .onSizeChanged { box = it }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    val maxX = (box.width * (scale - 1f)) / 2f
-                    val maxY = (box.height * (scale - 1f)) / 2f
-                    offset = Offset(
-                        (offset.x + pan.x).coerceIn(-maxX, maxX),
-                        (offset.y + pan.y).coerceIn(-maxY, maxY),
-                    )
+            .pointerInput(peerId) {
+                var lastTapAt = 0L
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val slop = viewConfiguration.touchSlop
+                    var last = down.position
+                    var moved = false
+                    var multi = false
+                    var remX = 0f
+                    var remY = 0f
+                    do {
+                        val event = awaitPointerEvent()
+                        val pressed = event.changes.count { it.pressed }
+                        if (pressed >= 2) {
+                            // Two fingers always zoom and pan the picture.
+                            multi = true
+                            scale = (scale * event.calculateZoom()).coerceIn(1f, 5f)
+                            pan(event.calculatePan())
+                            event.changes.forEach { it.consume() }
+                        } else if (pressed == 1 && !multi) {
+                            val c = event.changes.first { it.pressed }
+                            val d = c.position - last
+                            last = c.position
+                            if (!moved && (c.position - down.position).getDistance() > slop) moved = true
+                            if (moved) {
+                                if (controlNow) {
+                                    // Like a touchpad: the pointer goes on from where it is, as far as the
+                                    // finger moved over the picture.
+                                    val g = if (box.width > 0 && size.first > 0) size.first.toFloat() / (box.width * scale) else 1f
+                                    remX += d.x * g
+                                    remY += d.y * g
+                                    val ix = remX.toInt()
+                                    val iy = remY.toInt()
+                                    if (ix != 0 || iy != 0) {
+                                        remX -= ix
+                                        remY -= iy
+                                        moveBy(peerId, ix, iy)
+                                    }
+                                } else {
+                                    pan(d)
+                                }
+                                c.consume()
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
+                    if (!moved && !multi) {
+                        if (controlNow) {
+                            click(peerId)
+                        } else {
+                            val now = System.currentTimeMillis()
+                            if (now - lastTapAt < 300) {
+                                scale = 1f
+                                offset = Offset.Zero
+                            }
+                            lastTapAt = now
+                        }
+                    }
                 }
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        scale = 1f
-                        offset = Offset.Zero
-                    },
-                    onTap = { pos ->
-                        if (INPUT_FORWARDING) toHost(pos, box, scale, offset)?.let { pointer(peerId, it.x, it.y) }
-                    },
-                )
             },
     ) {
         AndroidView(

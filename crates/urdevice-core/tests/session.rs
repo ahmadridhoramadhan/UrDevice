@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use urdevice_core::discovery::DiscoveryConfig;
-use urdevice_core::node::{EventSink, PeerStatus, PermissionView, Snapshot};
+use urdevice_core::node::{EventSink, PeerStatus, PermissionView, PromptView, Snapshot};
 use urdevice_core::secret::MemorySecretStore;
 use urdevice_core::{Capability, Mode, Node, NodeConfig, NodeEvent};
 
@@ -464,6 +464,72 @@ fn code_pairing_cancel_stores_nothing() {
     assert!(a.snap().peers.is_empty() && b.snap().peers.is_empty());
 }
 
+/// Wait for the next prompt on `d` and answer it.
+fn answer_prompt(d: &Dev, allow: bool) -> PromptView {
+    wait_until("prompt", WAIT, || {
+        d.events
+            .find(|e| matches!(e, NodeEvent::Prompt(_)))
+            .is_some()
+    });
+    let Some(NodeEvent::Prompt(p)) = d.events.find(|e| matches!(e, NodeEvent::Prompt(_))) else {
+        unreachable!()
+    };
+    d.events.clear();
+    d.node().answer_prompt(p.id, allow);
+    p
+}
+
+#[test]
+fn code_pairing_asks_the_user_when_pair_screen_is_closed() {
+    let a = Dev::new("Laptop");
+    let b = Dev::new("Pixel");
+    // Neither device has the Pair screen open.
+    b.see(&a);
+    wait_until("nearby", WAIT, || !b.snap().nearby.is_empty());
+    b.node().pair_nearby(&b.snap().nearby[0].key).unwrap();
+    let prompt = answer_prompt(&a, true);
+    assert_eq!(prompt.capability, "pair");
+    assert_eq!(prompt.device_name, "Pixel");
+    wait_until("codes shown", WAIT, || {
+        !a.snap().code_pairings.is_empty() && !b.snap().code_pairings.is_empty()
+    });
+    // Accepting opened the Pair screen on the device that was asked.
+    assert!(a.snap().pair_screen.is_some());
+    let ca = a.snap().code_pairings[0].clone();
+    let cb = b.snap().code_pairings[0].clone();
+    assert_eq!(ca.code, cb.code);
+    a.node().confirm_code(&ca.key, true).unwrap();
+    b.node().confirm_code(&cb.key, true).unwrap();
+    wait_until("paired and connected", WAIT, || {
+        a.connected_to(&b) && b.connected_to(&a)
+    });
+}
+
+#[test]
+fn code_pairing_declined_stores_nothing_and_waits_before_asking_again() {
+    let a = Dev::new("Laptop");
+    let b = Dev::new("Pixel");
+    b.see(&a);
+    wait_until("nearby", WAIT, || !b.snap().nearby.is_empty());
+    let key = b.snap().nearby[0].key.clone();
+    b.node().pair_nearby(&key).unwrap();
+    answer_prompt(&a, false);
+    wait_until("declined", WAIT, || {
+        b.events
+            .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, reason, .. } if reason == "declined"))
+            .is_some()
+    });
+    assert!(a.snap().peers.is_empty() && b.snap().peers.is_empty());
+    assert!(a.snap().pair_screen.is_none());
+    // Asking again at once is refused without bothering the user.
+    b.node().pair_nearby(&key).unwrap();
+    wait_until("busy", WAIT, || {
+        b.events
+            .find(|e| matches!(e, NodeEvent::PairingFinished { ok: false, reason, .. } if reason == "busy"))
+            .is_some()
+    });
+}
+
 #[test]
 fn pairing_refused_when_pair_screen_is_closed() {
     let a = Dev::new("Laptop");
@@ -550,11 +616,12 @@ fn unpair_closes_and_blocks() {
     wait_until("both forgot", WAIT, || {
         a.snap().peers.is_empty() && b.snap().peers.is_empty()
     });
-    assert!(
+    // B removes the pairing first and emits the notice just after, so wait for it.
+    wait_until("unpaired notice", WAIT, || {
         b.events
             .find(|e| matches!(e, NodeEvent::Notice { code, .. } if code == "unpaired_by"))
             .is_some()
-    );
+    });
 
     // B pairs again, goes offline, and A forgets it while it is away. B still
     // trusts A, but A refuses B from now on.

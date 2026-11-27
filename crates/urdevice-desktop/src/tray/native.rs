@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 
 use super::Rgba;
 
@@ -34,15 +34,28 @@ pub(crate) fn install(version: &'static str, icon: Rgba) -> Result<Guard, Box<dy
 }
 
 fn build(version: &'static str, icon: Rgba) -> Result<TrayIcon, Box<dyn Error>> {
-    let version_item = MenuItem::new(format!("Core version {version}"), false, None);
+    let open_item = MenuItem::new("Open", true, None);
     let quit_item = MenuItem::new("Quit", true, None);
     let menu = Menu::new();
-    menu.append_items(&[&version_item, &PredefinedMenuItem::separator(), &quit_item])?;
+    menu.append_items(&[&open_item, &PredefinedMenuItem::separator(), &quit_item])?;
 
-    let quit_id = quit_item.id().clone();
+    let (open_id, quit_id) = (open_item.id().clone(), quit_item.id().clone());
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
         if event.id == quit_id {
             let _ = slint::quit_event_loop();
+        } else if event.id == open_id {
+            super::open_main_window();
+        }
+    }));
+    // A left click on the icon opens the window too.
+    TrayIconEvent::set_event_handler(Some(|event: TrayIconEvent| {
+        if let TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } = event
+        {
+            super::open_main_window();
         }
     }));
 

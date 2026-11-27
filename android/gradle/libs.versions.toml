@@ -14,7 +14,7 @@ min-sdk = "29"
 compile-sdk = "37"
 target-sdk = "37"
 # NDK used by cargo-ndk to build urdevice-ffi.
-ndk = "27.0.12077973"
+ndk = "30.0.16248370"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }

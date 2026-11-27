@@ -15,7 +15,7 @@ The mockups are a guide, not a final design. Build the UI to match them. You may
 ## Behavior the UI must keep
 
 - Permission labels are exactly **Allow**, **Always Ask**, and **Deny**.
-- Feature tiles on a paired device follow that host's `PermissionState`: normal for Allow, a "Needs approval" mark for Always Ask, grey and disabled for Deny ("Turned off by <device>"). Tapping a tile opens the feature view. The gear opens settings for that feature on this device.
+- Feature tiles on a paired device follow that host's `PermissionState`, without status words (owner decision 2026-11-24): normal for Allow, a small amber dot for Always Ask, dimmed and disabled for Deny. Screen readers still get the state in words. Tapping a tile opens the feature view. The gear opens settings for that feature on this device.
 - Pairing: "Scan QR" (hidden when there is no camera), this device's QR code with a countdown, and the nearby-devices list where a selected device shows the 6-digit code with "Codes match" and "Cancel".
 - Show the connection path and latency, the battery, Disconnect or Reconnect, and Forget device on each paired device. On Bluetooth LE, show the banner and grey out the unavailable features.
 - Settings opens from the bottom of the sidebar on desktop, and from a gear icon at the top right on Android.

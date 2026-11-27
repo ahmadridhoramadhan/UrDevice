@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaMetadata
+import android.media.VolumeProvider
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -183,12 +184,15 @@ class MediaHost(private val context: Context) : MediaHostFfi {
         return true
     }
 
+    /** The music volume before a mute that had to be done by setting it to 0. */
+    private var volumeBeforeMute = -1
+
     override fun volume(change: FfiVolumeChange): Boolean = try {
         val stream = AudioManager.STREAM_MUSIC
         when (change) {
             is FfiVolumeChange.Set -> {
                 val max = audio.getStreamMaxVolume(stream)
-                audio.setStreamVolume(stream, (change.value.coerceIn(0f, 1f) * max).roundToInt(), 0)
+                setMusicVolume((change.value.coerceIn(0f, 1f) * max).roundToInt())
             }
             is FfiVolumeChange.Step -> {
                 // The protocol step is 2 % of the range; always move at least one system step.
@@ -196,19 +200,90 @@ class MediaHost(private val context: Context) : MediaHostFfi {
                 val now = audio.getStreamVolume(stream)
                 var target = (now + change.steps * 0.02f * max).roundToInt()
                 if (change.steps != 0 && target == now) target = now + Integer.signum(change.steps)
-                audio.setStreamVolume(stream, target.coerceIn(0, max), 0)
+                setMusicVolume(target)
             }
-            is FfiVolumeChange.Mute ->
-                audio.adjustStreamVolume(
-                    stream,
-                    if (change.muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE,
-                    0,
-                )
+            is FfiVolumeChange.Mute -> setMusicMute(change.muted)
         }
         true
-    } catch (e: SecurityException) {
-        Log.w("UrDevice", "volume change refused")
+    } catch (e: Exception) {
+        // Not only SecurityException: a failed change must never take the core's worker down.
+        Log.w("UrDevice", "volume change refused: ${e.javaClass.simpleName}")
         false
+    }
+
+    /**
+     * Put the music volume at step [target]. Some phones (a vivo on Android 16 was seen) ignore
+     * `setStreamVolume` and `adjustStreamVolume` and only follow what the volume keys do, so when
+     * the volume did not move, step it the way the keys do (`adjustSuggestedStreamVolume`).
+     */
+    private fun setMusicVolume(target: Int) {
+        val stream = AudioManager.STREAM_MUSIC
+        val want = target.coerceIn(0, audio.getStreamMaxVolume(stream))
+        audio.setStreamVolume(stream, want, 0)
+        var guard = audio.getStreamMaxVolume(stream) + 1
+        while (guard-- > 0) {
+            val now = audio.getStreamVolume(stream)
+            if (now == want) return
+            val direction = if (want > now) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+            audio.adjustStreamVolume(stream, direction, 0)
+            if (audio.getStreamVolume(stream) == now) {
+                audio.adjustSuggestedStreamVolume(direction, stream, 0)
+            }
+            if (audio.getStreamVolume(stream) == now) {
+                // Last resort: ask the playing app's media session. The system applies it itself.
+                if (volumeViaSession(want, audio.getStreamMaxVolume(stream))) return
+                Log.w("UrDevice", "the music volume does not move")
+                return
+            }
+        }
+    }
+
+    /** Set the volume through the first media session that allows it (`MediaController.setVolumeTo`). */
+    private fun volumeViaSession(want: Int, max: Int): Boolean {
+        val list = controllers() ?: return false
+        for ((_, c) in list) {
+            val info = c.playbackInfo ?: continue
+            if (info.volumeControl == VolumeProvider.VOLUME_CONTROL_FIXED || info.maxVolume <= 0) continue
+            val index = if (max > 0) (want.toFloat() / max * info.maxVolume).roundToInt() else want
+            c.setVolumeTo(index.coerceIn(0, info.maxVolume), 0)
+            Log.i("UrDevice", "volume set through the media session")
+            return true
+        }
+        return false
+    }
+
+    /** Mute or unmute through the first media session that allows it. */
+    private fun muteViaSession(muted: Boolean): Boolean {
+        val list = controllers() ?: return false
+        for ((_, c) in list) {
+            val info = c.playbackInfo ?: continue
+            if (info.volumeControl == VolumeProvider.VOLUME_CONTROL_FIXED) continue
+            c.adjustVolume(if (muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE, 0)
+            Log.i("UrDevice", "mute set through the media session")
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Mute or unmute the music. If the system ignores that, mute by setting the volume to 0 and
+     * unmute by going back to the volume from before.
+     */
+    private fun setMusicMute(muted: Boolean) {
+        val stream = AudioManager.STREAM_MUSIC
+        val adjust = if (muted) AudioManager.ADJUST_MUTE else AudioManager.ADJUST_UNMUTE
+        audio.adjustStreamVolume(stream, adjust, 0)
+        if (audio.isStreamMute(stream) == muted) return
+        audio.adjustSuggestedStreamVolume(adjust, stream, 0)
+        if (audio.isStreamMute(stream) == muted) return
+        if (muteViaSession(muted)) return
+        if (muted) {
+            volumeBeforeMute = audio.getStreamVolume(stream)
+            setMusicVolume(0)
+        } else {
+            val max = audio.getStreamMaxVolume(stream)
+            setMusicVolume(if (volumeBeforeMute > 0) volumeBeforeMute else max / 2)
+        }
     }
 
     private companion object {

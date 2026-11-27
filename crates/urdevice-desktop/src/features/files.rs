@@ -14,7 +14,7 @@ use std::time::Duration;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use urdevice_core::Capability;
 use urdevice_core::identity::DeviceId;
-use urdevice_core::node::PeerView;
+use urdevice_core::node::Snapshot;
 use urdevice_core::services::files::{
     Files as FilesService, FilesEvents, TransferState, TransferView,
 };
@@ -98,6 +98,7 @@ fn row(t: &TransferView) -> TransferRow {
 }
 
 struct Ui {
+    window: slint::Weak<MainWindow>,
     svc: Arc<FilesService>,
     host: Arc<DesktopFiles>,
     rows: Rc<VecModel<TransferRow>>,
@@ -117,7 +118,19 @@ fn with_ui(f: impl FnOnce(&Rc<Ui>)) {
 
 impl Ui {
     fn redraw(&self) {
-        let rows: Vec<TransferRow> = self.svc.transfers().iter().map(row).collect();
+        // Only the transfers with the device whose page is open.
+        let selected = self
+            .window
+            .upgrade()
+            .map(|w| w.get_selected_peer().to_string())
+            .unwrap_or_default();
+        let rows: Vec<TransferRow> = self
+            .svc
+            .transfers()
+            .iter()
+            .filter(|t| t.peer.hex() == selected)
+            .map(row)
+            .collect();
         if self.rows.row_count() != rows.len() {
             self.rows.set_vec(rows);
             return;
@@ -139,12 +152,12 @@ impl FilesEvents for Events {
     }
 }
 
-/// The device whose Files view is open, if any.
+/// The device whose page is open, if any.
 fn open_peer(w: &MainWindow) -> Option<DeviceId> {
-    if w.get_page() != Page::Feature || w.get_feature() != "files" {
+    if w.get_page() != Page::Peer {
         return None;
     }
-    DeviceId::from_hex(&w.global::<FilesFeature>().get_peer_id())
+    DeviceId::from_hex(&w.get_selected_peer())
 }
 
 fn send(w: &MainWindow, svc: &Arc<FilesService>, paths: Vec<PathBuf>) {
@@ -197,10 +210,6 @@ impl Feature for Files {
         }]
     }
 
-    fn has_view(&self) -> bool {
-        true
-    }
-
     fn start(&self, ctx: &FeatureCtx) {
         let Some(w) = ctx.window.upgrade() else {
             return;
@@ -213,6 +222,7 @@ impl Feature for Files {
         svc.set_events(Arc::new(Events));
         let rows = Rc::new(VecModel::default());
         let ui = Rc::new(Ui {
+            window: ctx.window.clone(),
             svc,
             host,
             rows: rows.clone(),
@@ -285,7 +295,8 @@ impl Feature for Files {
                             let Some(w) = weak.upgrade() else { return };
                             with_ui(|ui| {
                                 let paths = std::mem::take(&mut *ui.dropped.borrow_mut());
-                                if open_peer(&w).is_some() {
+                                if let Some(peer) = open_peer(&w) {
+                                    w.global::<FilesFeature>().set_peer_id(peer.hex().into());
                                     send(&w, &ui.svc, paths);
                                 }
                             });
@@ -298,11 +309,7 @@ impl Feature for Files {
         ui.redraw();
     }
 
-    fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
-        if let Some(w) = ctx.window.upgrade() {
-            w.global::<FilesFeature>()
-                .set_peer_id(peer.id.clone().into());
-        }
+    fn refresh(&self, _ctx: &FeatureCtx, _snap: &Snapshot) {
         with_ui(|ui| ui.redraw());
     }
 }

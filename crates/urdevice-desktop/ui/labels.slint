@@ -62,12 +62,15 @@ export global Labels {
     pure public function locked-for(secs: int) -> string { return @tr("Too many failed attempts. Pairing is locked for {} s.", secs); }
     pure public function hidden-blocks() -> string { return @tr("Hidden mode is on. Turn it off in Settings to pair."); }
     pure public function paired-with(name: string) -> string { return @tr("Paired with {}", name); }
+    pure public function pairing-waiting(name: string) -> string { return @tr("Waiting for {} to accept…", name); }
     pure public function pairing-failed(reason: string) -> string {
         if (reason == "cancelled") { return @tr("Pairing was cancelled."); }
         if (reason == "timeout") { return @tr("Pairing timed out."); }
         if (reason == "expired") { return @tr("That QR code expired or was already used. Scan the new one."); }
         if (reason == "locked") { return @tr("Pairing is locked on the other device after too many failures."); }
         if (reason == "closed") { return @tr("Open Add Device on the other device first."); }
+        if (reason == "declined") { return @tr("The other device said no."); }
+        if (reason == "busy") { return @tr("Try again in a minute."); }
         if (reason == "hidden") { return @tr("The other device is in hidden mode."); }
         if (reason == "unreachable") { return @tr("Could not reach the other device, or its key did not match the QR code."); }
         return @tr("Pairing failed.");

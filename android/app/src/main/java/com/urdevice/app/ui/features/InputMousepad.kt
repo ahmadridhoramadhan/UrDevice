@@ -13,18 +13,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -39,6 +45,7 @@ import com.urdevice.app.R
 import com.urdevice.core.UrDeviceNode
 import kotlin.math.abs
 import kotlin.math.max
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** Mouse buttons on the wire. */
@@ -60,6 +67,91 @@ private const val SCROLL_UNITS_PER_PX = 3f
 
 private const val PREFS = "input"
 
+/** The tile key of the Mousepad settings page. */
+const val MOUSEPAD_SETTINGS = "mousepad.settings"
+
+/** Pointer speed, acceleration, and scroll direction for the Mousepad (R9a). Saved at once. */
+@Composable
+fun MousepadSettings() {
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
+    var sensitivity by remember { mutableFloatStateOf(prefs.getFloat("sensitivity", 1.5f)) }
+    var accel by remember { mutableFloatStateOf(prefs.getFloat("accel", 0.04f)) }
+    var natural by remember { mutableStateOf(prefs.getBoolean("natural", true)) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(stringResource(R.string.input_mousepad_settings), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.input_sensitivity), style = MaterialTheme.typography.bodyMedium)
+        Slider(
+            value = sensitivity,
+            onValueChange = { sensitivity = it },
+            onValueChangeFinished = { prefs.edit().putFloat("sensitivity", sensitivity).apply() },
+            valueRange = 0.5f..4f,
+        )
+        Text(stringResource(R.string.input_acceleration), style = MaterialTheme.typography.bodyMedium)
+        Slider(
+            value = accel,
+            onValueChange = { accel = it },
+            onValueChangeFinished = { prefs.edit().putFloat("accel", accel).apply() },
+            valueRange = 0f..0.15f,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.input_natural_scroll), modifier = Modifier.weight(1f))
+            Switch(checked = natural, onCheckedChange = {
+                natural = it
+                prefs.edit().putBoolean("natural", it).apply()
+            })
+        }
+    }
+}
+
+/** About one display frame, in ms. Pointer speed is measured in pixels per frame. */
+private const val FRAME_MS = 16f
+
+/** How often the smoother lets movement out, and how much of what waits it sends each time. */
+private const val SMOOTH_TICK_MS = 8L
+private const val SMOOTH_SHARE = 0.6f
+
+/**
+ * Spreads the pointer movement of each touch frame over the next few milliseconds, so the cursor
+ * on the other device glides instead of jumping once per frame. [flush] sends the rest at once
+ * (before a click, so it lands where the finger stopped).
+ */
+private class PointerSmoother(private val send: (Int, Int) -> Unit) {
+    // Movement not sent yet, and the fraction of a pixel carried between sends.
+    private var waitX = 0f
+    private var waitY = 0f
+    private var carryX = 0f
+    private var carryY = 0f
+
+    @Synchronized
+    fun add(dx: Float, dy: Float) {
+        waitX += dx
+        waitY += dy
+    }
+
+    @Synchronized
+    fun step() = release(SMOOTH_SHARE)
+
+    @Synchronized
+    fun flush() = release(1f)
+
+    private fun release(share: Float) {
+        val sx = waitX * share
+        val sy = waitY * share
+        waitX -= sx
+        waitY -= sy
+        carryX += sx
+        carryY += sy
+        val ix = carryX.toInt()
+        val iy = carryY.toInt()
+        if (ix != 0 || iy != 0) {
+            carryX -= ix
+            carryY -= iy
+            send(ix, iy)
+        }
+    }
+}
+
 /** Keeps the screen on while a screen that controls another device is open (R9a.5). */
 @Composable
 fun KeepScreenOn() {
@@ -76,7 +168,7 @@ fun KeepScreenOn() {
  * a press-and-drag drags.
  */
 @Composable
-fun MousepadPad(node: UrDeviceNode, device: String, enabled: Boolean) {
+fun MousepadPad(node: UrDeviceNode, device: String, enabled: Boolean, modifier: Modifier = Modifier) {
     KeepScreenOn()
     val ctx = LocalContext.current
     val prefs = remember { ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
@@ -85,17 +177,34 @@ fun MousepadPad(node: UrDeviceNode, device: String, enabled: Boolean) {
     var natural by remember { mutableStateOf(prefs.getBoolean("natural", true)) }
     val haptic = LocalHapticFeedback.current
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val openPage = LocalOpenFeaturePage.current
+    val smoother = remember(node, device) { PointerSmoother { x, y -> runCatching { node.inputMove(device, x, y) } } }
+    LaunchedEffect(smoother) {
+        while (true) {
+            delay(SMOOTH_TICK_MS)
+            smoother.step()
+        }
+    }
+    // The pad takes all the room that is left; the click buttons sit under it.
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Sensitivity and scrolling live on their own page.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.tile_mousepad), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            IconButton(onClick = { openPage("input", MOUSEPAD_SETTINGS) }) {
+                Icon(Icons.Outlined.Settings, stringResource(R.string.input_mousepad_settings))
+            }
+        }
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(320.dp)
+                .weight(1f)
+                .heightIn(min = 200.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .pointerInput(device, enabled) {
                     if (enabled) {
                         padGestures(
-                            node, device,
+                            node, device, smoother,
                             sensitivity = { sensitivity },
                             accel = { accel },
                             natural = { natural },
@@ -124,27 +233,6 @@ fun MousepadPad(node: UrDeviceNode, device: String, enabled: Boolean) {
                 modifier = Modifier.weight(1f).heightIn(min = 48.dp),
             ) { Text(stringResource(R.string.input_right_click)) }
         }
-        Text(stringResource(R.string.input_sensitivity), style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = sensitivity,
-            onValueChange = { sensitivity = it },
-            onValueChangeFinished = { prefs.edit().putFloat("sensitivity", sensitivity).apply() },
-            valueRange = 0.5f..4f,
-        )
-        Text(stringResource(R.string.input_acceleration), style = MaterialTheme.typography.bodyMedium)
-        Slider(
-            value = accel,
-            onValueChange = { accel = it },
-            onValueChangeFinished = { prefs.edit().putFloat("accel", accel).apply() },
-            valueRange = 0f..0.15f,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.input_natural_scroll), modifier = Modifier.weight(1f))
-            Switch(checked = natural, onCheckedChange = {
-                natural = it
-                prefs.edit().putBoolean("natural", it).apply()
-            })
-        }
     }
 }
 
@@ -159,9 +247,11 @@ private fun clickOnce(node: UrDeviceNode, device: String, button: UInt) {
  * The touch state machine. One gesture runs from the first finger down until every finger is up.
  * Pointer events are consumed, so the screen's own scrolling never competes with the pad.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 private suspend fun PointerInputScope.padGestures(
     node: UrDeviceNode,
     device: String,
+    smoother: PointerSmoother,
     sensitivity: () -> Float,
     accel: () -> Float,
     natural: () -> Boolean,
@@ -170,9 +260,6 @@ private suspend fun PointerInputScope.padGestures(
     val slop = viewConfiguration.touchSlop
     // When the last single-finger tap ended, for tap-then-drag.
     var lastTapUp = 0L
-    // Fractions of a pixel not sent yet.
-    var carryX = 0f
-    var carryY = 0f
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         down.consume()
@@ -186,6 +273,7 @@ private suspend fun PointerInputScope.padGestures(
         var prevCount = 1
         var prevX = down.position.x
         var prevY = down.position.y
+        var prevT = t0
         var lastUp = t0
         var scrollX = 0f
         var scrollY = 0f
@@ -201,6 +289,7 @@ private suspend fun PointerInputScope.padGestures(
                 // The finger stayed put for the long-press time: right click.
                 longPressed = true
                 onLongPress()
+                smoother.flush()
                 clickOnce(node, device, RIGHT)
                 continue
             }
@@ -218,13 +307,18 @@ private suspend fun PointerInputScope.padGestures(
                 prevCount = pressed.size
                 prevX = cx
                 prevY = cy
+                prevT = lastUp
                 event.changes.forEach { it.consume() }
                 continue
             }
             val dx = cx - prevX
             val dy = cy - prevY
+            val fromX = prevX
+            val fromY = prevY
+            val fromT = prevT
             prevX = cx
             prevY = cy
+            prevT = lastUp
             travelled += abs(dx) + abs(dy)
             if (pressed.size >= 2) {
                 // Two fingers scroll, vertically and horizontally (R9a.3).
@@ -239,22 +333,30 @@ private suspend fun PointerInputScope.padGestures(
                     runCatching { node.inputScroll(device, ix, iy) }
                 }
             } else if (!longPressed && (travelled >= slop || dragMode)) {
-                // One finger moves the pointer, faster when the finger is fast (R9a.1).
-                val speed = abs(dx) + abs(dy)
-                val factor = sensitivity() * (1f + accel() * speed)
-                carryX += dx * factor
-                carryY += dy * factor
-                val ix = carryX.toInt()
-                val iy = carryY.toInt()
-                if (ix != 0 || iy != 0) {
-                    carryX -= ix
-                    carryY -= iy
-                    runCatching { node.inputMove(device, ix, iy) }
+                // One finger moves the pointer, faster when the finger is fast (R9a.1). The system
+                // batches several touch samples into one event; use all of them, not just the last.
+                val c = pressed[0]
+                var lx = fromX
+                var ly = fromY
+                var lt = fromT
+                val samples = c.historical.map { Triple(it.position.x, it.position.y, it.uptimeMillis) } +
+                    Triple(c.position.x, c.position.y, c.uptimeMillis)
+                for ((x, y, t) in samples) {
+                    val sdx = x - lx
+                    val sdy = y - ly
+                    val perFrame = (abs(sdx) + abs(sdy)) / max(1L, t - lt) * FRAME_MS
+                    val factor = sensitivity() * (1f + accel() * perFrame)
+                    smoother.add(sdx * factor, sdy * factor)
+                    lx = x
+                    ly = y
+                    lt = t
                 }
             }
             event.changes.forEach { it.consume() }
         }
-        // Every finger is up: decide what the gesture was.
+        // Every finger is up: send what is left, so a click lands where the finger stopped.
+        smoother.flush()
+        // Decide what the gesture was.
         val short = lastUp - t0 < TAP_MS
         val still = travelled < slop * 2
         when {

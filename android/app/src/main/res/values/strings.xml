@@ -71,26 +71,24 @@
     <string name="tile_ready">Ready</string>
     <string name="tile_needs_approval">Needs approval</string>
     <string name="tile_turned_off_by">Turned off by %1$s</string>
-    <string name="features_on">Features on %1$s</string>
+    <string name="features">Features</string>
+    <string name="status_connected">Connected</string>
 
     <!-- Onboarding -->
     <string name="ob_welcome">Welcome to UrDevice</string>
-    <string name="ob_welcome_body">Connect your own devices on one local network. No account and no cloud server.</string>
+    <string name="ob_welcome_body">Your devices, working together.</string>
     <string name="ob_name">Name this device</string>
-    <string name="ob_name_hint">Other devices see this name. You can change it later in Settings.</string>
-    <string name="ob_safe">Safe and local</string>
-    <string name="ob_safe_body">Your devices talk directly on the same network. There is no server, and every connection is encrypted with this device\'s own key.</string>
-    <string name="ob_safe_key">The key for this device is ready and protected by Android Keystore. Its Device ID:</string>
-    <string name="ob_safe_check">Check this ID on the other device when you pair.</string>
-    <string name="ob_perms">Permissions for other devices</string>
-    <string name="ob_perms_body">Choose what your other devices may do here. This applies to every paired device. You can change it later on This device.</string>
-    <string name="ob_save">Save and continue</string>
-    <string name="ob_pair">Pair your first device</string>
+    <string name="ob_perms">What can your other devices do here?</string>
+    <string name="ob_perms_body">You can change this any time.</string>
+    <string name="ob_pair">Add your first device</string>
+    <string name="ob_pair_qr_body">Scan this code with your other device.</string>
+    <string name="ob_pair_nearby">Or pick a device nearby</string>
+    <string name="ob_pair_none">Looking for devices on your Wi-Fi…</string>
     <string name="ob_skip">Skip for now</string>
-    <string name="ob_ready">Ready</string>
-    <string name="ob_ready_body">You can pair a device any time with Add Device.</string>
+    <string name="ob_ready">You\'re all set</string>
+    <string name="ob_ready_body">Add a device any time with Add Device.</string>
     <string name="ob_paired">Paired with %1$s</string>
-    <string name="ob_paired_body">Both devices are connected. They reconnect on their own when they are on the same network.</string>
+    <string name="ob_paired_body">They connect by themselves on the same Wi-Fi.</string>
     <string name="ob_open">Open UrDevice</string>
 
     <!-- OS permission explanations (R15.2) -->
@@ -105,8 +103,6 @@
     <string name="open_settings">Open settings</string>
 
     <!-- Home -->
-    <string name="home_this_device_line">This device · Android %1$s · %2$s</string>
-    <string name="home_tap_perms">Tap to set permissions for other devices</string>
     <string name="status_connected_line">%1$s · %2$s · %3$d ms</string>
     <string name="status_offline">Offline</string>
     <string name="status_last_seen">Offline · last seen %1$s</string>
@@ -114,7 +110,8 @@
     <string name="no_devices">No paired devices yet.</string>
 
     <!-- This device sheet -->
-    <string name="perms_apply_all">Applies to every device paired with %1$s. Allow: starts right away. Always Ask: you confirm here first. Deny: the feature is off on other devices.</string>
+    <string name="perms_title">Permissions for other devices</string>
+    <string name="perms_apply_all">Applies to all your paired devices.</string>
     <string name="confirm_term_title">Allow remote terminal?</string>
     <string name="confirm_term_body">Every paired device gets full control of this device\'s shell, with no prompt. Only allow this if you trust all of them.</string>
     <string name="confirm_fs_title">Allow file changes?</string>
@@ -127,13 +124,11 @@
     <string name="forget_title">Forget this device?</string>
     <string name="forget_body">The pairing is deleted on both devices. To connect again, pair again.</string>
     <string name="peer_offline_title">%1$s is offline</string>
-    <string name="peer_offline_body">UrDevice connects on its own when %1$s is on the same network.</string>
-    <string name="peer_disconnected_body">Press Reconnect on either device to connect again. The pairing is kept.</string>
+    <string name="peer_offline_body">Connects on its own when %1$s is nearby.</string>
+    <string name="peer_disconnected_body">Press Reconnect to connect again.</string>
     <string name="device_id">Device ID: %1$s</string>
     <string name="you_are_using">You are using %1$s on %2$s</string>
     <string name="end">End</string>
-    <string name="legend_ask">Always Ask: %1$s confirms first</string>
-    <string name="legend_deny">Deny: turned off by %1$s</string>
 
     <!-- Pair -->
     <string name="pair_scan">Scan QR</string>
@@ -159,6 +154,13 @@
     <string name="pair_fail_timeout">Pairing timed out.</string>
     <string name="pair_fail_expired">That QR code expired or was already used. Scan the new one.</string>
     <string name="pair_fail_locked">Pairing is locked on the other device after too many failures.</string>
+    <string name="pair_fail_declined">The other device said no.</string>
+    <string name="pair_fail_busy">Try again in a minute.</string>
+    <string name="pair_waiting_for">Waiting for %1$s to accept…</string>
+    <string name="pair_accept">Accept</string>
+    <string name="pair_decline">Decline</string>
+    <string name="prompt_pair_title">%1$s wants to pair with this device</string>
+    <string name="prompt_pair_body">If you don\'t answer, it is declined in %1$d s.</string>
     <string name="pair_fail_closed">Open Add Device on the other device first.</string>
     <string name="pair_fail_hidden">The other device is in hidden mode.</string>
     <string name="pair_fail_unreachable">Could not reach the other device, or its key did not match the QR code.</string>
@@ -189,9 +191,9 @@
     <!-- Settings -->
     <string name="set_name">Device name</string>
     <string name="set_hidden">Hidden mode</string>
-    <string name="set_hidden_body">Stop announcing this device. Paired devices can still connect; new devices can\'t pair.</string>
+    <string name="set_hidden_body">New devices can\'t find or pair with this one.</string>
     <string name="set_language">Language</string>
-    <string name="set_language_body">English. More languages come later.</string>
+    <string name="set_language_body">English</string>
     <string name="set_log">Activity log</string>
     <string name="set_log_body">Requests from other devices in the last 30 days. Content is never recorded.</string>
     <string name="set_export">Export data</string>

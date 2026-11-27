@@ -32,21 +32,49 @@ use urdevice_platform::features::input::{
     DesktopInput, install_uinput_rule, open_permission_settings, sink,
 };
 
-use urdevice_core::node::PeerView;
-
 use super::{Feature, FeatureCtx, TileSpec};
-use crate::ui::{InputFeature, LaserWindow};
+#[cfg(not(windows))]
+use crate::ui::LaserWindow;
 
+#[cfg(windows)]
+mod laser_win;
 mod remote;
+
+pub(crate) use remote::{
+    open_screen as open_screen_window, screen_clear, screen_displays, screen_frame, screen_note,
+    select_backend,
+};
 
 pub(crate) struct Input;
 
 thread_local! {
-    /// The name of the device the view was opened for, for the window title.
-    static LAST_NAME: RefCell<String> = const { RefCell::new(String::new()) };
-
     /// The laser window. Slint windows live on the UI thread.
+    #[cfg(not(windows))]
     static LASER: RefCell<Option<LaserWindow>> = const { RefCell::new(None) };
+
+    /// The laser dot on Windows: a small layered window, not a Slint one (see `laser_win`).
+    #[cfg(windows)]
+    static DOT: RefCell<Option<laser_win::Dot>> = const { RefCell::new(None) };
+
+    /// Keeps the display size up to date for the input back-end.
+    static SIZE_TIMER: slint::Timer = slint::Timer::default();
+}
+
+/// Tell the input back-end how big the display is, in the pixels the pointer
+/// moves in (logical pixels). Wayland cannot place the pointer, so the back-end
+/// works out a position from this. Runs on the UI thread.
+fn report_display_size(window: &slint::Weak<crate::ui::MainWindow>, input: &DesktopInput) {
+    use slint::winit_030::WinitWindowAccessor;
+    let Some(w) = window.upgrade() else { return };
+    w.window().with_winit_window(|win| {
+        if let Some(m) = win.current_monitor().or_else(|| win.primary_monitor()) {
+            let scale = m.scale_factor() as f32;
+            let size = m.size();
+            if scale > 0.0 {
+                input.set_display_size(size.width as f32 / scale, size.height as f32 / scale);
+            }
+        }
+    });
 }
 
 /// Draws the presenter's laser dot (R9b.3).
@@ -81,6 +109,29 @@ impl Overlay for Laser {
 
 /// Show the dot at `pos` (0.0 to 1.0 of the primary display), or hide it.
 /// Runs on the UI thread.
+#[cfg(windows)]
+fn draw(pos: Option<(f32, f32)>) -> Result<(), String> {
+    DOT.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let Some((x, y)) = pos else {
+            if let Some(dot) = slot.as_mut() {
+                dot.hide();
+            }
+            return Ok(());
+        };
+        if slot.is_none() {
+            *slot = Some(laser_win::Dot::new()?);
+        }
+        match slot.as_mut() {
+            Some(dot) => dot.show_at(x, y),
+            None => Ok(()),
+        }
+    })
+}
+
+/// Show the dot at `pos` (0.0 to 1.0 of the primary display), or hide it.
+/// Runs on the UI thread.
+#[cfg(not(windows))]
 fn draw(pos: Option<(f32, f32)>) -> Result<(), String> {
     LASER.with(|cell| {
         let mut slot = cell.borrow_mut();
@@ -109,6 +160,7 @@ fn draw(pos: Option<(f32, f32)>) -> Result<(), String> {
 
 /// Make the window fill the primary display and let clicks through. Done on
 /// every show: cheap, and it follows a changed monitor setup.
+#[cfg(not(windows))]
 fn cover_display(w: &LaserWindow) {
     use slint::winit_030::WinitWindowAccessor;
     w.window().with_winit_window(|win| {
@@ -214,56 +266,57 @@ impl Feature for Input {
     }
 
     fn tiles(&self) -> &'static [TileSpec] {
-        &[
-            TileSpec {
-                cap: Capability::Input,
-                key: "input.v1",
-            },
-            TileSpec {
-                cap: Capability::Input,
-                key: "keyboard",
-            },
-        ]
+        &[TileSpec {
+            cap: Capability::Input,
+            key: "input.v1",
+        }]
     }
 
-    fn has_view(&self) -> bool {
-        true
+    // The tile is a switch: on while the remote-control window for that device is open. There
+    // is no page. Closing the window turns it off.
+    fn switch(&self, _ctx: &FeatureCtx, peer: &str) -> Option<bool> {
+        Some(DeviceId::from_hex(peer).is_some_and(remote::is_open_for))
     }
 
-    fn open(&self, ctx: &FeatureCtx, peer: &PeerView, _tile: &str) {
-        let (Some(w), Some(svc), Some(id)) = (
-            ctx.window.upgrade(),
-            ctx.node.service::<Service>(),
-            DeviceId::from_hex(&peer.id),
-        ) else {
+    fn set_switch(&self, ctx: &FeatureCtx, peer: &str, on: bool) {
+        if !on {
+            remote::close();
+            return;
+        }
+        let (Some(svc), Some(id)) = (ctx.node.service::<Service>(), DeviceId::from_hex(peer))
+        else {
             return;
         };
-        w.global::<InputFeature>()
-            .set_peer_id(peer.id.as_str().into());
-        LAST_NAME.with(|n| *n.borrow_mut() = peer.name.clone());
-        remote::open(svc, id, &peer.name);
+        let name = ctx
+            .node
+            .snapshot()
+            .peers
+            .iter()
+            .find(|p| p.id == peer)
+            .map_or_else(String::new, |p| p.name.clone());
+        remote::open(svc, id, &name);
     }
 
     fn start(&self, ctx: &FeatureCtx) {
         let Some(svc) = ctx.node.service::<Service>() else {
             return;
         };
-        if let Some(w) = ctx.window.upgrade() {
-            let (window, svc) = (ctx.window.clone(), svc.clone());
-            w.global::<InputFeature>().on_open_window(move || {
-                let Some(w) = window.upgrade() else { return };
-                let Some(id) = DeviceId::from_hex(&w.global::<InputFeature>().get_peer_id()) else {
-                    return;
-                };
-                let name = LAST_NAME.with(|n| n.borrow().clone());
-                remote::open(svc.clone(), id, &name);
-            });
-        }
         let secrets = Arc::new(urdevice_platform::DesktopSecretStore::new(
             &urdevice_platform::data_dir(),
         ));
         let input = sink(secrets);
         svc.set_sink(input.clone());
+        {
+            let (window, input) = (ctx.window.clone(), input.clone());
+            report_display_size(&window, &input);
+            SIZE_TIMER.with(|t| {
+                t.start(
+                    slint::TimerMode::Repeated,
+                    std::time::Duration::from_secs(3),
+                    move || report_display_size(&window, &input),
+                );
+            });
+        }
         svc.set_overlay(Arc::new(Laser { fallback: input }));
         svc.set_events(Arc::new(Events {
             last: AtomicU64::new(0),

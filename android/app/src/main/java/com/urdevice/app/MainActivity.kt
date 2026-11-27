@@ -11,10 +11,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -36,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -45,6 +58,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -54,14 +68,18 @@ import com.urdevice.app.ui.ActiveBanner
 import com.urdevice.app.ui.DeviceScreen
 import com.urdevice.app.ui.Explain
 import com.urdevice.app.ui.HomeScreen
+import com.urdevice.app.ui.PICK_ME
 import com.urdevice.app.ui.LogScreen
 import com.urdevice.app.ui.Onboarding
 import com.urdevice.app.ui.PairBody
 import com.urdevice.app.ui.SettingsScreen
 import com.urdevice.app.ui.ThisDeviceScreen
+import com.urdevice.app.ui.features.InputFeature
+import com.urdevice.app.ui.features.LocalOpenFeaturePage
 import com.urdevice.app.ui.UrDeviceTheme
 import com.urdevice.app.ui.features.feature
 import com.urdevice.core.FfiEvent
+import com.urdevice.core.FfiMode
 import com.urdevice.core.FfiException
 import com.urdevice.core.FfiLogEntry
 import com.urdevice.core.UrDeviceNode
@@ -71,8 +89,6 @@ import kotlinx.coroutines.delay
 /** Pages with a back button (Android v1 in docs/mockup/urdevice-layout.html). */
 sealed interface Page {
     data object Home : Page
-    data object ThisDevice : Page
-    data class Device(val id: String) : Page
     data object Pair : Page
     data object Settings : Page
     data object Log : Page
@@ -81,12 +97,53 @@ sealed interface Page {
     data class Feature(val device: String, val feature: String, val tile: String) : Page
 }
 
+/** A page and how deep it sits in the back stack, so a transition knows whether it goes forward or back. */
+private data class Shown(val page: Page, val depth: Int)
+
+/** Forward: the new page slides in from the right while the old one fades out. Back: the other way. */
+private fun AnimatedContentTransitionScope<Shown>.pageTransition(forward: Boolean): ContentTransform {
+    val slide = { width: Int -> if (forward) width / 6 else -width / 6 }
+    val enter = fadeIn(tween(240, delayMillis = 60)) +
+        slideInHorizontally(tween(300, easing = FastOutSlowInEasing)) { slide(it) }
+    val exit = fadeOut(tween(120)) +
+        slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -slide(it) }
+    return (enter togetherWith exit).using(null)
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestHighRefreshRate()
         UrDeviceService.start(this)
+        readGuide(intent)
         setContent { UrDeviceTheme { App() } }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        readGuide(intent)
+    }
+
+    /** A notification (or the core) asked to guide the user to an Android setting. */
+    private fun readGuide(intent: android.content.Intent?) {
+        intent?.getStringExtra(InputFeature.EXTRA_GUIDE)?.let { InputFeature.guide.value = it }
+    }
+
+    /**
+     * Ask for the display's fastest mode at the screen's current size (120 Hz where the phone has
+     * it). Android may still pick a lower rate to save power; this is a request, not a demand.
+     */
+    private fun requestHighRefreshRate() {
+        runCatching {
+            @Suppress("DEPRECATION")
+            val screen = (if (Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay) ?: return
+            val now = screen.mode
+            val best = screen.supportedModes
+                .filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
+                .maxByOrNull { it.refreshRate } ?: return
+            window.attributes = window.attributes.also { it.preferredDisplayModeId = best.modeId }
+        }
     }
 
     override fun onStart() {
@@ -116,6 +173,8 @@ private fun App() {
     val snackbar = remember { SnackbarHostState() }
     val stack = remember { mutableStateListOf<Page>(Page.Home) }
     var pairedName by rememberSaveable { mutableStateOf<String?>(null) }
+    // The device the Home picker shows: this device (PICK_ME) or a paired device's id. Null: this device.
+    var picked by rememberSaveable { mutableStateOf<String?>(null) }
     var inOnboarding by rememberSaveable { mutableStateOf<Boolean?>(null) }
     var notifNeeded by remember { mutableStateOf(needsNotificationPermission(ctx)) }
     var netNeeded by remember { mutableStateOf(needsNetworkPermission(ctx)) }
@@ -136,6 +195,12 @@ private fun App() {
     fun back() {
         if (stack.size > 1) {
             if (stack.removeAt(stack.lastIndex) == Page.Pair) node()?.closePairScreen()
+        }
+    }
+    fun pairNearby(key: String) {
+        val name = snap?.nearby?.firstOrNull { it.key == key }?.name ?: ""
+        if (runCatching { node()?.pairNearby(key) }.isSuccess) {
+            android.widget.Toast.makeText(ctx, ctx.getString(R.string.pair_waiting_for, name), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
     fun scanned(text: String) {
@@ -167,9 +232,15 @@ private fun App() {
         }
         return
     }
+    // Another device asked to pair and the user accepted: show the code.
+    val hasCodes = s.codePairings.isNotEmpty()
+    LaunchedEffect(hasCodes) {
+        if (hasCodes && inOnboarding != true && stack.last() != Page.Pair) go(Page.Pair)
+    }
     if (inOnboarding == null) inOnboarding = !s.me.onboarded
     if (!s.me.onboarded && inOnboarding == false) inOnboarding = true
 
+    InputFeature.HostGuideDialog()
     if (inOnboarding == true) {
         Onboarding(
             snap = s,
@@ -180,28 +251,38 @@ private fun App() {
             onOpenPair = { node()?.openPairScreen() },
             onClosePair = { node()?.closePairScreen() },
             onScanned = ::scanned,
-            onPairNearby = { runCatching { node()?.pairNearby(it) } },
+            onPairNearby = ::pairNearby,
             onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
             onFinish = { inOnboarding = false; stack.clear(); stack.add(Page.Home) },
         )
     } else {
         BackHandler(enabled = stack.size > 1) { back() }
+        // The app fades and rises in when it opens, and after onboarding.
+        var appShown by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { appShown = true }
+        val appIn by animateFloatAsState(if (appShown) 1f else 0f, tween(320), label = "app-in")
         Scaffold(
+            modifier = Modifier.graphicsLayer {
+                alpha = appIn
+                translationY = (1f - appIn) * 24.dp.toPx()
+            },
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
-                            when (page) {
+                        AnimatedContent(
+                            targetState = page,
+                            transitionSpec = { fadeIn(tween(200, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
+                            label = "title",
+                        ) { titled -> Text(
+                            when (titled) {
                                 Page.Home -> stringResource(R.string.app_name)
-                                Page.ThisDevice -> stringResource(R.string.this_device)
-                                is Page.Device -> s.peers.firstOrNull { it.id == page.id }?.name ?: ""
                                 Page.Pair -> stringResource(R.string.add_device)
                                 Page.Settings -> stringResource(R.string.settings)
                                 Page.Log -> stringResource(R.string.set_log)
-                                is Page.Feature -> s.peers.firstOrNull { it.id == page.device }?.name ?: ""
+                                is Page.Feature -> s.peers.firstOrNull { it.id == titled.device }?.name ?: ""
                             },
-                        )
+                        ) }
                     },
                     navigationIcon = {
                         if (stack.size > 1) {
@@ -222,7 +303,11 @@ private fun App() {
         ) { inner ->
             Column(Modifier.padding(inner).fillMaxSize()) {
                 s.activities.filter { it.incoming }.forEach { a -> ActiveBanner(a) { node()?.stopActivity(a.id) } }
-                Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+                // A full-screen feature page (the Mousepad) fills the room and does not scroll.
+                val full = (page as? Page.Feature)?.let { feature(it.feature)?.fullScreen(it.tile) } == true
+                Column(
+                    (if (full) Modifier.weight(1f).fillMaxWidth() else Modifier.verticalScroll(rememberScrollState())).padding(16.dp),
+                ) {
                     if (netNeeded) {
                         Explain(
                             stringResource(R.string.why_network_title), stringResource(R.string.why_network_body),
@@ -236,64 +321,81 @@ private fun App() {
                             onLater = { notifNeeded = false },
                         )
                     }
-                    when (page) {
-                        Page.Home -> HomeScreen(s, onThisDevice = { go(Page.ThisDevice) }, onPeer = { go(Page.Device(it)) }, onAdd = { go(Page.Pair) })
-                        Page.ThisDevice -> ThisDeviceScreen(s) { c, m, confirmed -> runCatching { node()?.setPermission(c, m, confirmed) } }
-                        is Page.Device -> {
-                            val peer = s.peers.firstOrNull { it.id == page.id }
-                            if (peer == null) {
-                                LaunchedEffect(page) { back() }
-                            } else {
-                                DeviceScreen(
-                                    s, peer,
-                                    onDisconnect = { runCatching { node()?.disconnect(peer.id) } },
-                                    onReconnect = { runCatching { node()?.reconnect(peer.id) } },
-                                    onForget = { runCatching { node()?.forget(peer.id) } },
-                                    onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
-                                    onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
-                                    onSettings = { go(Page.ThisDevice) },
-                                    onStop = { node()?.stopActivity(it) },
-                                )
+                    AnimatedContent(
+                        targetState = Shown(page, stack.size),
+                        transitionSpec = { pageTransition(forward = targetState.depth >= initialState.depth) },
+                        label = "page",
+                    ) { shown ->
+                    val page = shown.page
+                        when (page) {
+                            Page.Home -> {
+                                val shown = picked?.takeIf { it == PICK_ME || s.peers.any { p -> p.id == it } }
+                                    ?: PICK_ME
+                                HomeScreen(s, shown, onSelect = { picked = it }, onAdd = { go(Page.Pair) }) { pickedId ->
+                                    val peer = s.peers.firstOrNull { it.id == pickedId }
+                                    if (peer == null) {
+                                        ThisDeviceScreen()
+                                    } else {
+                                        DeviceScreen(
+                                            s, peer,
+                                            onDisconnect = { runCatching { node()?.disconnect(peer.id) } },
+                                            onReconnect = { runCatching { node()?.reconnect(peer.id) } },
+                                            onForget = { runCatching { node()?.forget(peer.id) } },
+                                            onRequest = { cap -> runCatching { node()?.requestActivity(peer.id, cap) } },
+                                            onOpenFeature = { f, tile -> go(Page.Feature(peer.id, f, tile)) },
+                                            onSettings = { go(Page.Settings) },
+                                            onStop = { node()?.stopActivity(it) },
+                                        )
+                                    }
+                                }
                             }
-                        }
-                        Page.Pair -> PairBody(
-                            s, ::scanned,
-                            onPairNearby = { runCatching { node()?.pairNearby(it) } },
-                            onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
-                        )
-                        Page.Settings -> SettingsScreen(
-                            s,
-                            onRename = { runCatching { node()?.setName(it) } },
-                            onHidden = { runCatching { node()?.setHidden(it) } },
-                            onLog = {
-                                log = runCatching { node()?.activityLog(500u) }.getOrNull() ?: emptyList()
-                                go(Page.Log)
-                            },
-                            onExport = {
-                                val text = runCatching { node()?.exportData() }.getOrNull() ?: return@SettingsScreen
-                                ctx.startActivity(
-                                    Intent.createChooser(
-                                        Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
-                                        null,
-                                    ),
-                                )
-                            },
-                            onReset = { runCatching { node()?.resetIdentity() } },
-                            onDeleteAll = {
-                                runCatching { node()?.deleteAllData() }
-                                pairedName = null
-                                inOnboarding = true
-                            },
-                            version = coreVersion(),
-                        )
-                        Page.Log -> LogScreen(log)
-                        is Page.Feature -> {
-                            val peer = s.peers.firstOrNull { it.id == page.device }
-                            val f = feature(page.feature)
-                            if (peer == null || f == null) {
-                                LaunchedEffect(page) { back() }
-                            } else {
-                                f.Screen(peer, page.tile)
+                            Page.Pair -> PairBody(
+                                s, ::scanned,
+                                onPairNearby = ::pairNearby,
+                                onConfirm = { k, ok -> runCatching { node()?.confirmCode(k, ok) } },
+                                compact = true,
+                            )
+                            Page.Settings -> SettingsScreen(
+                                s,
+                                onRename = { runCatching { node()?.setName(it) } },
+                                onHidden = { runCatching { node()?.setHidden(it) } },
+                                onLog = {
+                                    log = runCatching { node()?.activityLog(500u) }.getOrNull() ?: emptyList()
+                                    go(Page.Log)
+                                },
+                                onExport = {
+                                    val text = runCatching { node()?.exportData() }.getOrNull() ?: return@SettingsScreen
+                                    ctx.startActivity(
+                                        Intent.createChooser(
+                                            Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text),
+                                            null,
+                                        ),
+                                    )
+                                },
+                                onReset = { runCatching { node()?.resetIdentity() } },
+                                onSetPermission = { c, m, confirmed -> runCatching { node()?.setPermission(c, m, confirmed) } },
+                                onDeleteAll = {
+                                    runCatching { node()?.deleteAllData() }
+                                    pairedName = null
+                                    inOnboarding = true
+                                },
+                                version = coreVersion(),
+                            )
+                            Page.Log -> LogScreen(log)
+                            is Page.Feature -> {
+                                val peer = s.peers.firstOrNull { it.id == page.device }
+                                val f = feature(page.feature)
+                                val modes = peer?.remotePermissions?.associate { it.capability to it.mode } ?: emptyMap()
+                                val cap = f?.tiles(modes)?.firstOrNull { it.key == page.tile }?.cap
+                                // A feature page stays open only while its feature is on.
+                                val denied = cap != null && (modes[cap] ?: FfiMode.DENY) == FfiMode.DENY
+                                if (peer == null || f == null || denied) {
+                                    LaunchedEffect(page, denied) { back() }
+                                } else {
+                                    CompositionLocalProvider(
+                                        LocalOpenFeaturePage provides { feat, tile -> go(Page.Feature(peer.id, feat, tile)) },
+                                    ) { f.Screen(peer, page.tile) }
+                                }
                             }
                         }
                     }
@@ -315,12 +417,25 @@ private fun PromptDialog(p: FfiEvent.Prompt) {
             left -= 1
         }
     }
-    val feature = stringResource(Labels.cap(p.capability))
+    val pairing = p.capability == "pair"
     AlertDialog(
         onDismissRequest = {},
-        title = { Text(stringResource(R.string.prompt_title, p.deviceName, feature)) },
-        text = { Text(stringResource(R.string.prompt_body, left)) },
-        confirmButton = { TextButton(onClick = { Core.node()?.answerPrompt(p.id, true) }) { Text(stringResource(R.string.allow)) } },
-        dismissButton = { TextButton(onClick = { Core.node()?.answerPrompt(p.id, false) }) { Text(stringResource(R.string.deny)) } },
+        title = {
+            Text(
+                if (pairing) stringResource(R.string.prompt_pair_title, p.deviceName)
+                else stringResource(R.string.prompt_title, p.deviceName, stringResource(Labels.cap(p.capability))),
+            )
+        },
+        text = { Text(stringResource(if (pairing) R.string.prompt_pair_body else R.string.prompt_body, left)) },
+        confirmButton = {
+            TextButton(onClick = { Core.node()?.answerPrompt(p.id, true) }) {
+                Text(stringResource(if (pairing) R.string.pair_accept else R.string.allow))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { Core.node()?.answerPrompt(p.id, false) }) {
+                Text(stringResource(if (pairing) R.string.pair_decline else R.string.deny))
+            }
+        },
     )
 }

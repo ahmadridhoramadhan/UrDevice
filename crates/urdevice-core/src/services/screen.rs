@@ -51,8 +51,9 @@ pub use urdevice_proto::features::screen::{Display, Start, VideoFrame};
 pub(crate) const SHIPPED: &[Capability] = &[];
 
 /// Most encoded frames waiting for the network per session. Design §10:
-/// drop when the send buffer holds more than about 2 frames.
-pub const MAX_QUEUED_FRAMES: usize = 2;
+/// drop when the send buffer holds more than a few frames (8: about 130 ms at 60 frames a
+/// second, so a short Wi-Fi hiccup does not drop frames and force a keyframe).
+pub const MAX_QUEUED_FRAMES: usize = 8;
 
 /// How often a session feeds its counters to the [`Ladder`].
 pub const ADAPT_EVERY: Duration = Duration::from_millis(500);
