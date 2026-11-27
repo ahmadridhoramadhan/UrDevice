@@ -24,9 +24,11 @@ impl FakePhone {
         let p = Arc::new(Self::default());
         *p.state.lock().unwrap() = NotifyState {
             items: vec![
-                item("1", "com.chat", "Chat", "Ana", "hello", 3000),
-                item("2", "com.mail", "Mail", "Boss", "report", 2000),
-                item("3", "com.chat", "Chat", "Ben", "lunch?", 1000),
+                // Posted before the desktop turned mirroring on: never sent.
+                item("0", "com.chat", "Chat", "Old", "piled up", 1000),
+                item("1", "com.chat", "Chat", "Ana", "hello", soon(3000)),
+                item("2", "com.mail", "Mail", "Boss", "report", soon(2000)),
+                item("3", "com.chat", "Chat", "Ben", "lunch?", soon(1000)),
             ],
             apps: vec![app("com.chat", "Chat"), app("com.mail", "Mail")],
             unavailable: String::new(),
@@ -37,6 +39,15 @@ impl FakePhone {
     fn edit(&self, f: impl FnOnce(&mut NotifyState)) {
         f(&mut self.state.lock().unwrap());
     }
+}
+
+/// A time after the desktop subscribes, `ms` after an hour from now.
+fn soon(ms: u64) -> u64 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    u64::try_from(now).unwrap() + 3_600_000 + ms
 }
 
 fn item(key: &str, id: &str, name: &str, title: &str, text: &str, at: u64) -> NotifyItem {
@@ -147,7 +158,7 @@ fn a_notification_dismissed_on_the_phone_leaves_the_desktop() {
     wait_until("dismissed", WAIT, || r.keys() == ["2", "3"]);
     r.phone.edit(|s| {
         s.items
-            .insert(0, item("4", "com.chat", "Chat", "Cy", "new", 4000));
+            .insert(0, item("4", "com.chat", "Chat", "Cy", "new", soon(4000)));
     });
     wait_until("new one", WAIT, || r.keys() == ["4", "2", "3"]);
 }
@@ -242,4 +253,20 @@ fn a_desktop_does_not_offer_notifications() {
             .iter()
             .any(|r| r.capability == Capability::Notify)
     );
+}
+
+#[test]
+fn clearing_hides_what_is_shown_and_a_new_message_shows_again() {
+    let r = Rig::new();
+    r.desk.subscribe(r.phone_id(), true).unwrap();
+    wait_until("all", WAIT, || r.keys() == ["1", "2", "3"]);
+    r.desk.clear(r.phone_id());
+    assert!(r.keys().is_empty(), "cleared");
+    // The phone still has them; they stay hidden.
+    holds_for("stays cleared", 2500, || r.keys().is_empty());
+    // A new message in an existing chat (same key, later time) shows again.
+    r.phone.edit(|s| {
+        s.items.iter_mut().find(|i| i.key == "1").unwrap().posted_ms = soon(9000);
+    });
+    wait_until("shows again", WAIT, || r.keys() == ["1"]);
 }

@@ -27,6 +27,8 @@ export global NotifyFeature {
     in property <[NotifyRow]> items;
 
     callback set-on(bool);
+    // Clear the notifications that are shown.
+    callback clear();
 }
 
 // The notifications of the host on the device page: a title with the Active switch and the list. The page shows it only while `NotifyFeature.available`.
@@ -41,6 +43,20 @@ export component NotifyPanel inherits VerticalLayout {
             vertical-alignment: center;
         }
         Rectangle { }
+        if NotifyFeature.on && NotifyFeature.items.length > 0: Rectangle {
+            width: clear-label.preferred-width + 16px;
+            clear-label := Text {
+                text: @tr("Clear");
+                color: Theme.accent;
+                font-weight: 600;
+                font-size: Theme.font-body;
+                vertical-alignment: center;
+            }
+            TouchArea {
+                mouse-cursor: pointer;
+                clicked => { NotifyFeature.clear(); }
+            }
+        }
         Text {
             text: @tr("Active");
             color: Theme.muted;

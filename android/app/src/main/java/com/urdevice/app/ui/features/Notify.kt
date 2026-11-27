@@ -43,7 +43,7 @@ object NotifyFeature : Feature {
     override fun ThisDevice() {
         val context = LocalContext.current
         val prefs = remember { context.getSharedPreferences(NotifyHost.PREFS, Context.MODE_PRIVATE) }
-        var full by remember { mutableStateOf(prefs.getBoolean(NotifyHost.FULL_CONTENT, false)) }
+        var full by remember { mutableStateOf(prefs.getBoolean(NotifyHost.FULL_CONTENT, true)) }
         Card(Modifier.fillMaxWidth()) {
             Row(
                 Modifier.padding(14.dp),

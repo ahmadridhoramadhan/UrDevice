@@ -8,7 +8,9 @@
 //! least one receiver is subscribed, the service reads the [`NotifyHost`]
 //! every [`POLL_EVERY`] and pushes a [`NotifyState`] to each subscriber when
 //! it changed. A receiver sends no app list, which means every app; a list, if
-//! one is sent, limits what leaves the host (R18.2). A notification that is dismissed on the host is missing
+//! one is sent, limits what leaves the host (R18.2). Only notifications posted
+//! after the receiver subscribed leave the host, so turning mirroring on does
+//! not bring in what piled up before. A notification that is dismissed on the host is missing
 //! from the next state, so dismissal reaches the receiver (R18.5). `on:
 //! false`, a closed session, a change of the setting to Deny, and the end of
 //! an Always Ask activity all stop the pushes (R5.5). The host adapter hides
@@ -20,7 +22,8 @@
 //! accepted only from a host this device subscribed to, is sanitized, and is
 //! shown, never acted on. Notification content is kept in memory only, and
 //! is dropped when the host dismisses it, when mirroring is turned off, and
-//! when the session ends (R18.6).
+//! when the session ends (R18.6). [`Notify::clear`] hides what is shown now on
+//! this device; a notification posted again later shows up again.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
@@ -70,8 +73,10 @@ pub trait NotifyEvents: Send + Sync {
 struct Subscriber {
     /// The activity the subscription was granted under, or 0 for Allow.
     activity: u64,
-    /// The apps the receiver picked.
+    /// The apps the receiver picked. Empty means every app.
     apps: HashSet<String>,
+    /// Notifications posted before this time (host clock, ms) are not sent.
+    since_ms: u64,
     /// What this receiver last got.
     last: Option<NotifyState>,
 }
@@ -85,6 +90,9 @@ struct Receiver {
     wanted: HashSet<DeviceId>,
     /// The newest state from each host.
     latest: HashMap<DeviceId, NotifyState>,
+    /// Notifications the user cleared: key and the time it was posted. One that is posted
+    /// again (a new message in the same chat) has a later time and shows again.
+    cleared: HashMap<DeviceId, HashMap<String, u64>>,
     /// Always Ask activity per host, once approved.
     activity: HashMap<DeviceId, u64>,
     /// The last message a host refused with `ask` or `no_activity`.
@@ -156,6 +164,7 @@ impl Notify {
             } else {
                 r.wanted.remove(&host);
                 r.latest.remove(&host);
+                r.cleared.remove(&host);
             }
         }
         ctx.set_setting(&on_key(host), if on { "1" } else { "0" })?;
@@ -176,7 +185,33 @@ impl Notify {
     /// The newest state from `host`. `None` while mirroring is off or before
     /// the first state.
     pub fn state_of(&self, host: DeviceId) -> Option<NotifyState> {
-        lock(&self.shared.recv).latest.get(&host).cloned()
+        let r = lock(&self.shared.recv);
+        let mut st = r.latest.get(&host)?.clone();
+        if let Some(cleared) = r.cleared.get(&host) {
+            st.items
+                .retain(|i| cleared.get(&i.key).is_none_or(|at| i.posted_ms > *at));
+        }
+        Some(st)
+    }
+
+    /// Clear the notifications shown for `host`. This only hides them here; the
+    /// phone keeps its own.
+    pub fn clear(&self, host: DeviceId) {
+        {
+            let mut r = lock(&self.shared.recv);
+            let Some(st) = r.latest.get(&host) else {
+                return;
+            };
+            let all: HashMap<String, u64> = st
+                .items
+                .iter()
+                .map(|i| (i.key.clone(), i.posted_ms))
+                .collect();
+            r.cleared.insert(host, all);
+        }
+        if let Some(e) = self.shared.events.get() {
+            e.updated(host);
+        }
     }
 
     fn send_subscribe(&self, ctx: &ServiceCtx, host: DeviceId, on: bool) -> Result<()> {
@@ -213,13 +248,20 @@ fn on_key(host: DeviceId) -> String {
     format!("on.{}", host.hex())
 }
 
-/// `st` with only the notifications of `apps`; an empty set means every app.
-fn filtered(st: &NotifyState, apps: &HashSet<String>) -> NotifyState {
+/// `st` with only the notifications posted at or after `since_ms`, and of `apps` (an empty
+/// set means every app).
+fn filtered(st: &NotifyState, apps: &HashSet<String>, since_ms: u64) -> NotifyState {
     let mut out = st.clone();
-    if !apps.is_empty() {
-        out.items.retain(|i| apps.contains(&i.app_id));
-    }
+    out.items
+        .retain(|i| i.posted_ms >= since_ms && (apps.is_empty() || apps.contains(&i.app_id)));
     out
+}
+
+/// Now, in milliseconds since the epoch.
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
 }
 
 /// Read the host's state off the async runtime, with the limits applied.
@@ -245,7 +287,7 @@ fn push(shared: &Shared, ctx: &ServiceCtx, peer: DeviceId, st: &NotifyState) {
     let Some(sub) = subs.get_mut(&peer) else {
         return;
     };
-    let shown = filtered(st, &sub.apps);
+    let shown = filtered(st, &sub.apps, sub.since_ms);
     let m = WireNotify::from(Msg::State(shown.clone()));
     if ctx
         .send(peer, Direction::ToController, sub.activity, &m)
@@ -280,7 +322,7 @@ async fn poll_loop(shared: Arc<Shared>, ctx: ServiceCtx) {
         for peer in peers {
             let send = lock(&shared.subs)
                 .get(&peer)
-                .is_some_and(|s| s.last.as_ref() != Some(&filtered(&st, &s.apps)));
+                .is_some_and(|s| s.last.as_ref() != Some(&filtered(&st, &s.apps, s.since_ms)));
             if send {
                 push(&shared, &ctx, peer, &st);
             }
@@ -384,6 +426,7 @@ impl Service for Notify {
             r.activity.remove(&peer);
             r.pending.remove(&peer);
             r.requesting.remove(&peer);
+            r.cleared.remove(&peer);
             r.latest.remove(&peer).is_some()
         };
         if had && let Some(e) = self.shared.events.get() {
@@ -417,16 +460,21 @@ impl Notify {
             return;
         }
         s.sanitize();
-        let fresh = lock(&self.shared.subs)
+        // A new receiver starts from now; one that asks again keeps its start.
+        let mut subs = lock(&self.shared.subs);
+        let since_ms = subs.get(&peer).map_or_else(now_ms, |old| old.since_ms);
+        let fresh = subs
             .insert(
                 peer,
                 Subscriber {
                     activity: grant.activity(),
                     apps: s.apps.into_iter().collect(),
+                    since_ms,
                     last: None,
                 },
             )
             .is_none();
+        drop(subs);
         if fresh {
             ctx.log(peer, "notifications on");
         }
@@ -447,6 +495,10 @@ impl Notify {
                 return;
             }
             st.sanitize();
+            // A cleared notification that is gone from the host is forgotten.
+            if let Some(cleared) = r.cleared.get_mut(&peer) {
+                cleared.retain(|k, _| st.items.iter().any(|i| i.key == *k));
+            }
             r.latest.insert(peer, st);
         }
         if let Some(e) = self.shared.events.get() {
@@ -481,10 +533,25 @@ mod tests {
             items: vec![item("1", "chat"), item("2", "mail"), item("3", "chat")],
             ..NotifyState::default()
         };
-        assert_eq!(filtered(&st, &HashSet::new()).items.len(), 3);
+        assert_eq!(filtered(&st, &HashSet::new(), 0).items.len(), 3);
         let picked: HashSet<String> = ["chat".to_owned()].into();
-        let out = filtered(&st, &picked);
+        let out = filtered(&st, &picked, 0);
         assert_eq!(out.items.len(), 2);
         assert!(out.items.iter().all(|i| i.app_id == "chat"));
+    }
+
+    #[test]
+    fn what_was_posted_before_subscribing_is_not_sent() {
+        let mut old = item("1", "chat");
+        old.posted_ms = 100;
+        let mut new = item("2", "chat");
+        new.posted_ms = 200;
+        let st = NotifyState {
+            items: vec![old, new],
+            ..NotifyState::default()
+        };
+        let out = filtered(&st, &HashSet::new(), 150);
+        assert_eq!(out.items.len(), 1);
+        assert_eq!(out.items[0].key, "2");
     }
 }

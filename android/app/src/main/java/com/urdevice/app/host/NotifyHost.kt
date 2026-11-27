@@ -18,8 +18,8 @@ import com.urdevice.core.NotifyHostFfi
  * calls [state] from a worker thread and only filters it by the apps the desktop picked; secret and
  * private content is hidden here, on the phone, before anything is handed over (R18.3):
  *  - `VISIBILITY_SECRET`: the notification is left out.
- *  - `VISIBILITY_PRIVATE`: the app's own public version if it made one, otherwise only
- *    "New notification from <app>". The user can allow the full content in [FULL_CONTENT].
+ *  - `VISIBILITY_PRIVATE`: the full content, as on by default. When the user turns [FULL_CONTENT] off,
+ *    the app's own public version if it made one, otherwise only "New notification from <app>".
  * Ongoing notifications (media players, foreground services) and group summaries are left out.
  */
 class NotifyHost(private val context: Context) : NotifyHostFfi {
@@ -35,7 +35,7 @@ class NotifyHost(private val context: Context) : NotifyHostFfi {
             val off = !MediaListenerService.isEnabled(context)
             return FfiNotifState(emptyList(), emptyList(), if (off) "listener_permission" else "")
         }
-        val full = prefs.getBoolean(FULL_CONTENT, false)
+        val full = prefs.getBoolean(FULL_CONTENT, true)
         val items = ArrayList<FfiNotifItem>()
         val apps = LinkedHashMap<String, String>()
         for (sbn in list) {
@@ -100,7 +100,7 @@ class NotifyHost(private val context: Context) : NotifyHostFfi {
     companion object {
         const val PREFS = "urdevice-notify"
 
-        /** The user allows the full content of private notifications (R18.3). Off by default. */
+        /** The user allows the full content of private notifications (R18.3). On by default. */
         const val FULL_CONTENT = "full_content"
 
         /** `Notification.EXTRA_BUILDER_APPLICATION_INFO`, which is hidden from the SDK. */

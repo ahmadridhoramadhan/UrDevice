@@ -11,8 +11,9 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 use urdevice_core::identity::DeviceId;
 use urdevice_core::node::{PeerStatus, Snapshot};
 use urdevice_core::services::notify::{Notify as NotifyService, NotifyEvents};
@@ -22,6 +23,9 @@ use super::{Feature, FeatureCtx};
 use crate::ui::{MainWindow, NotifyFeature, NotifyRow, Page};
 
 pub(crate) struct Notify;
+
+/// How often the panel follows the device page, so it shows as soon as the page opens.
+const TICK: Duration = Duration::from_millis(500);
 
 /// The message kinds `ui/features/notify.slint` knows.
 mod kind {
@@ -45,6 +49,7 @@ struct Ui {
     asked: HashSet<String>,
     /// The host refused the last request, until the next state arrives.
     refused: bool,
+    timer: Timer,
 }
 
 thread_local! {
@@ -91,6 +96,14 @@ impl Feature for Notify {
             let mut u = u.borrow_mut();
             u.node = Some(ctx.node.clone());
             u.svc = Some(svc);
+            let weak = ctx.window.clone();
+            u.timer.start(TimerMode::Repeated, TICK, move || {
+                if let Some(w) = weak.upgrade()
+                    && let Some(node) = UI.with(|u| u.borrow().node.clone())
+                {
+                    follow(&w, &node.snapshot());
+                }
+            });
         });
         wire(&w);
     }
@@ -157,6 +170,18 @@ fn follow(w: &MainWindow, snap: &Snapshot) {
 fn wire(w: &MainWindow) {
     let g = w.global::<NotifyFeature>();
     let weak = w.as_weak();
+
+    g.on_clear({
+        let weak = weak.clone();
+        move || {
+            let Some(w) = weak.upgrade() else { return };
+            let (Some(id), Some(svc)) = (peer_of(&w), service()) else {
+                return;
+            };
+            svc.clear(id);
+            sync(&w);
+        }
+    });
 
     g.on_set_on(move |on| {
         let Some(w) = weak.upgrade() else { return };
