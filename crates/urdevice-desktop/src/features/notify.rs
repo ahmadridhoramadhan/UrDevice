@@ -2,12 +2,13 @@
 //!
 //! The notifications of a phone are a panel at the bottom of the device page
 //! (`NotifyPanel` in `ui/features/notify.slint`, global `NotifyFeature`) with
-//! an Active switch, not a tile. The core service
-//! (`urdevice_core::services::notify`) does the protocol and keeps the
-//! choices (switch and apps) in the device settings; this file draws what a
-//! host sends. See `docs/dev/adding-a-feature.md`.
+//! an Active switch, not a tile. It is on from the start and shows every
+//! notification of the phone (R18.2). The core service
+//! (`urdevice_core::services::notify`) does the protocol and keeps the switch in
+//! the device settings; this file draws what a host sends. See `docs/dev/adding-a-feature.md`.
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -18,7 +19,7 @@ use urdevice_core::services::notify::{Notify as NotifyService, NotifyEvents};
 use urdevice_core::{Capability, Mode, Node};
 
 use super::{Feature, FeatureCtx};
-use crate::ui::{MainWindow, NotifyAppRow, NotifyFeature, NotifyRow, Page};
+use crate::ui::{MainWindow, NotifyFeature, NotifyRow, Page};
 
 pub(crate) struct Notify;
 
@@ -31,9 +32,8 @@ mod kind {
     pub const WAITING: i32 = 4;
     pub const LISTENER: i32 = 5;
     pub const UNSUPPORTED: i32 = 6;
-    pub const NO_APPS: i32 = 7;
-    pub const EMPTY: i32 = 8;
-    pub const REFUSED: i32 = 9;
+    pub const EMPTY: i32 = 7;
+    pub const REFUSED: i32 = 8;
 }
 
 /// Everything the UI thread keeps for this panel.
@@ -41,8 +41,8 @@ mod kind {
 struct Ui {
     node: Option<Arc<Node>>,
     svc: Option<Arc<NotifyService>>,
-    /// The ids of the apps in the list, in the order shown.
-    app_ids: Vec<String>,
+    /// Hosts this computer asked for notifications on the current connection.
+    asked: HashSet<String>,
     /// The host refused the last request, until the next state arrives.
     refused: bool,
 }
@@ -124,6 +124,26 @@ fn follow(w: &MainWindow, snap: &Snapshot) {
                 .any(|r| r.capability == Capability::Notify)
     });
     g.set_available(listed);
+    // Like media: showing a phone that mirrors starts the notifications, with no extra step.
+    if let Some(p) = peer {
+        let id = DeviceId::from_hex(&p.id);
+        let denied = p
+            .remote_permissions
+            .iter()
+            .any(|r| r.capability == Capability::Notify && r.mode == Mode::Deny);
+        let ask = match (listed && !denied, id, service()) {
+            (true, Some(id), Some(svc)) if svc.is_on(id) => UI
+                .with(|u| u.borrow_mut().asked.insert(p.id.clone()))
+                .then_some((svc, id)),
+            _ => {
+                UI.with(|u| u.borrow_mut().asked.remove(&p.id));
+                None
+            }
+        };
+        if let Some((svc, id)) = ask {
+            let _ = svc.subscribe(id, true);
+        }
+    }
     if let Some(p) = peer
         && g.get_peer_id() != p.id.as_str()
     {
@@ -138,36 +158,13 @@ fn wire(w: &MainWindow) {
     let g = w.global::<NotifyFeature>();
     let weak = w.as_weak();
 
-    g.on_set_on({
-        let weak = weak.clone();
-        move |on| {
-            let Some(w) = weak.upgrade() else { return };
-            let (Some(id), Some(svc)) = (peer_of(&w), service()) else {
-                return;
-            };
-            UI.with(|u| u.borrow_mut().refused = false);
-            let _ = svc.subscribe(id, on);
-            sync(&w);
-        }
-    });
-
-    g.on_pick_app(move |i, picked| {
+    g.on_set_on(move |on| {
         let Some(w) = weak.upgrade() else { return };
         let (Some(id), Some(svc)) = (peer_of(&w), service()) else {
             return;
         };
-        let Some(app) = usize::try_from(i)
-            .ok()
-            .and_then(|i| UI.with(|u| u.borrow().app_ids.get(i).cloned()))
-        else {
-            return;
-        };
-        let mut apps = svc.picked_apps(id);
-        apps.retain(|a| *a != app);
-        if picked {
-            apps.push(app);
-        }
-        let _ = svc.set_apps(id, &apps);
+        UI.with(|u| u.borrow_mut().refused = false);
+        let _ = svc.subscribe(id, on);
         sync(&w);
     });
 }
@@ -201,7 +198,6 @@ fn sync(w: &MainWindow) {
     } else {
         None
     };
-    let picked = svc.picked_apps(id);
     let refused = UI.with(|u| u.borrow().refused);
 
     let message = if !connected {
@@ -217,7 +213,6 @@ fn sync(w: &MainWindow) {
             None => kind::WAITING,
             Some(st) if st.unavailable == "listener_permission" => kind::LISTENER,
             Some(st) if !st.unavailable.is_empty() => kind::UNSUPPORTED,
-            _ if picked.is_empty() => kind::NO_APPS,
             Some(st) if st.items.is_empty() => kind::EMPTY,
             Some(_) => kind::NONE,
         }
@@ -235,28 +230,6 @@ fn sync(w: &MainWindow) {
         })
         .collect();
     g.set_items(ModelRc::from(Rc::new(VecModel::from(rows))));
-
-    // The apps to choose from: the ones the host showed, then the picked ones it has not
-    // shown lately (named by their id).
-    let mut apps = svc.known_apps(id);
-    for a in &picked {
-        if !apps.iter().any(|k| k.id == *a) {
-            apps.push(urdevice_core::services::notify::NotifyApp {
-                id: a.clone(),
-                name: a.clone(),
-            });
-        }
-    }
-    apps.sort_by_key(|a| a.name.to_lowercase());
-    let app_rows: Vec<NotifyAppRow> = apps
-        .iter()
-        .map(|a| NotifyAppRow {
-            name: a.name.as_str().into(),
-            picked: picked.contains(&a.id),
-        })
-        .collect();
-    UI.with(|u| u.borrow_mut().app_ids = apps.into_iter().map(|a| a.id).collect());
-    g.set_apps(ModelRc::from(Rc::new(VecModel::from(app_rows))));
 }
 
 /// When a notification was posted, in local time.

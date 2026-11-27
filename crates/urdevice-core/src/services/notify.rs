@@ -7,17 +7,16 @@
 //! **Host side.** A receiver sends `Subscribe { on: true, apps }`. While at
 //! least one receiver is subscribed, the service reads the [`NotifyHost`]
 //! every [`POLL_EVERY`] and pushes a [`NotifyState`] to each subscriber when
-//! it changed. Only the notifications of the apps the receiver picked leave
-//! the host (R18.2). A notification that is dismissed on the host is missing
+//! it changed. A receiver sends no app list, which means every app; a list, if
+//! one is sent, limits what leaves the host (R18.2). A notification that is dismissed on the host is missing
 //! from the next state, so dismissal reaches the receiver (R18.5). `on:
 //! false`, a closed session, a change of the setting to Deny, and the end of
 //! an Always Ask activity all stop the pushes (R5.5). The host adapter hides
 //! secret and private content before it hands a notification over (R18.3).
 //!
-//! **Receiver side.** [`Notify::subscribe`], [`Notify::set_apps`], and the
-//! getters are called by the UI. Whether mirroring is on for a host and which
-//! apps are picked are kept in the device settings, so they survive a restart;
-//! mirroring is off until the user turns it on (R18.2). A pushed state is
+//! **Receiver side.** [`Notify::subscribe`] and the getters are called by the
+//! UI. Whether mirroring is on for a host is kept in the device settings, so it
+//! survives a restart; it is on until the user turns it off (R18.2). A pushed state is
 //! accepted only from a host this device subscribed to, is sanitized, and is
 //! shown, never acted on. Notification content is kept in memory only, and
 //! is dropped when the host dismisses it, when mirroring is turned off, and
@@ -44,12 +43,6 @@ pub(crate) const SHIPPED: &[Capability] = &[Capability::Notify];
 
 /// How often the host reads its notifications while someone is subscribed.
 pub const POLL_EVERY: Duration = Duration::from_secs(2);
-
-/// Settings are at most 256 bytes, so a list of app ids is stored in chunks.
-const CHUNK: usize = 240;
-
-/// Most chunks of picked apps.
-const CHUNKS: usize = 16;
 
 /// What the host OS provides: the notifications that are shown now.
 /// Android: Kotlin through the FFI.
@@ -88,12 +81,8 @@ struct Subscriber {
 struct Receiver {
     /// Hosts whose saved settings were read.
     loaded: HashSet<DeviceId>,
-    /// Hosts the user turned mirroring on for.
+    /// Hosts mirroring is on for: all of them, except the ones the user turned it off for.
     wanted: HashSet<DeviceId>,
-    /// The apps picked for each host.
-    apps: HashMap<DeviceId, Vec<String>>,
-    /// Apps each host has shown a notification for, with their names.
-    catalog: HashMap<DeviceId, Vec<NotifyApp>>,
     /// The newest state from each host.
     latest: HashMap<DeviceId, NotifyState>,
     /// Always Ask activity per host, once approved.
@@ -184,51 +173,6 @@ impl Notify {
         lock(&self.shared.recv).wanted.contains(&host)
     }
 
-    /// Pick the apps to mirror from `host` (R18.2). Ids that are empty, too
-    /// long, or hold a comma are ignored.
-    pub fn set_apps(&self, host: DeviceId, apps: &[String]) -> Result<()> {
-        let ctx = self.ctx()?;
-        self.load(ctx, host);
-        let mut seen = HashSet::new();
-        let apps: Vec<String> = apps
-            .iter()
-            .filter(|a| valid_app_id(a) && seen.insert(a.as_str()))
-            .take(MAX_APPS)
-            .cloned()
-            .collect();
-        let on = {
-            let mut r = lock(&self.shared.recv);
-            r.apps.insert(host, apps.clone());
-            r.wanted.contains(&host)
-        };
-        save_apps(ctx, host, &apps)?;
-        if on {
-            self.send_subscribe(ctx, host, true)?;
-        }
-        Ok(())
-    }
-
-    /// The apps picked for `host`.
-    pub fn picked_apps(&self, host: DeviceId) -> Vec<String> {
-        if let Ok(ctx) = self.ctx() {
-            self.load(ctx, host);
-        }
-        lock(&self.shared.recv)
-            .apps
-            .get(&host)
-            .cloned()
-            .unwrap_or_default()
-    }
-
-    /// The apps `host` has shown a notification for since this app started.
-    pub fn known_apps(&self, host: DeviceId) -> Vec<NotifyApp> {
-        lock(&self.shared.recv)
-            .catalog
-            .get(&host)
-            .cloned()
-            .unwrap_or_default()
-    }
-
     /// The newest state from `host`. `None` while mirroring is off or before
     /// the first state.
     pub fn state_of(&self, host: DeviceId) -> Option<NotifyState> {
@@ -239,12 +183,11 @@ impl Notify {
         if !ctx.peer_offers(host) {
             return Err(CoreError::Refused("unsupported".into()));
         }
-        let apps = lock(&self.shared.recv)
-            .apps
-            .get(&host)
-            .cloned()
-            .unwrap_or_default();
-        let m = WireNotify::from(Msg::Subscribe(wire::Subscribe { on, apps }));
+        // No app list: every app (R18.2).
+        let m = WireNotify::from(Msg::Subscribe(wire::Subscribe {
+            on,
+            apps: Vec::new(),
+        }));
         let activity = {
             let mut r = lock(&self.shared.recv);
             r.pending.insert(host, m.clone());
@@ -259,10 +202,10 @@ impl Notify {
         if !r.loaded.insert(host) {
             return;
         }
-        if ctx.setting(&on_key(host)).as_deref() == Some("1") {
+        // On until the user turns it off for this host (R18.2).
+        if ctx.setting(&on_key(host)).as_deref() != Some("0") {
             r.wanted.insert(host);
         }
-        r.apps.insert(host, load_apps(ctx, host));
     }
 }
 
@@ -270,55 +213,12 @@ fn on_key(host: DeviceId) -> String {
     format!("on.{}", host.hex())
 }
 
-fn apps_key(host: DeviceId, i: usize) -> String {
-    format!("apps.{}.{i}", host.hex())
-}
-
-/// An app id this device accepts: not empty, not too long, and without
-/// anything that would break the saved list.
-fn valid_app_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= MAX_ID && !id.contains(',') && !id.chars().any(char::is_control)
-}
-
-/// Save the picked apps in chunks of at most [`CHUNK`] bytes.
-fn save_apps(ctx: &ServiceCtx, host: DeviceId, apps: &[String]) -> Result<()> {
-    let mut chunks: Vec<String> = Vec::new();
-    let mut cur = String::new();
-    for a in apps.iter().filter(|a| a.len() <= CHUNK) {
-        if !cur.is_empty() && cur.len() + 1 + a.len() > CHUNK {
-            chunks.push(std::mem::take(&mut cur));
-        }
-        if !cur.is_empty() {
-            cur.push(',');
-        }
-        cur.push_str(a);
-    }
-    if !cur.is_empty() {
-        chunks.push(cur);
-    }
-    for i in 0..CHUNKS {
-        let v = chunks.get(i).map_or("", String::as_str);
-        ctx.set_setting(&apps_key(host, i), v)?;
-    }
-    Ok(())
-}
-
-fn load_apps(ctx: &ServiceCtx, host: DeviceId) -> Vec<String> {
-    let mut out = Vec::new();
-    for i in 0..CHUNKS {
-        let Some(v) = ctx.setting(&apps_key(host, i)).filter(|v| !v.is_empty()) else {
-            break;
-        };
-        out.extend(v.split(',').filter(|a| valid_app_id(a)).map(str::to_owned));
-    }
-    out.truncate(MAX_APPS);
-    out
-}
-
-/// `st` with only the notifications of `apps`.
+/// `st` with only the notifications of `apps`; an empty set means every app.
 fn filtered(st: &NotifyState, apps: &HashSet<String>) -> NotifyState {
     let mut out = st.clone();
-    out.items.retain(|i| apps.contains(&i.app_id));
+    if !apps.is_empty() {
+        out.items.retain(|i| apps.contains(&i.app_id));
+    }
     out
 }
 
@@ -547,14 +447,6 @@ impl Notify {
                 return;
             }
             st.sanitize();
-            let catalog = r.catalog.entry(peer).or_default();
-            for a in &st.apps {
-                if let Some(c) = catalog.iter_mut().find(|c| c.id == a.id) {
-                    c.name.clone_from(&a.name);
-                } else if catalog.len() < MAX_APPS {
-                    catalog.push(a.clone());
-                }
-            }
             r.latest.insert(peer, st);
         }
         if let Some(e) = self.shared.events.get() {
@@ -584,37 +476,15 @@ mod tests {
     }
 
     #[test]
-    fn only_picked_apps_leave_the_host() {
+    fn no_app_list_means_every_app_and_a_list_limits_it() {
         let st = NotifyState {
             items: vec![item("1", "chat"), item("2", "mail"), item("3", "chat")],
-            apps: vec![
-                NotifyApp {
-                    id: "chat".into(),
-                    name: "Chat".into(),
-                },
-                NotifyApp {
-                    id: "mail".into(),
-                    name: "Mail".into(),
-                },
-            ],
-            unavailable: String::new(),
+            ..NotifyState::default()
         };
+        assert_eq!(filtered(&st, &HashSet::new()).items.len(), 3);
         let picked: HashSet<String> = ["chat".to_owned()].into();
         let out = filtered(&st, &picked);
         assert_eq!(out.items.len(), 2);
         assert!(out.items.iter().all(|i| i.app_id == "chat"));
-        // The picker still lists every app.
-        assert_eq!(out.apps.len(), 2);
-        // Nothing is picked: nothing leaves.
-        assert!(filtered(&st, &HashSet::new()).items.is_empty());
-    }
-
-    #[test]
-    fn app_ids_for_the_saved_list_are_checked() {
-        assert!(valid_app_id("com.chat"));
-        assert!(!valid_app_id(""));
-        assert!(!valid_app_id("a,b"));
-        assert!(!valid_app_id("a\nb"));
-        assert!(!valid_app_id(&"x".repeat(MAX_ID + 1)));
     }
 }

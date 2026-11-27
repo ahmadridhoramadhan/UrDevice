@@ -39,7 +39,7 @@
     <string name="cap_fswrite">File changes</string>
     <string name="cap_fswrite_desc">Upload, rename, and delete. Only this device can change it.</string>
     <string name="cap_notify">Notifications</string>
-    <string name="cap_notify_desc">Other devices show the notifications you pick</string>
+    <string name="cap_notify_desc">Other devices show your notifications</string>
     <string name="cap_ring">Find my device</string>
     <string name="cap_ring_desc">Other devices make this device ring</string>
     <string name="cap_camera">Webcam</string>

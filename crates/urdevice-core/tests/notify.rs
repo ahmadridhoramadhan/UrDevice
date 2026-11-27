@@ -128,61 +128,33 @@ impl Rig {
 }
 
 #[test]
-fn nothing_is_sent_until_mirroring_is_on_and_apps_are_picked() {
+fn every_app_arrives_newest_first() {
     let r = Rig::new();
-    assert!(!r.desk.is_on(r.phone_id()), "off by default (R18.2)");
-    assert!(r.state().is_none());
-    // On, but no app picked: the list of apps arrives, no notification does.
+    // On by default (R18.2), and no app has to be chosen.
+    assert!(r.desk.is_on(r.phone_id()));
     r.desk.subscribe(r.phone_id(), true).unwrap();
-    wait_until("first state", WAIT, || r.state().is_some());
+    wait_until("all apps", WAIT, || r.keys() == ["1", "2", "3"]);
     let st = r.state().unwrap();
-    assert!(st.items.is_empty(), "newly seen apps are not mirrored");
     assert_eq!(st.apps.len(), 2);
-    assert_eq!(r.desk.known_apps(r.phone_id()).len(), 2);
-}
-
-#[test]
-fn only_the_picked_apps_arrive_newest_first() {
-    let r = Rig::new();
-    r.desk
-        .set_apps(r.phone_id(), &["com.chat".to_owned()])
-        .unwrap();
-    r.desk.subscribe(r.phone_id(), true).unwrap();
-    wait_until("chat only", WAIT, || r.keys() == ["1", "3"]);
-    // Picking the other app too sends its notifications.
-    r.desk
-        .set_apps(
-            r.phone_id(),
-            &["com.chat".to_owned(), "com.mail".to_owned()],
-        )
-        .unwrap();
-    wait_until("both apps", WAIT, || r.keys() == ["1", "2", "3"]);
-    assert_eq!(r.desk.picked_apps(r.phone_id()).len(), 2);
 }
 
 #[test]
 fn a_notification_dismissed_on_the_phone_leaves_the_desktop() {
     let r = Rig::new();
-    r.desk
-        .set_apps(r.phone_id(), &["com.chat".to_owned()])
-        .unwrap();
     r.desk.subscribe(r.phone_id(), true).unwrap();
-    wait_until("first state", WAIT, || r.keys() == ["1", "3"]);
+    wait_until("first state", WAIT, || r.keys() == ["1", "2", "3"]);
     r.phone.edit(|s| s.items.retain(|i| i.key != "1"));
-    wait_until("dismissed", WAIT, || r.keys() == ["3"]);
+    wait_until("dismissed", WAIT, || r.keys() == ["2", "3"]);
     r.phone.edit(|s| {
         s.items
             .insert(0, item("4", "com.chat", "Chat", "Cy", "new", 4000));
     });
-    wait_until("new one", WAIT, || r.keys() == ["4", "3"]);
+    wait_until("new one", WAIT, || r.keys() == ["4", "2", "3"]);
 }
 
 #[test]
 fn turning_mirroring_off_stops_and_drops_everything() {
     let r = Rig::new();
-    r.desk
-        .set_apps(r.phone_id(), &["com.chat".to_owned()])
-        .unwrap();
     r.desk.subscribe(r.phone_id(), true).unwrap();
     wait_until("first state", WAIT, || !r.keys().is_empty());
     r.desk.subscribe(r.phone_id(), false).unwrap();
@@ -197,9 +169,6 @@ fn turning_mirroring_off_stops_and_drops_everything() {
 #[test]
 fn deny_on_the_phone_stops_pushes() {
     let r = Rig::new();
-    r.desk
-        .set_apps(r.phone_id(), &["com.chat".to_owned()])
-        .unwrap();
     r.desk.subscribe(r.phone_id(), true).unwrap();
     wait_until("first state", WAIT, || !r.keys().is_empty());
     r.p.b.set(Capability::Notify, Mode::Deny);
@@ -221,9 +190,6 @@ fn always_ask_needs_one_approval_on_the_phone() {
     wait_until("desktop sees ask", WAIT, || {
         r.p.a.remote_mode(&r.p.b, Capability::Notify) == Some(Mode::Ask)
     });
-    r.desk
-        .set_apps(r.phone_id(), &["com.chat".to_owned()])
-        .unwrap();
     r.desk.subscribe(r.phone_id(), true).unwrap();
     r.p.b.answer_prompt(true);
     wait_until("state after approval", WAIT, || !r.keys().is_empty());
@@ -260,7 +226,6 @@ fn a_phone_without_an_adapter_answers_with_an_empty_state() {
         p.a.remote_mode(&p.b, Capability::Notify) == Some(Mode::Allow)
     });
     let desk = p.a.node.service::<Notify>().unwrap();
-    desk.set_apps(p.b.id(), &["com.chat".to_owned()]).unwrap();
     desk.subscribe(p.b.id(), true).unwrap();
     wait_until("state", WAIT, || desk.state_of(p.b.id()).is_some());
     let st = desk.state_of(p.b.id()).unwrap();
