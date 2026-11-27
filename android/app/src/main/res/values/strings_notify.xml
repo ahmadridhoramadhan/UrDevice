@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification mirroring (#26, R18). -->
+    <string name="notify_private_title">New notification from %1$s</string>
+    <string name="notify_full_title">Show private notifications in full</string>
+    <string name="notify_full_body">A computer you allowed can read private notifications, like message text, instead of only the app name.</string>
+</resources>

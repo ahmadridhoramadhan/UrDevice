@@ -288,14 +288,14 @@ fn unknown_service_and_unshipped_capability_are_unsupported() {
 
     // A Release 2 capability that has not shipped is never offered.
     let (ea, eb) = (
-        Echo::new(0xff04, Capability::Notify),
-        Echo::new(0xff04, Capability::Notify),
+        Echo::new(0xff04, Capability::Ring),
+        Echo::new(0xff04, Capability::Ring),
     );
     let p = Pair::with(
         Dev::with("Laptop", "linux", vec![service(ea.clone())]),
         Dev::with("Phone", "android", vec![service(eb.clone())]),
     );
-    if !Capability::Notify.shipped() {
+    if !Capability::Ring.shipped() {
         eb.send(p.a.id(), 0, b"x");
         wait_until("unsupported", WAIT, || {
             eb.saw(|s| matches!(s, Seen::Refused(0, r) if r == "unsupported"))

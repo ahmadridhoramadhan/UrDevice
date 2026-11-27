@@ -1,17 +1,199 @@
-// Notification mirroring (#26): the desktop feature view.
+// Notification mirroring (#26, R18): the desktop view.
 // Rust side: src/features/notify.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Card, Toggle, Muted, SectionTitle } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+
+// One notification of the host.
+export struct NotifyRow {
+    app: string,
+    title: string,
+    text: string,
+    // The time it was posted, for example "14:05".
+    when: string,
+}
+
+// One app of the host, and whether its notifications are shown here.
+export struct NotifyAppRow {
+    name: string,
+    picked: bool,
+}
 
 // State and callbacks shared with src/features/notify.rs.
 export global NotifyFeature {
-    // The paired device the view is open for (Device ID, hex).
+    // The paired device the panel is open for (Device ID, hex).
     in-out property <string> peer-id;
+    // The device page shows the panel: the device is connected and lists notifications.
+    in property <bool> available;
+    // Mirroring from this host is on (R18.2). Off until the user turns it on.
+    in-out property <bool> on;
+    // Why there is nothing to show (0 none, 1 offline, 2 turned off by the host,
+    // 3 mirroring off, 4 waiting, 5 Android notification access off, 6 host cannot read
+    // notifications, 7 no app picked, 8 no notifications, 9 request refused).
+    in property <int> message-kind;
+    in property <[NotifyRow]> items;
+    in property <[NotifyAppRow]> apps;
+
+    callback set-on(bool);
+    // Show or hide the notifications of the app at this index.
+    callback pick-app(int, bool);
 }
 
-export component NotifyView inherits VerticalLayout {
-    // The tile that opened the view, for features with more than one tile.
-    in property <string> tile;
+// The notifications of the host on the device page: a title with the Active switch, the apps to
+// choose from, and the list. The page shows it only while `NotifyFeature.available`.
+export component NotifyPanel inherits VerticalLayout {
     in property <string> peer-name;
     spacing: 10px;
-    Muted { text: @tr("This feature is not available yet."); }
+    // The app list is open.
+    property <bool> choosing: false;
+
+    HorizontalLayout {
+        spacing: 10px;
+        SectionTitle {
+            text: @tr("Notification");
+            vertical-alignment: center;
+        }
+        Rectangle { }
+        Text {
+            text: @tr("Active");
+            color: Theme.muted;
+            font-size: Theme.font-body;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+        VerticalLayout {
+            alignment: center;
+            Toggle {
+                checked: NotifyFeature.on;
+                enabled: NotifyFeature.message-kind != 2;
+                toggled(on) => { NotifyFeature.set-on(on); }
+            }
+        }
+    }
+
+    // Why there is nothing to show. "Mirroring off" needs no line: the switch says it.
+    if NotifyFeature.message-kind != 0 && NotifyFeature.message-kind != 3: Muted {
+        text: [
+            "",
+            @tr("{} is offline.", root.peer-name),
+            @tr("Notifications are turned off by {}.", root.peer-name),
+            "",
+            @tr("Waiting for {}…", root.peer-name),
+            @tr("Notification access is off on {}. Turn it on in the Android settings so other devices can see its notifications.", root.peer-name),
+            @tr("{} cannot read its notifications.", root.peer-name),
+            @tr("Choose which apps of {} to show.", root.peer-name),
+            @tr("No notifications on {}.", root.peer-name),
+            @tr("{} did not allow that.", root.peer-name),
+        ][NotifyFeature.message-kind];
+    }
+
+    if NotifyFeature.on && NotifyFeature.message-kind != 1 && NotifyFeature.message-kind != 2: Card {
+        VerticalLayout {
+            // The apps: closed, one line; open, one switch per app.
+            Rectangle {
+                height: 44px;
+                background: apps-ta.has-hover ? Theme.surface-2 : transparent;
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    Text {
+                        text: @tr("Apps");
+                        font-weight: 600;
+                        color: Theme.text;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { }
+                    Text {
+                        text: root.choosing ? @tr("Done") : @tr("Choose");
+                        color: Theme.accent;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+                }
+                apps-ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.choosing = !root.choosing; }
+                }
+            }
+            if root.choosing: VerticalLayout {
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
+                }
+                if NotifyFeature.apps.length == 0: Text {
+                    text: @tr("Apps show up here when they have a notification on {}.", root.peer-name);
+                    color: Theme.muted;
+                    font-size: Theme.font-body;
+                    wrap: word-wrap;
+                    horizontal-alignment: left;
+                }
+                for a[i] in NotifyFeature.apps: HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-top: 6px;
+                    padding-bottom: 6px;
+                    spacing: 10px;
+                    Text {
+                        text: a.name;
+                        color: Theme.text;
+                        overflow: elide;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Toggle {
+                            checked: a.picked;
+                            toggled(on) => { NotifyFeature.pick-app(i, on); }
+                        }
+                    }
+                }
+            }
+            for n in NotifyFeature.items: VerticalLayout {
+                Rectangle {
+                    height: 1px;
+                    background: Theme.border;
+                }
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 2px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: n.app;
+                            font-size: Theme.font-small;
+                            font-weight: 700;
+                            color: Theme.accent;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                        Text {
+                            text: n.when;
+                            font-size: Theme.font-small;
+                            color: Theme.muted;
+                        }
+                    }
+                    if n.title != "": Text {
+                        text: n.title;
+                        font-weight: 600;
+                        color: Theme.text;
+                        wrap: word-wrap;
+                    }
+                    if n.text != "": Text {
+                        text: n.text;
+                        font-size: Theme.font-body;
+                        color: Theme.muted;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Kept so `features.slint` lists every feature. Notifications have no page of their own: they
+// are the `NotifyPanel` on the device page.
+export component NotifyView inherits VerticalLayout {
+    in property <string> tile;
+    in property <string> peer-name;
+    NotifyPanel { peer-name: root.peer-name; }
 }
