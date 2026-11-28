@@ -38,7 +38,7 @@ Service ids are the only numbers features share. Message field numbers and strea
 | 16 | `notify` | #26 | `NOTIFY` | `notify.v1` |
 | 17 | `ring` | #27 | `RING` | `ring.v1` |
 | 18 | `webcam` | #28 | `CAMERA` | `camera.v1` (Android hosts) |
-| 19 | `webcam` | #28 | `MIC` | `mic.v1` (Android hosts) |
+| 19 | `mic` | #28 | `MIC` | `mic.v1` (Android hosts) |
 | 20 | `telephony` | #29 | `TELEPHONY` | `telephony.v1` (Android hosts) |
 | 21 | `kvm` | #30 | `KVM` | `kvm.v1` |
 | 22 | `display` | #31 | `DISPLAY` | `display.v1` |
