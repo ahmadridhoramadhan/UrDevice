@@ -444,6 +444,11 @@ class CameraStream internal constructor(
     }
 
     private var pushed = 0L
+    private var lastPushAt = 0L
+    private var maxGapMs = 0L
+    private var windowStart = 0L
+    private var windowFrames = 0
+    private var windowBytes = 0L
 
     private fun drain() {
         val info = MediaCodec.BufferInfo()
@@ -473,6 +478,19 @@ class CameraStream internal constructor(
                         val (w, h) = if (key) sz.width to sz.height else 0 to 0
                         pushed++
                         if (pushed == 1L) CameraStreams.log("first frame ${sz.width} x ${sz.height} key=$key")
+                        // Timing for the log: frames and bytes in two seconds, and the longest wait.
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (lastPushAt != 0L) maxGapMs = maxOf(maxGapMs, now - lastPushAt)
+                        lastPushAt = now
+                        windowFrames++
+                        windowBytes += bytes.size
+                        if (now - windowStart >= 2_000) {
+                            CameraStreams.log("encoded frames=$windowFrames bytes=$windowBytes longest_gap_ms=$maxGapMs")
+                            windowStart = now
+                            windowFrames = 0
+                            windowBytes = 0
+                            maxGapMs = 0
+                        }
                         node?.screenPushFrame(
                             session,
                             FfiVideoFrame(info.presentationTimeUs.toULong(), key, data, w.toUInt(), h.toUInt()),
@@ -491,27 +509,16 @@ class CameraStream internal constructor(
         synchronized(lock) { runCatching { codec?.setParameters(b) } }
     }
 
-    /** The ladder moved: a new bitrate, or a new size (a new encoder and a new camera session). */
+    /**
+     * The ladder moved. Only the bit rate follows: the picture keeps its size, because a new size
+     * means a new encoder and a new camera session, and the picture freezes while they open. A
+     * webcam looks better a little blurry than frozen.
+     */
     fun setTarget(t: FfiVideoTarget) {
         if (!running) return
         target = t
-        val next = pickSize(t)
-        if (next == synchronized(lock) { size }) {
-            val b = Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, t.bitrateBps.toInt()) }
-            synchronized(lock) { runCatching { codec?.setParameters(b) } }
-            return
-        }
-        CameraStreams.log("size ${size.width} x ${size.height} -> ${next.width} x ${next.height}")
-        runCatching {
-            val old = synchronized(lock) { codec to surface }
-            runCatching { captureSession?.stopRepeating() }
-            runCatching { captureSession?.close() }
-            captureSession = null
-            buildEncoder(next, t)
-            createSession()
-            old.first?.let { runCatching { it.stop() }; runCatching { it.release() } }
-            old.second?.release()
-        }.onFailure { CameraStreams.log("encoder resize failed", it) }
+        val b = Bundle().apply { putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, t.bitrateBps.toInt()) }
+        synchronized(lock) { runCatching { codec?.setParameters(b) } }
     }
 
     /** Flash and zoom (ratio times 100) from the viewer. */

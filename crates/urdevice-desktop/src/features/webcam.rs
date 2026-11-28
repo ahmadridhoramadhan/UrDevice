@@ -10,10 +10,10 @@
 //! Frames are never stored or logged.
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, TrySendError, sync_channel};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use slint::{
     ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel,
@@ -33,10 +33,12 @@ pub(crate) struct Webcam;
 /// Frames waiting for the decoder. When it is behind, frames are dropped until the next keyframe.
 const DECODE_QUEUE: usize = 16;
 
-/// What the window asks the phone for: up to 1080p at 30 frames a second (R17.5). The phone's
-/// ladder lowers it when the link is slow.
-const MAX_WIDTH: u32 = 1920;
-const MAX_HEIGHT: u32 = 1080;
+/// What the window asks the phone for: 720p at 30 frames a second, the least R17.5 asks for. A
+/// camera sends full motion all the time (a screen is mostly still), so 1080p at 8 Mbps was more
+/// than a Wi-Fi link carried smoothly; this keeps the picture even. The phone lowers the bit rate
+/// when the link is slow.
+const MAX_WIDTH: u32 = 1280;
+const MAX_HEIGHT: u32 = 720;
 const FPS: u32 = 30;
 
 /// The states `CameraWindow.state` knows.
@@ -162,7 +164,78 @@ struct Dec {
     /// A picture is waiting for the UI thread.
     pending: Mutex<Option<SharedPixelBuffer<Rgba8Pixel>>>,
     posted: AtomicBool,
+    /// Frames that arrived, were dropped because the decoder was behind, and are queued now
+    /// (for the log and for skipping work on a frame a newer one replaces).
+    rx_frames: AtomicU64,
+    dropped_frames: AtomicU64,
+    queued: AtomicI64,
     svc: Weak<Screen>,
+}
+
+/// Timing of the viewer, written to the log every two seconds: how many pictures arrive, are
+/// dropped and are shown, how long a decode takes, and the longest wait between two pictures.
+struct Stats {
+    since: Instant,
+    last_shown: Option<Instant>,
+    decoded: u32,
+    decode_total: Duration,
+    decode_max: Duration,
+    gap_max: Duration,
+    last_rx: u64,
+    last_dropped: u64,
+}
+
+impl Stats {
+    fn new() -> Self {
+        Self {
+            since: Instant::now(),
+            last_shown: None,
+            decoded: 0,
+            decode_total: Duration::ZERO,
+            decode_max: Duration::ZERO,
+            gap_max: Duration::ZERO,
+            last_rx: 0,
+            last_dropped: 0,
+        }
+    }
+
+    fn decoded(&mut self, took: Duration) {
+        self.decoded += 1;
+        self.decode_total += took;
+        self.decode_max = self.decode_max.max(took);
+        let now = Instant::now();
+        if let Some(prev) = self.last_shown.replace(now) {
+            self.gap_max = self.gap_max.max(now - prev);
+        }
+    }
+
+    fn report(&mut self, d: &Dec) {
+        let spent = self.since.elapsed();
+        if spent < Duration::from_secs(2) {
+            return;
+        }
+        let (rx, dropped) = (
+            d.rx_frames.load(Ordering::Relaxed),
+            d.dropped_frames.load(Ordering::Relaxed),
+        );
+        if self.decoded > 0 || rx > self.last_rx {
+            tracing::info!(
+                received = rx - self.last_rx,
+                dropped = dropped - self.last_dropped,
+                decoded = self.decoded,
+                decode_avg_ms = self.decode_total.as_millis() as u32 / self.decoded.max(1),
+                decode_max_ms = self.decode_max.as_millis() as u32,
+                longest_gap_ms = self.gap_max.as_millis() as u32,
+                secs = spent.as_secs_f32(),
+                "camera viewer"
+            );
+        }
+        *self = Self {
+            last_rx: rx,
+            last_dropped: dropped,
+            ..Self::new()
+        };
+    }
 }
 
 impl Dec {
@@ -206,7 +279,9 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
     let mut pic = RgbaFrame::default();
     let mut waiting_key = true;
     let mut retries = 0u32;
+    let mut stats = Stats::new();
     loop {
+        stats.report(d);
         let item = match rx.recv_timeout(Duration::from_millis(700)) {
             Ok(item) => item,
             Err(RecvTimeoutError::Timeout) => {
@@ -228,6 +303,8 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
                 retries = 0;
             }
             Item::Frame(peer, activity, f) => {
+                // Newer frames wait behind this one: it is decoded, but not converted or shown.
+                let behind = d.queued.fetch_sub(1, Ordering::Relaxed) > 1;
                 if activity != d.current.load(Ordering::Relaxed) {
                     continue;
                 }
@@ -238,7 +315,10 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
                 let Some(decoder) = dec.as_mut() else {
                     continue;
                 };
-                match decoder.decode_with(&f.data, &mut pic, true) {
+                let began = Instant::now();
+                let decoded = decoder.decode_with(&f.data, &mut pic, !behind);
+                stats.decoded(began.elapsed());
+                match decoded {
                     Ok(true) => d.publish(&pic),
                     Ok(false) => {}
                     Err(_) => {
@@ -309,16 +389,21 @@ impl ScreenEvents for Events {
     }
 
     fn frame(&self, peer: DeviceId, activity: u64, frame: VideoFrame) {
+        self.dec.rx_frames.fetch_add(1, Ordering::Relaxed);
         if self.dec.drop_until_key.load(Ordering::Relaxed) {
             if !frame.keyframe {
+                self.dec.dropped_frames.fetch_add(1, Ordering::Relaxed);
                 return;
             }
             self.dec.drop_until_key.store(false, Ordering::Relaxed);
         }
         match self.dec.tx.try_send(Item::Frame(peer, activity, frame)) {
-            Ok(()) => {}
+            Ok(()) => {
+                self.dec.queued.fetch_add(1, Ordering::Relaxed);
+            }
             Err(TrySendError::Full(_)) => {
                 // The decoder is behind: drop until a keyframe, and ask for one.
+                self.dec.dropped_frames.fetch_add(1, Ordering::Relaxed);
                 self.dec.drop_until_key.store(true, Ordering::Relaxed);
                 self.dec.want_keyframe(peer, activity);
             }
@@ -479,6 +564,9 @@ impl Feature for Webcam {
             asking: Mutex::new(None),
             pending: Mutex::new(None),
             posted: AtomicBool::new(false),
+            rx_frames: AtomicU64::new(0),
+            dropped_frames: AtomicU64::new(0),
+            queued: AtomicI64::new(0),
             svc: Arc::downgrade(&svc),
         });
         let worker = dec.clone();
