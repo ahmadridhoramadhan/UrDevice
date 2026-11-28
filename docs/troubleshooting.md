@@ -53,7 +53,7 @@ The phone camera always shows in its UrDevice window. To use it in a call app, t
 
 ## Webcam: the microphone
 
-Linux only. The phone microphone appears as "UrDevice Microphone" (PipeWire) while the microphone is on. It needs `pw-cat` (package `pipewire-utils`). On Windows and macOS the microphone is not available yet, because a virtual audio driver is needed.
+Linux only. The phone microphone appears as "UrDevice Microphone" (PipeWire) while the microphone switch is on, and goes away when it is off. It needs `pw-cat` (package `pipewire-utils`) and `pactl` (package `pulseaudio-utils`). If you hear nothing, check that the phone allowed the microphone and that the microphone is not muted in the app. On Windows and macOS the microphone is not available yet, because a virtual audio driver is needed.
 
 ## Still stuck
 

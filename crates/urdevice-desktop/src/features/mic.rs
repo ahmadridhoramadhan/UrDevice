@@ -90,6 +90,8 @@ type Out = Arc<Mutex<Option<Box<dyn VirtualMic>>>>;
 
 struct Events {
     out: Out,
+    /// When the numbers were last written to the log, and the chunks that came since.
+    stats: Mutex<(std::time::Instant, u64)>,
 }
 
 fn on_ui(f: impl FnOnce() + Send + 'static) {
@@ -140,6 +142,19 @@ impl MicEvents for Events {
     }
 
     fn chunk(&self, _peer: DeviceId, _activity: u64, pcm: Vec<u8>) {
+        // Numbers for the log, every few seconds: how many chunks came, never what they hold.
+        {
+            let mut s = lock(&self.stats);
+            s.1 += 1;
+            if s.0.elapsed() >= Duration::from_secs(3) {
+                tracing::info!(
+                    received = s.1,
+                    secs = s.0.elapsed().as_secs_f32(),
+                    "microphone"
+                );
+                *s = (std::time::Instant::now(), 0);
+            }
+        }
         let mut out = lock(&self.out);
         if out.as_mut().is_some_and(|m| m.write(&pcm).is_err()) {
             // The player died: drop it; the next stream opens a new one.
@@ -188,7 +203,10 @@ impl Feature for Mic {
             return;
         };
         let out: Out = Arc::default();
-        svc.events.set(Arc::new(Events { out: out.clone() }));
+        svc.events.set(Arc::new(Events {
+            out: out.clone(),
+            stats: Mutex::new((std::time::Instant::now(), 0)),
+        }));
         SVC.with(|s| *s.borrow_mut() = Some(svc));
         OUT.with(|o| *o.borrow_mut() = Some(out));
         WINDOW.with(|w| *w.borrow_mut() = Some(ctx.window.clone()));
