@@ -10,7 +10,8 @@
 //! activity with the indicator and Stop on the phone (R5.4, R17.6), and it defaults to
 //! Always Ask. Only Android hosts offer it (`Capability::android_only`).
 //!
-//! The microphone (`mic.v1`, T11.5) is not built yet.
+//! **Microphone (`mic.v1`, T11.5).** A service of its own, [`super::mic::Mic`]: the phone's
+//! microphone is a stream of PCM chunks to the desktop, which plays it into a virtual source.
 
 use std::sync::Arc;
 
@@ -22,7 +23,7 @@ use crate::permission::Capability;
 
 /// Release 2 capabilities this module ships. Add each one when the feature
 /// is done: the capability then shows in the settings and the handshake.
-pub(crate) const SHIPPED: &[Capability] = &[Capability::Camera];
+pub(crate) const SHIPPED: &[Capability] = &[Capability::Camera, Capability::Mic];
 
 /// The phone-as-webcam service. UI code reaches it with `node.service::<Camera>()` and then
 /// uses [`Camera::screen`] for the calls.
@@ -83,4 +84,5 @@ impl Service for Camera {
 /// `windows`, `macos`, or `android`.
 pub(crate) fn register(r: &mut Registry, _platform: &str) {
     r.add(Arc::new(Camera::new()));
+    super::mic::register(r, _platform);
 }
