@@ -35,6 +35,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <!-- webcam (#28, R17): the camera foreground service while a desktop uses the camera. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- webcam (#28, R17.4): the microphone foreground service while a desktop listens. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <!-- input (#18): the presenter's timer vibrates at its alerts (R9b.4). -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
@@ -186,6 +189,18 @@
             android:name=".host.CameraStreamService"
             android:exported="false"
             android:foregroundServiceType="camera" />
+        <!-- microphone (#28, R17.4): asks for the microphone permission when needed, from a visible
+             screen, and starts the microphone service. -->
+        <activity
+            android:name=".host.MicConsentActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <service
+            android:name=".host.MicStreamService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
         <!-- input (#19, R9.3): taps, swipes, Back, Home and Recents for a paired device the user
              approved. Gestures only; it does not read the screen and is not declared an
              accessibility tool (docs/spikes/t0.4-accessibility-play.md). -->
