@@ -1,17 +1,148 @@
-// Phone as webcam and microphone (#28): the desktop feature view.
+// Phone as webcam and microphone (#28): the desktop view.
 // Rust side: src/features/webcam.rs. See docs/dev/adding-a-feature.md.
-import { Muted } from "../widgets.slint";
+import { Theme } from "../theme.slint";
+import { Btn, IconBtn, Muted } from "../widgets.slint";
 
-// State and callbacks shared with src/features/webcam.rs.
+// State shared with src/features/webcam.rs.
 export global WebcamFeature {
     // The paired device the view is open for (Device ID, hex).
     in-out property <string> peer-id;
 }
 
+// The camera tile opens the window of `CameraWindow` below, not a page. This stays so
+// `features.slint` lists every feature.
 export component WebcamView inherits VerticalLayout {
     // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
     in property <string> peer-name;
     spacing: 10px;
     Muted { text: @tr("This feature is not available yet."); }
+}
+
+// The window that shows the phone's camera (#28, R17.1, R17.3): the picture, the camera to use, the
+// flash, the zoom, and Stop. src/features/webcam.rs feeds it.
+export component CameraWindow inherits Window {
+    icon: @image-url("../../../../assets/urdevice-icon-512.png");
+    // Name of the phone.
+    in property <string> device-name;
+    // 0 idle, 1 asking the phone, 2 starting, 3 showing the camera, 4 stopped.
+    in property <int> state;
+    // Why it stopped (0 none, 1 declined, 2 denied, 3 offline, 4 no camera, 5 camera permission
+    // refused on the phone, 6 failed, 7 ended, 8 timed out).
+    in property <int> message-kind;
+    in property <bool> has-frame;
+    in property <image> frame;
+    // Width over height of the picture.
+    in property <float> aspect: 1.7778;
+    // The phone's cameras by name, and the one shown.
+    in property <[string]> cameras;
+    in property <int> camera-index;
+    // The flash exists on the back camera only.
+    in property <bool> flash-available;
+    in property <bool> flash;
+    // Zoom ratio times 100.
+    in property <int> zoom: 100;
+
+    // The line for a stopped camera.
+    property <string> stopped-text: [
+        "",
+        @tr("{} did not allow the camera.", root.device-name),
+        @tr("{} turned the camera off.", root.device-name),
+        @tr("{} is offline.", root.device-name),
+        @tr("{} has no camera to share.", root.device-name),
+        @tr("The camera permission was refused on {}.", root.device-name),
+        @tr("The camera of {} could not start.", root.device-name),
+        @tr("The camera stream ended."),
+        @tr("{} did not answer.", root.device-name),
+    ][root.message-kind];
+
+    callback pick-camera(int);
+    callback set-flash(bool);
+    callback set-zoom(int);
+    callback stop();
+
+    title: @tr("UrDevice camera: {}", root.device-name);
+    preferred-width: 900px;
+    preferred-height: 560px;
+    min-width: 420px;
+    min-height: 260px;
+    background: Theme.surface;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            if root.cameras.length > 1: HorizontalLayout {
+                spacing: 6px;
+                for name[i] in root.cameras: Btn {
+                    text: name;
+                    kind: root.camera-index == i ? 0 : 1;
+                    clicked => { root.pick-camera(i); }
+                }
+            }
+            if root.state == 3 && root.flash-available: Btn {
+                text: @tr("Flash");
+                kind: root.flash ? 0 : 1;
+                clicked => { root.set-flash(!root.flash); }
+            }
+            if root.state == 3: HorizontalLayout {
+                spacing: 6px;
+                for z in [100, 200, 300, 500]: Btn {
+                    text: (z / 100) + "×";
+                    min-width: 48px;
+                    kind: root.zoom == z ? 0 : 1;
+                    clicked => { root.set-zoom(z); }
+                }
+            }
+            Rectangle { horizontal-stretch: 1; }
+            IconBtn {
+                icon: @image-url("../icons/close.svg");
+                label: @tr("Stop");
+                kind: 2;
+                clicked => { root.stop(); }
+            }
+        }
+
+        area := Rectangle {
+            vertical-stretch: 1;
+            property <length> pic-w: min(self.width, self.height * root.aspect);
+            property <length> pic-h: self.pic-w / root.aspect;
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                width: parent.pic-w;
+                height: parent.pic-h;
+                background: root.has-frame ? #000000 : Theme.surface-2;
+                border-radius: Theme.radius;
+                border-width: 1px;
+                border-color: Theme.border;
+                clip: true;
+                if root.has-frame: Image {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    source: root.frame;
+                    image-fit: fill;
+                }
+                Text {
+                    visible: !root.has-frame;
+                    text: root.state == 1 ? @tr("Waiting for {} to allow the camera…", root.device-name)
+                        : root.state == 2 ? @tr("Starting the camera of {}…", root.device-name)
+                        : root.state == 4 ? root.stopped-text
+                        : "";
+                    color: Theme.text;
+                    opacity: 0.6;
+                    font-size: Theme.font-body;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                    width: parent.width - 24px;
+                    x: 12px;
+                }
+            }
+        }
+    }
 }

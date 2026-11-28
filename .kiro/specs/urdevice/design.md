@@ -541,7 +541,7 @@ Each feature below is a core service (§9) with its own capability string and se
 
 | Requirement | Capability | Default and notes |
 |---|---|---|
-| R17 Webcam and microphone | `camera.v1`, `mic.v1` | Default when built |
+| R17 Webcam and microphone | `camera.v1`, `mic.v1` | Always Ask, watched (camera confirmed 2026-11-28; mic when built) |
 | R18 Notification mirroring | `notify.v1` | Default when built; receiving is also off per host on the receiver (R18.2) |
 | R19 Shared mouse and keyboard | `kvm.v1` | Default when built (uses the input setting) |
 | R20 Second display | `display.v1` | Default when built |
@@ -569,6 +569,12 @@ Each feature below is a core service (§9) with its own capability string and se
 | Linux | `v4l2loopback` device, filled through V4L2 output. The app checks whether the module is loaded and explains how to install it | PipeWire virtual source (`pipewire-rs`) |
 
 The camera service runs in the foreground service with the `camera` and `microphone` service types.
+
+**First version (2026-11-28, T11.3):**
+- **Core:** `camera.v1` (service 18) reuses the screen service (§10) with another id and capability (`Screen::for_camera`, wrapped as `services::webcam::Camera`). A "display" is a camera (`primary` = back camera), the video stream and its limits, keyframe requests, ladder, and sender queue are those of screen sharing. One extra viewer-to-host message, `Control { flash, zoom_x100 }` (zoom 100 to 1000, clamped on both sides, at most one acted on per 50 ms), goes to `Capture::control`. The capability is watched, so every stream is an activity with the indicator and Stop on the phone (R5.4, R17.6). Android hosts only.
+- **Android host:** Camera2 (not CameraX: Camera2 draws straight into the MediaCodec input Surface) → MediaCodec H.264 with the §10 settings. The core's request opens a translucent activity that asks for the CAMERA permission when it is missing and starts a `camera` foreground service from a visible screen, as Android 14 needs. Back camera first; flash is the torch; zoom uses `CONTROL_ZOOM_RATIO` (API 30+) or a crop region. The picture is sent as the sensor delivers it, without rotation.
+- **Desktop:** the camera tile opens a viewer window (like screen sharing): the picture, the camera buttons, Flash on the back camera, zoom steps 1×/2×/3×/5×, and Stop. Closing the window stops the stream.
+- **Left for later:** virtual camera back-ends (T11.4), microphone (T11.5), rotation of the picture to the phone's orientation.
 
 ### 18.2 Notification mirroring (R18)
 
