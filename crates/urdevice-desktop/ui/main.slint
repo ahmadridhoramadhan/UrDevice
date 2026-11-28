@@ -60,6 +60,8 @@ export struct TileItem {
     // A switch tile (no view, no settings icon) and its state.
     toggle: bool,
     on: bool,
+    // A switch tile whose gear opens a window of its own (the webcam preview).
+    panel: bool,
 }
 
 export struct NearbyItem {
@@ -930,15 +932,19 @@ export component MainWindow inherits Window {
                                                     Icon { source: t.icon; tint: Theme.muted; width: 16px; height: 16px; }
                                                 }
                                                 Rectangle { horizontal-stretch: 1; }
-                                                if !t.toggle && !off: Rectangle {
+                                                if (!t.toggle || t.panel) && !off: Rectangle {
                                                     width: 28px; height: 28px; border-radius: 14px;
                                                     background: gear-ta.has-hover ? Theme.border : transparent;
                                                     Icon { source: @image-url("icons/gear.svg"); width: 14px; height: 14px; tint: Theme.muted; }
                                                     gear-ta := TouchArea {
                                                         mouse-cursor: pointer;
                                                         clicked => {
-                                                            root.jump-files = t.feature == "files";
-                                                            root.page = Page.settings;
+                                                            if (t.panel) {
+                                                                root.open-feature(root.peer.id, t.feature, t.key);
+                                                            } else {
+                                                                root.jump-files = t.feature == "files";
+                                                                root.page = Page.settings;
+                                                            }
                                                         }
                                                     }
                                                 }

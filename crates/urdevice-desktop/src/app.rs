@@ -532,6 +532,7 @@ impl Ui {
                         feature: f.id().into(),
                         view: f.has_view(),
                         direct: f.direct(),
+                        panel: f.panel(),
                         toggle: f.switch(&self.feature_ctx, &sp.id).is_some(),
                         on: f.switch(&self.feature_ctx, &sp.id).unwrap_or(false),
                         label: l.invoke_tile_label(t.key.into()),

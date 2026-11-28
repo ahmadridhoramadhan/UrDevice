@@ -2,6 +2,7 @@
 // Rust side: src/features/webcam.rs. See docs/dev/adding-a-feature.md.
 import { Theme } from "../theme.slint";
 import { Btn, IconBtn, Muted } from "../widgets.slint";
+import { Labels } from "../labels.slint";
 
 // State shared with src/features/webcam.rs.
 export global WebcamFeature {
@@ -9,8 +10,8 @@ export global WebcamFeature {
     in-out property <string> peer-id;
 }
 
-// The camera tile opens the window of `CameraWindow` below, not a page. This stays so
-// `features.slint` lists every feature.
+// The camera tile is a switch, and its gear opens the window of `CameraWindow` below, not a page.
+// This stays so `features.slint` lists every feature.
 export component WebcamView inherits VerticalLayout {
     // The tile that opened the view, for features with more than one tile.
     in property <string> tile;
@@ -19,13 +20,14 @@ export component WebcamView inherits VerticalLayout {
     Muted { text: @tr("This feature is not available yet."); }
 }
 
-// The window that shows the phone's camera (#28, R17.1, R17.3): the picture, the camera to use, the
-// flash, the zoom, and Stop. src/features/webcam.rs feeds it.
+// The preview window of the phone's camera (#28, R17.1, R17.3): the picture, the camera to use, the
+// flash, the zoom, and the turn. Closing it does not stop the camera; Stop does. src/features/webcam.rs
+// feeds it.
 export component CameraWindow inherits Window {
     icon: @image-url("../../../../assets/urdevice-icon-512.png");
     // Name of the phone.
     in property <string> device-name;
-    // 0 idle, 1 asking the phone, 2 starting, 3 showing the camera, 4 stopped.
+    // 0 off, 1 asking the phone, 2 starting, 3 showing the camera, 4 stopped.
     in property <int> state;
     // Why it stopped (0 none, 1 declined, 2 denied, 3 offline, 4 no camera, 5 camera permission
     // refused on the phone, 6 failed, 7 ended, 8 timed out).
@@ -45,19 +47,8 @@ export component CameraWindow inherits Window {
     // The virtual camera other apps can pick: 0 off, 1 on, 2 not set up, 3 not on this system,
     // 4 stopped working.
     in property <int> vcam-state: 0;
-
-    // The line for a stopped camera.
-    property <string> stopped-text: [
-        "",
-        @tr("{} did not allow the camera.", root.device-name),
-        @tr("{} turned the camera off.", root.device-name),
-        @tr("{} is offline.", root.device-name),
-        @tr("{} has no camera to share.", root.device-name),
-        @tr("The camera permission was refused on {}.", root.device-name),
-        @tr("The camera of {} could not start.", root.device-name),
-        @tr("The camera stream ended."),
-        @tr("{} did not answer.", root.device-name),
-    ][root.message-kind];
+    // The name call apps list the virtual camera by.
+    in property <string> vcam-name;
 
     callback pick-camera(int);
     callback set-flash(bool);
@@ -116,7 +107,7 @@ export component CameraWindow inherits Window {
         if root.vcam-state != 0: Text {
             text: [
                 "",
-                @tr("Virtual camera on. Pick “UrDevice Camera” in your call app."),
+                @tr("Virtual camera on. Pick “{}” in your call app.", root.vcam-name),
                 @tr("The virtual camera is not set up on this computer. The steps are in the troubleshooting guide."),
                 @tr("This system has no virtual camera yet. The camera shows in this window only."),
                 @tr("The virtual camera stopped working."),
@@ -152,7 +143,8 @@ export component CameraWindow inherits Window {
                     visible: !root.has-frame;
                     text: root.state == 1 ? @tr("Waiting for {} to allow the camera…", root.device-name)
                         : root.state == 2 ? @tr("Starting the camera of {}…", root.device-name)
-                        : root.state == 4 ? root.stopped-text
+                        : root.state == 4 ? Labels.camera-note(root.message-kind)
+                        : root.state == 0 ? Labels.camera-note(0)
                         : "";
                     color: Theme.text;
                     opacity: 0.6;

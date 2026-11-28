@@ -1,11 +1,12 @@
 //! Phone as webcam and microphone (#28): the desktop side.
 //!
-//! The camera tile opens a window of its own (`CameraWindow` in `ui/features/webcam.slint`). The
-//! window asks the phone for an activity (the phone's user answers Always Ask), lists the phone's
-//! cameras, starts the back one, decodes the H.264 stream on a thread of its own, and draws the
-//! pictures. Camera, flash, and zoom are buttons in the window; Stop ends the activity. The
-//! camera is the screen service with another id (`urdevice_core::services::webcam`), so the
-//! stream, the keyframe requests, and the limits are the ones of screen sharing.
+//! The camera tile is a switch, like the others. Turning it on asks the phone for an activity (the
+//! phone's user answers Always Ask), lists the phone's cameras, starts the back one, and decodes
+//! the H.264 stream on a thread of its own, with no window. The gear of the tile opens a preview
+//! window (`CameraWindow` in `ui/features/webcam.slint`) with the picture, the camera, flash,
+//! zoom, and rotation; closing it does not stop the camera, the switch does. The camera is the
+//! screen service with another id (`urdevice_core::services::webcam`), so the stream, the
+//! keyframe requests, and the limits are the ones of screen sharing.
 //!
 //! The decoded picture is turned to the angle the user chose and shown in the window. It also goes
 //! to the virtual camera (`urdevice_platform::features::webcam`), which other apps can pick as a
@@ -20,7 +21,8 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
 
 use slint::{
-    ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel,
+    ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, Timer, TimerMode,
+    VecModel,
 };
 use urdevice_core::Capability;
 use urdevice_core::identity::DeviceId;
@@ -33,7 +35,7 @@ use urdevice_platform::features::webcam::{
 };
 
 use super::{Feature, FeatureCtx, TileSpec};
-use crate::ui::CameraWindow;
+use crate::ui::{CameraWindow, Labels, MainWindow};
 
 pub(crate) struct Webcam;
 
@@ -75,9 +77,13 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|p| p.into_inner())
 }
 
-/// The one open camera window. Slint windows live on the UI thread.
+/// The one camera session, and its preview window while the user has it open. Slint windows live
+/// on the UI thread.
 struct View {
-    win: CameraWindow,
+    win: Option<CameraWindow>,
+    state: i32,
+    message: i32,
+    has_frame: bool,
     peer: DeviceId,
     name: String,
     activity: Option<u64>,
@@ -90,6 +96,8 @@ struct View {
 }
 
 thread_local! {
+    static WINDOW: RefCell<Option<slint::Weak<MainWindow>>> = const { RefCell::new(None) };
+    static TOAST: Timer = Timer::default();
     static VIEW: RefCell<Option<View>> = const { RefCell::new(None) };
     static SVC: RefCell<Option<Arc<Screen>>> = const { RefCell::new(None) };
     static DEC: RefCell<Option<Arc<Dec>>> = const { RefCell::new(None) };
@@ -103,44 +111,84 @@ fn service() -> Option<Arc<Screen>> {
     SVC.with(|s| s.borrow().clone())
 }
 
+fn dec() -> Option<Arc<Dec>> {
+    DEC.with(|d| d.borrow().clone())
+}
+
+/// Show a line about the camera for a few seconds, in the toast of the main window.
+fn say(kind: i32) {
+    let Some(w) = WINDOW.with(|w| w.borrow().as_ref().and_then(slint::Weak::upgrade)) else {
+        return;
+    };
+    w.set_toast(w.global::<Labels>().invoke_camera_note(kind));
+    let weak = w.as_weak();
+    TOAST.with(|t| {
+        t.start(TimerMode::SingleShot, Duration::from_secs(6), move || {
+            if let Some(w) = weak.upgrade() {
+                w.set_toast(SharedString::new());
+            }
+        });
+    });
+}
+
 impl View {
-    fn set_state(&self, state: i32, message: i32) {
-        self.win.set_state(state);
-        self.win.set_message_kind(message);
+    fn set_state(&mut self, state: i32, message: i32) {
+        self.state = state;
+        self.message = message;
         if state != state::SHOWING {
-            self.win.set_has_frame(false);
+            self.has_frame = false;
+        }
+        self.push();
+        // No window open: a stop the user did not ask for is told in the toast.
+        if state == state::STOPPED && self.win.is_none() {
+            say(message);
         }
     }
 
-    fn show_cameras(&self) {
+    /// True while the camera is asked for, starting, or showing: the switch is on.
+    fn active(&self) -> bool {
+        matches!(self.state, state::ASKING | state::STARTING | state::SHOWING)
+    }
+
+    /// Write everything the window shows. Does nothing while the window is closed.
+    fn push(&self) {
+        let Some(win) = &self.win else { return };
+        win.set_device_name(self.name.as_str().into());
+        win.set_state(self.state);
+        win.set_message_kind(self.message);
+        win.set_has_frame(self.has_frame);
         let names: Vec<SharedString> = self
             .cameras
             .iter()
             .map(|c| SharedString::from(c.name.as_str()))
             .collect();
-        self.win.set_cameras(ModelRc::new(VecModel::from(names)));
-        self.win
-            .set_camera_index(i32::try_from(self.index).unwrap_or(0));
+        win.set_cameras(ModelRc::new(VecModel::from(names)));
+        win.set_camera_index(i32::try_from(self.index).unwrap_or(0));
         // The flash is on the back camera, which the phone marks as primary.
         let back = self.cameras.get(self.index).is_some_and(|c| c.primary);
-        self.win.set_flash_available(back);
-        self.win.set_flash(self.flash);
-        self.win.set_zoom(i32::try_from(self.zoom).unwrap_or(100));
+        win.set_flash_available(back);
+        win.set_flash(self.flash);
+        win.set_zoom(i32::try_from(self.zoom).unwrap_or(100));
+        if let Some(d) = dec() {
+            win.set_vcam_state(d.vcam_state.load(Ordering::Relaxed));
+            win.set_vcam_name(lock(&d.vcam_name).as_str().into());
+        }
     }
 
     /// Start the stream of camera `index`. A new stream starts with the flash off and no zoom.
     fn start_camera(&mut self, index: usize) {
-        let (Some(svc), Some(activity), Some(cam)) =
-            (service(), self.activity, self.cameras.get(index))
-        else {
+        let (Some(svc), Some(activity), Some(cam_id)) = (
+            service(),
+            self.activity,
+            self.cameras.get(index).map(|c| c.id),
+        ) else {
             return;
         };
         self.index = index;
         self.flash = false;
         self.zoom = 100;
-        self.show_cameras();
         self.set_state(state::STARTING, 0);
-        let _ = svc.start(self.peer, activity, cam.id, MAX_WIDTH, MAX_HEIGHT, FPS);
+        let _ = svc.start(self.peer, activity, cam_id, MAX_WIDTH, MAX_HEIGHT, FPS);
     }
 
     fn control(&self) {
@@ -190,8 +238,12 @@ struct Dec {
     queued: AtomicI64,
     /// The turn the user chose, in quarter turns clockwise (0 to 3).
     quarter_turns: AtomicI32,
-    /// What the window says about the virtual camera (`vcam::*`).
+    /// What the window says about the virtual camera (`vcam::*`), and its name.
     vcam_state: AtomicI32,
+    vcam_name: Mutex<String>,
+    /// The preview window is open: pictures are copied to it. Without it they only go to the
+    /// virtual camera.
+    show: AtomicBool,
     svc: Weak<Screen>,
 }
 
@@ -274,16 +326,19 @@ impl Dec {
         )
     }
 
-    /// Tell the window what became of the virtual camera.
-    fn set_vcam(&self, state: i32) {
-        if self.vcam_state.swap(state, Ordering::Relaxed) != state {
-            on_ui(move || {
-                with(|v| v.win.set_vcam_state(state));
-            });
-        }
+    /// Tell the window what became of the virtual camera, and under which name apps list it.
+    fn set_vcam(&self, state: i32, name: &str) {
+        *lock(&self.vcam_name) = name.to_owned();
+        self.vcam_state.store(state, Ordering::Relaxed);
+        on_ui(|| {
+            with(|v| v.push());
+        });
     }
 
     fn publish(self: &Arc<Self>, data: &[u8], width: u32, height: u32) {
+        if !self.show.load(Ordering::Relaxed) {
+            return;
+        }
         let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(data, width, height);
         *lock(&self.pending) = Some(buf);
         if self.posted.swap(true, Ordering::AcqRel) {
@@ -297,15 +352,14 @@ impl Dec {
             };
             with(|v| {
                 let (w, h) = (buf.width() as usize, buf.height() as usize);
-                v.win.set_frame(Image::from_rgba8(buf));
+                v.has_frame = true;
+                let Some(win) = &v.win else { return };
+                win.set_frame(Image::from_rgba8(buf));
                 if v.shape != (w, h) && w > 0 && h > 0 {
                     v.shape = (w, h);
-                    v.win.set_aspect(w as f32 / h as f32);
+                    win.set_aspect(w as f32 / h as f32);
                 }
-                v.win.set_has_frame(true);
-                if v.win.get_state() != state::SHOWING {
-                    v.set_state(state::SHOWING, 0);
-                }
+                win.set_has_frame(true);
             });
         });
     }
@@ -318,6 +372,7 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
     let mut retries = 0u32;
     let mut stats = Stats::new();
     let mut camera: Option<Box<dyn VirtualCamera>> = None;
+    let mut announced = false;
     loop {
         stats.report(d);
         let item = match rx.recv_timeout(Duration::from_millis(700)) {
@@ -339,24 +394,28 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
                 dec = H264Decoder::new().ok();
                 waiting_key = true;
                 retries = 0;
+                announced = false;
                 if camera.is_none() {
                     match open_virtual_camera() {
                         Ok(c) => {
+                            let name = c.name();
                             camera = Some(c);
-                            d.set_vcam(vcam::ON);
+                            d.set_vcam(vcam::ON, &name);
                         }
-                        Err(VirtualCameraError::NotAvailable) => d.set_vcam(vcam::NOT_AVAILABLE),
-                        Err(VirtualCameraError::NotSetUp) => d.set_vcam(vcam::NOT_SET_UP),
+                        Err(VirtualCameraError::NotAvailable) => {
+                            d.set_vcam(vcam::NOT_AVAILABLE, "");
+                        }
+                        Err(VirtualCameraError::NotSetUp) => d.set_vcam(vcam::NOT_SET_UP, ""),
                         Err(e) => {
                             tracing::info!(error = %e, "no virtual camera");
-                            d.set_vcam(vcam::FAILED);
+                            d.set_vcam(vcam::FAILED, "");
                         }
                     }
                 }
             }
             Item::Stop => {
                 camera = None;
-                d.set_vcam(vcam::OFF);
+                d.set_vcam(vcam::OFF, "");
             }
             Item::Frame(peer, activity, f) => {
                 // Newer frames wait behind this one: it is decoded, but not converted or shown.
@@ -384,12 +443,19 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
                             Some((v, w, h)) => (v.as_slice(), *w, *h),
                             None => (pic.data.as_slice(), pic.width, pic.height),
                         };
+                        if !announced {
+                            // The first picture: the session is showing, window or not.
+                            announced = true;
+                            on_ui(|| {
+                                with(|v| v.set_state(state::SHOWING, 0));
+                            });
+                        }
                         d.publish(data, w, h);
                         if let Some(cam) = camera.as_mut()
                             && cam.write(data, w, h).is_err()
                         {
                             camera = None;
-                            d.set_vcam(vcam::FAILED);
+                            d.set_vcam(vcam::FAILED, "");
                         }
                     }
                     Ok(false) => {}
@@ -420,17 +486,20 @@ impl ScreenEvents for Events {
     fn opened(&self, peer: DeviceId, activity: u64) {
         on_ui(move || {
             let mine = with(|v| {
-                if v.peer != peer {
+                // Only while the switch is still waiting for this answer.
+                if v.peer != peer || v.state != state::ASKING {
                     return false;
                 }
                 v.activity = Some(activity);
                 v.set_state(state::STARTING, 0);
                 true
             });
-            if mine == Some(true)
-                && let Some(svc) = service()
-            {
+            let Some(svc) = service() else { return };
+            if mine == Some(true) {
                 let _ = svc.list_displays(peer, activity);
+            } else {
+                // The user turned the camera off while the phone was asking.
+                svc.stop(peer, activity);
             }
         });
     }
@@ -510,27 +579,76 @@ impl ScreenEvents for Events {
 }
 
 // ---------------------------------------------------------------------------
-// The window
+// The session and its preview window
 // ---------------------------------------------------------------------------
 
-/// Stop the stream and close the window.
-fn close() {
-    let old = VIEW.with(|v| v.borrow_mut().take());
-    if let Some(v) = old {
-        if let (Some(svc), Some(activity)) = (service(), v.activity) {
-            svc.stop(v.peer, activity);
+impl View {
+    fn new(peer: DeviceId, name: &str) -> Self {
+        Self {
+            win: None,
+            state: state::IDLE,
+            message: 0,
+            has_frame: false,
+            peer,
+            name: name.to_owned(),
+            activity: None,
+            cameras: Vec::new(),
+            index: 0,
+            flash: false,
+            zoom: 100,
+            shape: (0, 0),
         }
-        let _ = v.win.hide();
     }
-    DEC.with(|d| {
-        if let Some(d) = d.borrow().as_ref() {
-            d.current.store(0, Ordering::Relaxed);
-            let _ = d.tx.try_send(Item::Stop);
+}
+
+/// Make sure the session is for `peer`: another phone's session ends first.
+fn ensure_view(peer: DeviceId, name: &str) {
+    let other = VIEW.with(|v| v.borrow().as_ref().is_some_and(|x| x.peer != peer));
+    if other {
+        end_stream();
+        close_window();
+        VIEW.with(|v| *v.borrow_mut() = None);
+    }
+    VIEW.with(|v| {
+        let mut v = v.borrow_mut();
+        if v.is_none() {
+            *v = Some(View::new(peer, name));
         }
     });
 }
 
-/// Connect the window's callbacks. Each looks the window up again, so none holds the window and
+/// End the stream and turn the switch off. An open window stays and says the camera is off.
+fn end_stream() {
+    let ended = with(|v| {
+        let ended = v.activity.take().map(|a| (v.peer, a));
+        v.cameras.clear();
+        v.shape = (0, 0);
+        v.set_state(state::IDLE, 0);
+        ended
+    })
+    .flatten();
+    if let (Some((peer, activity)), Some(svc)) = (ended, service()) {
+        svc.stop(peer, activity);
+    }
+    if let Some(d) = dec() {
+        d.current.store(0, Ordering::Relaxed);
+        let _ = d.tx.try_send(Item::Stop);
+    }
+}
+
+/// Close the preview window. The camera keeps running.
+fn close_window() {
+    with(|v| {
+        if let Some(w) = v.win.take() {
+            let _ = w.hide();
+        }
+    });
+    if let Some(d) = dec() {
+        d.show.store(false, Ordering::Relaxed);
+    }
+}
+
+/// Connect the window's callbacks. Each looks the session up again, so none holds the window and
 /// there is no reference cycle.
 fn wire(win: &CameraWindow) {
     win.on_pick_camera(|i| {
@@ -543,69 +661,71 @@ fn wire(win: &CameraWindow) {
     win.on_set_flash(|on| {
         with(|v| {
             v.flash = on;
-            v.win.set_flash(on);
+            v.push();
             v.control();
         });
     });
     win.on_set_zoom(|z| {
         with(|v| {
             v.zoom = u32::try_from(z).unwrap_or(100).clamp(100, 1000);
-            v.win.set_zoom(i32::try_from(v.zoom).unwrap_or(100));
+            v.push();
             v.control();
         });
     });
     win.on_rotate(|| {
-        DEC.with(|d| {
-            if let Some(d) = d.borrow().as_ref() {
-                let next = (d.quarter_turns.load(Ordering::Relaxed) + 1) % 4;
-                d.quarter_turns.store(next, Ordering::Relaxed);
-            }
-        });
+        if let Some(d) = dec() {
+            let next = (d.quarter_turns.load(Ordering::Relaxed) + 1) % 4;
+            d.quarter_turns.store(next, Ordering::Relaxed);
+        }
     });
-    win.on_stop(close);
+    // Stop turns the camera off and closes the window. The window is closed after the callback
+    // returns, not inside it.
+    win.on_stop(|| {
+        end_stream();
+        let _ = slint::invoke_from_event_loop(close_window);
+    });
     win.window().on_close_requested(|| {
-        // The close button ends the stream too: the phone stops using its camera.
-        let _ = slint::invoke_from_event_loop(close);
+        // The close button only closes the preview: the camera keeps running.
+        let _ = slint::invoke_from_event_loop(close_window);
         slint::CloseRequestResponse::HideWindow
     });
 }
 
-fn open_window(svc: &Arc<Screen>, peer: DeviceId, name: &str) {
-    let same = VIEW.with(|v| v.borrow().as_ref().is_some_and(|x| x.peer == peer));
-    if !same {
-        // Another phone's window ends its stream first.
-        close();
-        let Ok(win) = CameraWindow::new() else {
-            tracing::warn!("the camera window could not be created");
-            return;
-        };
-        wire(&win);
-        win.set_device_name(name.into());
-        VIEW.with(|v| {
-            *v.borrow_mut() = Some(View {
-                win,
-                peer,
-                name: name.to_owned(),
-                activity: None,
-                cameras: Vec::new(),
-                index: 0,
-                flash: false,
-                zoom: 100,
-                shape: (0, 0),
-            });
-        });
-    }
-    let ask = with(|v| {
-        let _ = v.win.show();
-        // A window that stopped (or has not asked yet) asks the phone again.
-        let idle = v.activity.is_none();
-        if idle {
-            v.win.set_device_name(v.name.as_str().into());
-            v.set_state(state::ASKING, 0);
+/// Open the preview window for `peer` (the gear of the tile). It does not start the camera.
+fn open_window(peer: DeviceId, name: &str) {
+    ensure_view(peer, name);
+    with(|v| {
+        if v.win.is_none() {
+            let Ok(win) = CameraWindow::new() else {
+                tracing::warn!("the camera window could not be created");
+                return;
+            };
+            wire(&win);
+            v.win = Some(win);
         }
-        idle
+        if let Some(win) = &v.win {
+            let _ = win.show();
+        }
+        v.push();
     });
-    if ask == Some(true) {
+    if let Some(d) = dec() {
+        d.show.store(true, Ordering::Relaxed);
+    }
+}
+
+/// Turn the camera on for `peer`: ask the phone, and show nothing until the user opens the preview.
+fn begin(peer: DeviceId, name: &str) {
+    let Some(svc) = service() else { return };
+    ensure_view(peer, name);
+    let asking = with(|v| {
+        if v.active() {
+            return false;
+        }
+        v.name = name.to_owned();
+        v.set_state(state::ASKING, 0);
+        true
+    });
+    if asking == Some(true) {
         let _ = svc.request_view(peer);
     }
 }
@@ -622,9 +742,37 @@ impl Feature for Webcam {
         }]
     }
 
-    // The tile opens a window of its own, not a page.
-    fn direct(&self) -> bool {
+    // The tile is a switch, and its gear opens the preview window.
+    fn panel(&self) -> bool {
         true
+    }
+
+    fn switch(&self, _ctx: &FeatureCtx, peer: &str) -> Option<bool> {
+        Some(VIEW.with(|v| {
+            v.borrow()
+                .as_ref()
+                .is_some_and(|v| v.peer.hex() == peer && v.active())
+        }))
+    }
+
+    fn set_switch(&self, ctx: &FeatureCtx, peer: &str, on: bool) {
+        let Some(id) = DeviceId::from_hex(peer) else {
+            return;
+        };
+        if !on {
+            if VIEW.with(|v| v.borrow().as_ref().is_some_and(|v| v.peer == id)) {
+                end_stream();
+            }
+            return;
+        }
+        let name = ctx
+            .node
+            .snapshot()
+            .peers
+            .iter()
+            .find(|p| p.id == peer)
+            .map_or_else(String::new, |p| p.name.clone());
+        begin(id, &name);
     }
 
     fn start(&self, ctx: &FeatureCtx) {
@@ -645,6 +793,8 @@ impl Feature for Webcam {
             queued: AtomicI64::new(0),
             quarter_turns: AtomicI32::new(0),
             vcam_state: AtomicI32::new(vcam::OFF),
+            vcam_name: Mutex::new(String::new()),
+            show: AtomicBool::new(false),
             svc: Arc::downgrade(&svc),
         });
         let worker = dec.clone();
@@ -657,32 +807,31 @@ impl Feature for Webcam {
         svc.events.set(Arc::new(Events { dec: dec.clone() }));
         SVC.with(|s| *s.borrow_mut() = Some(svc));
         DEC.with(|d| *d.borrow_mut() = Some(dec));
+        WINDOW.with(|w| *w.borrow_mut() = Some(ctx.window.clone()));
     }
 
     fn refresh(&self, _ctx: &FeatureCtx, snap: &Snapshot) {
         // The phone went offline: the stream is gone.
-        let gone = with(|v| {
+        with(|v| {
             let hex = v.peer.hex();
             let online = snap
                 .peers
                 .iter()
                 .any(|p| p.id == hex && p.status == PeerStatus::Connected);
-            if !online && v.win.get_state() != state::STOPPED && v.win.get_state() != state::IDLE {
+            if !online && v.active() {
                 v.activity = None;
                 v.set_state(state::STOPPED, message_for("offline"));
             }
         });
-        let _ = gone;
     }
 
     fn open(&self, _ctx: &FeatureCtx, peer: &PeerView, tile: &str) {
         if tile != "camera.v1" {
             return;
         }
-        let (Some(id), Some(svc)) = (DeviceId::from_hex(&peer.id), service()) else {
-            return;
-        };
-        open_window(&svc, id, &peer.name);
+        if let Some(id) = DeviceId::from_hex(&peer.id) {
+            open_window(id, &peer.name);
+        }
     }
 }
 

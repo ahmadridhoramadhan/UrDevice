@@ -208,6 +208,9 @@ impl std::error::Error for VirtualCameraError {}
 
 /// A camera other apps can pick. Dropping it removes the camera (or leaves it without a picture).
 pub trait VirtualCamera: Send {
+    /// The name call apps list this camera by (the card label of the device).
+    fn name(&self) -> String;
+
     /// Show one RGBA picture of `width` x `height` pixels, already turned.
     fn write(&mut self, rgba: &[u8], width: u32, height: u32) -> std::io::Result<()>;
 }

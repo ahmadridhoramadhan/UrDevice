@@ -79,6 +79,12 @@ pub(crate) trait Feature {
         false
     }
 
+    /// True for a switch tile whose gear opens a window of its own: `open` is called when the
+    /// gear is pressed (the webcam preview).
+    fn panel(&self) -> bool {
+        false
+    }
+
     /// True when a tile opens a window of its own: the page does not change, and `open` is
     /// called at once (screen sharing).
     fn direct(&self) -> bool {

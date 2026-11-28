@@ -39,6 +39,14 @@ The phone camera always shows in its UrDevice window. To use it in a call app, t
   sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="UrDevice Camera" exclusive_caps=1
   ```
 
+  **The camera is listed as "OBS Virtual Camera"?** The Fedora package of `v4l2loopback` loads the module at boot with that card label (`/usr/lib/modprobe.d/98-v4l2loopback.conf`), and UrDevice uses the loopback device it finds. OBS does not have to be installed. The label is fixed when the module loads, so UrDevice cannot change it. To get your own name, reload the module with yours (close every app that uses the camera first), and keep it with a file that sorts after the package's:
+
+  ```sh
+  sudo modprobe -r v4l2loopback
+  sudo modprobe v4l2loopback devices=1 video_nr=10 card_label="UrDevice Camera" exclusive_caps=1
+  echo 'options v4l2loopback devices=1 video_nr=10 card_label="UrDevice Camera" exclusive_caps=1' | sudo tee /etc/modprobe.d/99-urdevice.conf
+  ```
+
   To load it at every start, put `v4l2loopback` in `/etc/modules-load.d/urdevice.conf` and the options in `/etc/modprobe.d/urdevice.conf` (`options v4l2loopback devices=1 video_nr=10 card_label="UrDevice Camera" exclusive_caps=1`). With Secure Boot on, the module needs a signing key. The camera shows up in other apps only while a phone camera window is streaming.
 - **Windows and macOS:** there is no virtual camera yet (Windows 11 needs a registered media source, macOS a signed Camera Extension). The camera shows in its UrDevice window only.
 - **Picture turned the wrong way:** hold the phone sideways, or press **Rotate** in the camera window.

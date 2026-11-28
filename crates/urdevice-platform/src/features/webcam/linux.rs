@@ -18,9 +18,15 @@ const LABEL: &str = "UrDevice";
 
 struct Loopback {
     device: Device,
+    /// The card label other apps list the camera by. The module fixes it when it loads.
+    label: String,
 }
 
 impl VirtualCamera for Loopback {
+    fn name(&self) -> String {
+        self.label.clone()
+    }
+
     fn write(&mut self, rgba: &[u8], width: u32, height: u32) -> std::io::Result<()> {
         let Some(frame) = rgba_to_yuyv_fit(rgba, width, height, OUT_WIDTH, OUT_HEIGHT) else {
             return Err(std::io::Error::new(
@@ -30,6 +36,14 @@ impl VirtualCamera for Loopback {
         };
         self.device.write_all(&frame)
     }
+}
+
+/// The card label of `/dev/videoN`, from sysfs.
+fn label_of(dev: &Path) -> String {
+    let name = dev.file_name().map(|n| n.to_string_lossy().into_owned());
+    name.and_then(|n| std::fs::read_to_string(format!("/sys/class/video4linux/{n}/name")).ok())
+        .map(|l| l.trim().to_owned())
+        .unwrap_or_default()
 }
 
 /// `/dev/videoN` of the loopback devices under `class_dir` (`/sys/class/video4linux`), those
@@ -79,7 +93,8 @@ pub(super) fn open() -> Result<Box<dyn VirtualCamera>, VirtualCameraError> {
         match attempt {
             Ok(device) => {
                 tracing::info!(device = %path.display(), "virtual camera opened");
-                return Ok(Box::new(Loopback { device }));
+                let label = label_of(&path);
+                return Ok(Box::new(Loopback { device, label }));
             }
             Err(e) => last = format!("{}: {e}", path.display()),
         }
