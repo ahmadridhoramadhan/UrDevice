@@ -7666,6 +7666,7 @@ dependencies = [
  "urdevice-core",
  "urdevice-proto",
  "uuid",
+ "v4l",
  "windows",
  "x11rb",
  "zbus 5.19.0",

@@ -49,6 +49,8 @@ directories = "6"
 jiff = "0.2"
 auto-launch = "0.6"
 nokhwa = { version = "0.10", default-features = false, features = ["input-native"] }
+# Virtual camera on Linux (#28): the v4l2loopback device. Already built for the camera scan (nokhwa).
+v4l = { version = "0.14", default-features = false, features = ["v4l2"] }
 rqrr = "0.10"
 # Pure-Rust MJPEG decoding for webcams without uncompressed formats (#47).
 # Already in the tree through Slint's image loading.

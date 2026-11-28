@@ -23,6 +23,12 @@
 //! [`ADAPT_EVERY`] the session feeds the drop counts to a [`Ladder`], which
 //! moves between bitrate and resolution steps (R12.4).
 //!
+//! **Camera.** The phone-as-webcam service (#28, `ServiceId::CAMERA`) is this
+//! same service with another id and capability: [`Screen::for_camera`]. A
+//! "display" is a camera, a video stream is the camera picture, and a viewer
+//! can also send [`Screen::control`] (flash and zoom). [`Camera`] in
+//! `webcam.rs` wraps it so `node.service::<Camera>()` finds it.
+//!
 //! Frames are never stored or logged; tracing carries ids and sizes only.
 
 use std::collections::HashMap;
@@ -252,7 +258,15 @@ pub trait Capture: Send + Sync {
     fn set_target(&self, target: VideoTarget);
     /// Stop capturing and release the OS resources. Called once.
     fn stop(&self);
+    /// Camera only: switch the flash and set the zoom (ratio times 100). Hosts that
+    /// capture a screen ignore it.
+    fn control(&self, flash: bool, zoom_x100: u32) {
+        let _ = (flash, zoom_x100);
+    }
 }
+
+/// Fewest milliseconds between two [`Control`](wire::Control) messages a host acts on.
+pub const CONTROL_MIN_GAP: Duration = Duration::from_millis(50);
 
 /// What the host OS provides. Desktop: `urdevice-desktop` glues
 /// `urdevice-platform` capture to an `urdevice-media` encoder. Android:
@@ -353,6 +367,7 @@ struct HostSession {
     stop: Arc<Notify>,
     capture: Option<Arc<dyn Capture>>,
     last_keyframe: Option<Instant>,
+    last_control: Option<Instant>,
 }
 
 // ---------------------------------------------------------------------------
@@ -373,14 +388,22 @@ struct State {
 }
 
 /// The screen service. UI code reaches it with `node.service::<Screen>()`.
-#[derive(Default)]
 pub struct Screen {
+    /// `SCREEN`, or `CAMERA` for the webcam (see [`Screen::for_camera`]).
+    service: ServiceId,
+    cap: Capability,
     ctx: OnceLock<ServiceCtx>,
     /// The capture adapter, on devices that can be viewed.
     pub host: Slot<dyn ScreenHost>,
     /// The viewer UI.
     pub events: Slot<dyn ScreenEvents>,
     state: Arc<Mutex<State>>,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Self::with(ServiceId::SCREEN, Capability::Screen)
+    }
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -391,6 +414,22 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl Screen {
+    fn with(service: ServiceId, cap: Capability) -> Self {
+        Self {
+            service,
+            cap,
+            ctx: OnceLock::new(),
+            host: Slot::default(),
+            events: Slot::default(),
+            state: Arc::default(),
+        }
+    }
+
+    /// The same service for the phone's camera (`camera.v1`, #28).
+    pub fn for_camera() -> Self {
+        Self::with(ServiceId::CAMERA, Capability::Camera)
+    }
+
     fn ctx(&self) -> Result<&ServiceCtx> {
         self.ctx.get().ok_or(CoreError::Stopped)
     }
@@ -455,6 +494,20 @@ impl Screen {
     /// Ask for a keyframe after the decoder lost sync or dropped frames.
     pub fn request_keyframe(&self, peer: DeviceId, activity: u64) -> Result<()> {
         self.send(peer, activity, Msg::RequestKeyframe(RequestKeyframe {}))
+    }
+
+    /// Camera only: turn the flash on or off and set the zoom (ratio times
+    /// 100, 100 is no zoom).
+    pub fn control(
+        &self,
+        peer: DeviceId,
+        activity: u64,
+        flash: bool,
+        zoom_x100: u32,
+    ) -> Result<()> {
+        let mut c = wire::Control { flash, zoom_x100 };
+        c.sanitize();
+        self.send(peer, activity, Msg::Control(c))
     }
 
     /// End the session on both devices.
@@ -540,6 +593,7 @@ impl Screen {
                     stop: Arc::new(Notify::new()),
                     capture: None,
                     last_keyframe: None,
+                    last_control: None,
                 },
             );
             generation
@@ -576,6 +630,27 @@ impl Screen {
         if let Some(c) = s.capture.clone() {
             drop(st);
             c.request_keyframe();
+        }
+    }
+
+    fn host_control(&self, grant: &Grant, mut c: wire::Control) {
+        c.sanitize();
+        let capture = {
+            let mut st = lock(&self.state);
+            let Some(s) = st.host.get_mut(&(grant.peer(), grant.activity())) else {
+                return;
+            };
+            let now = Instant::now();
+            if s.last_control
+                .is_some_and(|t| now.duration_since(t) < CONTROL_MIN_GAP)
+            {
+                return;
+            }
+            s.last_control = Some(now);
+            s.capture.clone()
+        };
+        if let Some(cap) = capture {
+            cap.control(c.flash, c.zoom_x100);
         }
     }
 
@@ -820,11 +895,11 @@ fn remove_if_current(state: &Mutex<State>, peer: DeviceId, activity: u64, genera
 
 impl Service for Screen {
     fn id(&self) -> ServiceId {
-        ServiceId::SCREEN
+        self.service
     }
 
     fn capability(&self) -> Capability {
-        Capability::Screen
+        self.cap
     }
 
     fn start(&self, ctx: ServiceCtx) {
@@ -845,6 +920,7 @@ impl Service for Screen {
                     Msg::ListDisplays(_) => self.host_list(ctx, grant),
                     Msg::Start(s) => self.host_start(ctx, grant, s),
                     Msg::RequestKeyframe(_) => self.host_keyframe(&grant),
+                    Msg::Control(c) => self.host_control(&grant, c),
                     // Host-to-viewer messages sent the wrong way.
                     Msg::Displays(_) | Msg::Error(_) => {}
                 }
@@ -866,7 +942,10 @@ impl Service for Screen {
                         err.sanitize();
                         e.error(peer, activity, &err.reason);
                     }
-                    Msg::ListDisplays(_) | Msg::Start(_) | Msg::RequestKeyframe(_) => {}
+                    Msg::ListDisplays(_)
+                    | Msg::Start(_)
+                    | Msg::RequestKeyframe(_)
+                    | Msg::Control(_) => {}
                 }
             }
         }

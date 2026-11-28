@@ -125,9 +125,9 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 
 - [ ] T11.1 Notification mirroring (first version done 2026-11-27, changed 2026-11-28: Android host to desktop, on by default with all apps (no picker), visibility filtering, dismissal as part of the list, desktop panel; still open: native desktop notifications, reply and actions, desktop to Android, dismissal from the desktop): NotifSubscribe and the app picker on the receiver, listener service changes, visibility filtering, desktop native notifications, reply and actions for Android hosts, desktop → Android mirroring from the T10.5 results, dismissal sync, 24 h retention. _Req: R18_
 - [ ] T11.2 Find my device: Ring messages, Android alarm-stream ringing with the full-screen fallback, desktop ringing window, last-seen display. _Req: R25_
-- [ ] T11.3 Webcam: CameraX → MediaCodec stream, camera controls, desktop viewer window. _Req: R17.1, R17.3, R17.5, R17.6_
-- [ ] T11.4 Virtual camera back-ends on macOS, Windows 11, and Linux. _Req: R17.2_
-- [ ] T11.5 Microphone: Opus stream and PipeWire virtual source on Linux, with the "not yet available" message on macOS and Windows. _Req: R17.4_
+- [ ] T11.3 Webcam (first version done 2026-11-28: Camera2 → MediaCodec stream over the screen service, camera switch, flash, zoom, desktop viewer window, foreground service with the indicator and Stop; still open: tested on a phone, picture rotation): CameraX → MediaCodec stream, camera controls, desktop viewer window. _Req: R17.1, R17.3, R17.5, R17.6_
+- [ ] T11.4 Virtual camera back-ends on macOS, Windows 11, and Linux. (Linux done 2026-11-28 with v4l2loopback, not yet tried in a call app; Windows 11 and macOS open: they need a registered media source and a signed Camera Extension.) _Req: R17.2_
+- [ ] T11.5 Microphone: Opus stream and PipeWire virtual source on Linux, with the "not yet available" message on macOS and Windows. (First version done 2026-11-28: PCM stream instead of Opus, `pw-cat` virtual source on Linux, "not available" on Windows and macOS; not yet tried on a phone.) _Req: R17.4_
 - [ ] T11.6 Android `play` and `full` build flavors. _Req: R29.3_
 - [ ] T11.7 SMS and calls in the `full` build: conversations, sending, incoming-call controls, encrypted desktop cache. _Req: R29_
 

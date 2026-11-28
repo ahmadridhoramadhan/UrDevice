@@ -15,6 +15,7 @@ pub(crate) fn all() -> Vec<Box<dyn Feature>> {
         Box::new(super::notify::Notify),
         Box::new(super::ring::Ring),
         Box::new(super::webcam::Webcam),
+        Box::new(super::mic::Mic),
         Box::new(super::telephony::Telephony),
         Box::new(super::kvm::Kvm),
         Box::new(super::display::Display),

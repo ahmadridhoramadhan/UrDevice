@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- webcam (#28): host -->
+    <string name="camera_back">Back camera</string>
+    <string name="camera_front">Front camera</string>
+    <string name="camera_channel">Camera streaming</string>
+    <string name="camera_streaming_title">Your camera is in use by another device</string>
+    <string name="camera_consent_title">Allow the camera?</string>
+    <string name="camera_consent_body">Tap to let UrDevice use the camera.</string>
+    <string name="mic_channel">Microphone streaming</string>
+    <string name="mic_streaming_title">Your microphone is in use by another device</string>
+    <string name="mic_consent_title">Allow the microphone?</string>
+    <string name="mic_consent_body">Tap to let UrDevice use the microphone.</string>
+</resources>

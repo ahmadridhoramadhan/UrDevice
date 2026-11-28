@@ -1,0 +1,31 @@
+// Phone as webcam and microphone (#28, design §18.1). Reference copy of `src/features/webcam.rs`,
+// which is the source of truth. Never reuse or renumber a field.
+//
+// The camera (service 18) speaks the screen messages (screen.proto): its displays are the phone's
+// cameras, and a viewer adds `Control`. The microphone (service 19) uses the messages below,
+// carried as the body of a `Feature` envelope.
+
+syntax = "proto3";
+package urdevice.v1.webcam;
+
+message Mic {
+  oneof msg {
+    Start start = 1;       // viewer -> host
+    MicError error = 2;    // host -> viewer
+  }
+}
+
+message Start {}
+
+// no_host, consent_declined, capture_failed, stopped
+message MicError { string reason = 1; }
+
+// Header meta of the audio stream (stream kind 1, host -> viewer, unidirectional).
+message AudioInfo {
+  uint32 sample_rate = 1;  // 48000
+  uint32 channels = 2;     // 1
+  string codec = 3;        // "pcm_s16le"
+}
+
+// On the audio stream each chunk is a big-endian u32 length (2..=16 KiB, even) followed by that many
+// bytes of 16-bit little-endian samples.

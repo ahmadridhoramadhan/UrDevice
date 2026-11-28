@@ -28,6 +28,7 @@ mod input;
 mod inspector;
 mod kvm;
 mod media;
+mod mic;
 mod notify;
 mod port_profiles;
 mod proximity_lock;
@@ -75,6 +76,12 @@ pub(crate) trait Feature {
     /// True when a tile opens this feature's view instead of sending a
     /// plain activity request.
     fn has_view(&self) -> bool {
+        false
+    }
+
+    /// True for a switch tile whose gear opens a window of its own: `open` is called when the
+    /// gear is pressed (the webcam preview).
+    fn panel(&self) -> bool {
         false
     }
 

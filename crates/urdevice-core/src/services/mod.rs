@@ -38,6 +38,7 @@ pub mod input;
 pub mod inspector;
 pub mod kvm;
 pub mod media;
+pub mod mic;
 pub mod notify;
 pub mod port_profiles;
 pub mod proximity_lock;

@@ -134,7 +134,7 @@ pub trait ScreenListener: Send + Sync {
     fn on_ended(&self, device_id: String, activity: u64);
 }
 
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     match m.lock() {
         Ok(g) => g,
         Err(p) => p.into_inner(),
@@ -143,12 +143,13 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 
 /// Sinks of the running captures, by session number.
 #[derive(Default)]
-struct Sessions {
-    next: AtomicU64,
-    sinks: Mutex<HashMap<u64, Arc<dyn FrameSink>>>,
+pub(crate) struct Sessions {
+    pub(crate) next: AtomicU64,
+    pub(crate) sinks: Mutex<HashMap<u64, Arc<dyn FrameSink>>>,
 }
 
-static SESSIONS: std::sync::LazyLock<Sessions> = std::sync::LazyLock::new(Sessions::default);
+pub(crate) static SESSIONS: std::sync::LazyLock<Sessions> =
+    std::sync::LazyLock::new(Sessions::default);
 
 struct HostAdapter(Arc<dyn ScreenHostFfi>);
 

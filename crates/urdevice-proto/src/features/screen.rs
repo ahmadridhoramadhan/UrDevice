@@ -14,6 +14,10 @@
 //! [`StreamInfo`]. The stream carries [`VideoFrame`]s, each prefixed with its
 //! length as a big-endian `u32` ([`encode_frame`], [`frame_len`]).
 //!
+//! The phone-as-webcam service (`ServiceId::CAMERA`, #28) speaks the same
+//! messages: its "displays" are the phone's cameras (`primary` is the back
+//! camera), and a viewer adds [`Control`] to switch the flash and the zoom.
+//!
 //! Everything here is untrusted input. Lengths are checked against the limits
 //! below before anything is allocated, and [`Display::sanitize`] clamps what a
 //! hostile host can make a viewer draw.
@@ -42,6 +46,12 @@ pub const MAX_DIMENSION: u32 = 8192;
 /// Highest frame rate a viewer may ask for.
 pub const MAX_FPS: u32 = 60;
 
+/// Zoom is sent as a ratio times 100: 100 is no zoom.
+pub const ZOOM_MIN: u32 = 100;
+
+/// Largest zoom ratio a viewer may ask for (10x). The host clamps it to what the camera does.
+pub const ZOOM_MAX: u32 = 1000;
+
 /// Size of the length prefix in front of every frame on the video stream.
 pub const FRAME_PREFIX: usize = 4;
 
@@ -49,7 +59,7 @@ pub const FRAME_PREFIX: usize = 4;
 #[derive(Clone, PartialEq, Message)]
 pub struct Screen {
     /// The message.
-    #[prost(oneof = "message::Msg", tags = "1, 2, 3, 4, 5")]
+    #[prost(oneof = "message::Msg", tags = "1, 2, 3, 4, 5, 6")]
     pub msg: Option<message::Msg>,
 }
 
@@ -73,6 +83,9 @@ pub mod message {
         /// Host to viewer: capture could not start or stopped.
         #[prost(message, tag = "5")]
         Error(super::ScreenError),
+        /// Viewer to host (camera only): flash and zoom.
+        #[prost(message, tag = "6")]
+        Control(super::Control),
     }
 }
 
@@ -159,6 +172,25 @@ impl Start {
         self.max_width = self.max_width.min(MAX_DIMENSION);
         self.max_height = self.max_height.min(MAX_DIMENSION);
         self.max_fps = self.max_fps.min(MAX_FPS);
+    }
+}
+
+/// Camera controls during a stream (`ServiceId::CAMERA` only): the host
+/// applies them to the running camera and ignores what the camera cannot do.
+#[derive(Clone, PartialEq, Message)]
+pub struct Control {
+    /// The torch (flash light) is on.
+    #[prost(bool, tag = "1")]
+    pub flash: bool,
+    /// Zoom ratio times 100, [`ZOOM_MIN`] to [`ZOOM_MAX`].
+    #[prost(uint32, tag = "2")]
+    pub zoom_x100: u32,
+}
+
+impl Control {
+    /// Clamp a request a peer sent.
+    pub fn sanitize(&mut self) {
+        self.zoom_x100 = self.zoom_x100.clamp(ZOOM_MIN, ZOOM_MAX);
     }
 }
 
@@ -314,6 +346,19 @@ mod tests {
         };
         s.sanitize();
         assert_eq!((s.max_width, s.max_fps), (MAX_DIMENSION, MAX_FPS));
+    }
+
+    #[test]
+    fn control_zoom_is_clamped() {
+        let mut c = Control {
+            flash: true,
+            zoom_x100: 0,
+        };
+        c.sanitize();
+        assert_eq!(c.zoom_x100, ZOOM_MIN);
+        c.zoom_x100 = u32::MAX;
+        c.sanitize();
+        assert_eq!(c.zoom_x100, ZOOM_MAX);
     }
 
     #[test]

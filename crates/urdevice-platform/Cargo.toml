@@ -34,6 +34,8 @@ ashpd.workspace = true
 futures-util.workspace = true
 libloading.workspace = true
 tokio.workspace = true
+# Virtual camera (#28): the v4l2loopback device.
+v4l.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { workspace = true, features = ["apple-native"] }

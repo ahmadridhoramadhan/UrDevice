@@ -12,6 +12,7 @@ message Screen {
     Start start = 3;                      // viewer -> host
     RequestKeyframe request_keyframe = 4; // viewer -> host
     ScreenError error = 5;                // host -> viewer
+    Control control = 6;                  // viewer -> host (camera.v1 only)
   }
 }
 
@@ -35,6 +36,12 @@ message Start {
 }
 
 message RequestKeyframe {}
+
+// Camera controls (ServiceId::CAMERA, #28). zoom_x100: 100 = no zoom, <= 1000.
+message Control {
+  bool flash = 1;
+  uint32 zoom_x100 = 2;
+}
 
 // no_host, no_display, capture_failed, consent_declined, stopped
 message ScreenError { string reason = 1; }
