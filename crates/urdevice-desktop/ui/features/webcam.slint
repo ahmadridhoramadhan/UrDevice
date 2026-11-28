@@ -42,6 +42,9 @@ export component CameraWindow inherits Window {
     in property <bool> flash;
     // Zoom ratio times 100.
     in property <int> zoom: 100;
+    // The virtual camera other apps can pick: 0 off, 1 on, 2 not set up, 3 not on this system,
+    // 4 stopped working.
+    in property <int> vcam-state: 0;
 
     // The line for a stopped camera.
     property <string> stopped-text: [
@@ -59,6 +62,7 @@ export component CameraWindow inherits Window {
     callback pick-camera(int);
     callback set-flash(bool);
     callback set-zoom(int);
+    callback rotate();
     callback stop();
 
     title: @tr("UrDevice camera: {}", root.device-name);
@@ -96,6 +100,10 @@ export component CameraWindow inherits Window {
                     clicked => { root.set-zoom(z); }
                 }
             }
+            if root.state == 3: Btn {
+                text: @tr("Rotate");
+                clicked => { root.rotate(); }
+            }
             Rectangle { horizontal-stretch: 1; }
             IconBtn {
                 icon: @image-url("../icons/close.svg");
@@ -103,6 +111,19 @@ export component CameraWindow inherits Window {
                 kind: 2;
                 clicked => { root.stop(); }
             }
+        }
+
+        if root.vcam-state != 0: Text {
+            text: [
+                "",
+                @tr("Virtual camera on. Pick “UrDevice Camera” in your call app."),
+                @tr("The virtual camera is not set up on this computer. The steps are in the troubleshooting guide."),
+                @tr("This system has no virtual camera yet. The camera shows in this window only."),
+                @tr("The virtual camera stopped working."),
+            ][root.vcam-state];
+            color: root.vcam-state == 1 ? Theme.accent : Theme.muted;
+            font-size: Theme.font-small;
+            wrap: word-wrap;
         }
 
         area := Rectangle {

@@ -7,10 +7,14 @@
 //! camera is the screen service with another id (`urdevice_core::services::webcam`), so the
 //! stream, the keyframe requests, and the limits are the ones of screen sharing.
 //!
+//! The decoded picture is turned to the angle the user chose and shown in the window. It also goes
+//! to the virtual camera (`urdevice_platform::features::webcam`), which other apps can pick as a
+//! webcam; where the OS has none the window says so and the camera shows here only (R17.3).
+//!
 //! Frames are never stored or logged.
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicI64, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, SyncSender, TrySendError, sync_channel};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::time::{Duration, Instant};
@@ -24,6 +28,9 @@ use urdevice_core::node::{PeerStatus, PeerView, Snapshot};
 use urdevice_core::services::screen::{Display, Screen, ScreenEvents, VideoFrame};
 use urdevice_core::services::webcam::Camera;
 use urdevice_media::{H264Decoder, RgbaFrame};
+use urdevice_platform::features::webcam::{
+    Rotation, VirtualCamera, VirtualCameraError, open_virtual_camera, rotate_rgba,
+};
 
 use super::{Feature, FeatureCtx, TileSpec};
 use crate::ui::CameraWindow;
@@ -147,8 +154,20 @@ impl View {
 // Decoding
 // ---------------------------------------------------------------------------
 
+/// The values of `CameraWindow.vcam-state`.
+mod vcam {
+    pub const OFF: i32 = 0;
+    pub const ON: i32 = 1;
+    pub const NOT_SET_UP: i32 = 2;
+    pub const NOT_AVAILABLE: i32 = 3;
+    pub const FAILED: i32 = 4;
+}
+
 enum Item {
+    /// A new stream began: start the decoder over and open the virtual camera.
     Reset,
+    /// The session ended: close the virtual camera.
+    Stop,
     Frame(DeviceId, u64, VideoFrame),
 }
 
@@ -169,6 +188,10 @@ struct Dec {
     rx_frames: AtomicU64,
     dropped_frames: AtomicU64,
     queued: AtomicI64,
+    /// The turn the user chose, in quarter turns clockwise (0 to 3).
+    quarter_turns: AtomicI32,
+    /// What the window says about the virtual camera (`vcam::*`).
+    vcam_state: AtomicI32,
     svc: Weak<Screen>,
 }
 
@@ -245,9 +268,23 @@ impl Dec {
         }
     }
 
-    fn publish(self: &Arc<Self>, pic: &RgbaFrame) {
-        let buf =
-            SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(&pic.data, pic.width, pic.height);
+    fn rotation(&self) -> Rotation {
+        Rotation::from_degrees(
+            u32::try_from(self.quarter_turns.load(Ordering::Relaxed)).unwrap_or(0) * 90,
+        )
+    }
+
+    /// Tell the window what became of the virtual camera.
+    fn set_vcam(&self, state: i32) {
+        if self.vcam_state.swap(state, Ordering::Relaxed) != state {
+            on_ui(move || {
+                with(|v| v.win.set_vcam_state(state));
+            });
+        }
+    }
+
+    fn publish(self: &Arc<Self>, data: &[u8], width: u32, height: u32) {
+        let buf = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(data, width, height);
         *lock(&self.pending) = Some(buf);
         if self.posted.swap(true, Ordering::AcqRel) {
             return;
@@ -280,6 +317,7 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
     let mut waiting_key = true;
     let mut retries = 0u32;
     let mut stats = Stats::new();
+    let mut camera: Option<Box<dyn VirtualCamera>> = None;
     loop {
         stats.report(d);
         let item = match rx.recv_timeout(Duration::from_millis(700)) {
@@ -301,6 +339,24 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
                 dec = H264Decoder::new().ok();
                 waiting_key = true;
                 retries = 0;
+                if camera.is_none() {
+                    match open_virtual_camera() {
+                        Ok(c) => {
+                            camera = Some(c);
+                            d.set_vcam(vcam::ON);
+                        }
+                        Err(VirtualCameraError::NotAvailable) => d.set_vcam(vcam::NOT_AVAILABLE),
+                        Err(VirtualCameraError::NotSetUp) => d.set_vcam(vcam::NOT_SET_UP),
+                        Err(e) => {
+                            tracing::info!(error = %e, "no virtual camera");
+                            d.set_vcam(vcam::FAILED);
+                        }
+                    }
+                }
+            }
+            Item::Stop => {
+                camera = None;
+                d.set_vcam(vcam::OFF);
             }
             Item::Frame(peer, activity, f) => {
                 // Newer frames wait behind this one: it is decoded, but not converted or shown.
@@ -319,7 +375,23 @@ fn decode_loop(d: &Arc<Dec>, rx: &Receiver<Item>) {
                 let decoded = decoder.decode_with(&f.data, &mut pic, !behind);
                 stats.decoded(began.elapsed());
                 match decoded {
-                    Ok(true) => d.publish(&pic),
+                    Ok(true) => {
+                        // Turned to the user's angle: the window and the virtual camera show the
+                        // same picture.
+                        let turned = rotate_rgba(&pic.data, pic.width, pic.height, d.rotation())
+                            .filter(|_| d.rotation() != Rotation::None);
+                        let (data, w, h) = match &turned {
+                            Some((v, w, h)) => (v.as_slice(), *w, *h),
+                            None => (pic.data.as_slice(), pic.width, pic.height),
+                        };
+                        d.publish(data, w, h);
+                        if let Some(cam) = camera.as_mut()
+                            && cam.write(data, w, h).is_err()
+                        {
+                            camera = None;
+                            d.set_vcam(vcam::FAILED);
+                        }
+                    }
                     Ok(false) => {}
                     Err(_) => {
                         waiting_key = true;
@@ -425,6 +497,7 @@ impl ScreenEvents for Events {
 
     fn ended(&self, peer: DeviceId, activity: u64) {
         self.dec.current.store(0, Ordering::Relaxed);
+        let _ = self.dec.tx.try_send(Item::Stop);
         on_ui(move || {
             with(|v| {
                 if v.peer == peer && v.activity == Some(activity) {
@@ -452,6 +525,7 @@ fn close() {
     DEC.with(|d| {
         if let Some(d) = d.borrow().as_ref() {
             d.current.store(0, Ordering::Relaxed);
+            let _ = d.tx.try_send(Item::Stop);
         }
     });
 }
@@ -478,6 +552,14 @@ fn wire(win: &CameraWindow) {
             v.zoom = u32::try_from(z).unwrap_or(100).clamp(100, 1000);
             v.win.set_zoom(i32::try_from(v.zoom).unwrap_or(100));
             v.control();
+        });
+    });
+    win.on_rotate(|| {
+        DEC.with(|d| {
+            if let Some(d) = d.borrow().as_ref() {
+                let next = (d.quarter_turns.load(Ordering::Relaxed) + 1) % 4;
+                d.quarter_turns.store(next, Ordering::Relaxed);
+            }
         });
     });
     win.on_stop(close);
@@ -567,6 +649,8 @@ impl Feature for Webcam {
             rx_frames: AtomicU64::new(0),
             dropped_frames: AtomicU64::new(0),
             queued: AtomicI64::new(0),
+            quarter_turns: AtomicI32::new(0),
+            vcam_state: AtomicI32::new(vcam::OFF),
             svc: Arc::downgrade(&svc),
         });
         let worker = dec.clone();
