@@ -123,7 +123,7 @@ Start after Release 1 (Phases 0–9) is stable. Design references are to [design
 
 ## Phase 11: Phone-centered features
 
-- [ ] T11.1 Notification mirroring: NotifSubscribe and the app picker on the receiver, listener service changes, visibility filtering, desktop native notifications, reply and actions for Android hosts, desktop → Android mirroring from the T10.5 results, dismissal sync, 24 h retention. _Req: R18_
+- [ ] T11.1 Notification mirroring (first version done 2026-11-27, changed 2026-11-28: Android host to desktop, on by default with all apps (no picker), visibility filtering, dismissal as part of the list, desktop panel; still open: native desktop notifications, reply and actions, desktop to Android, dismissal from the desktop): NotifSubscribe and the app picker on the receiver, listener service changes, visibility filtering, desktop native notifications, reply and actions for Android hosts, desktop → Android mirroring from the T10.5 results, dismissal sync, 24 h retention. _Req: R18_
 - [ ] T11.2 Find my device: Ring messages, Android alarm-stream ringing with the full-screen fallback, desktop ringing window, last-seen display. _Req: R25_
 - [ ] T11.3 Webcam: CameraX → MediaCodec stream, camera controls, desktop viewer window. _Req: R17.1, R17.3, R17.5, R17.6_
 - [ ] T11.4 Virtual camera back-ends on macOS, Windows 11, and Linux. _Req: R17.2_

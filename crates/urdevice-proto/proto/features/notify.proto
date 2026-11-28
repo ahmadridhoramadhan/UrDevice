@@ -1,0 +1,39 @@
+// Notification mirroring (#26, design §18.2). Reference copy of
+// `src/features/notify.rs`, which is the source of truth. Never reuse or
+// renumber a field. Carried as the body of a `Feature` envelope for service 16.
+
+syntax = "proto3";
+package urdevice.v1.notify;
+
+message Notify {
+  oneof msg {
+    Subscribe subscribe = 1;  // receiver -> host (R18.2)
+    State state = 2;          // host -> receiver
+  }
+}
+
+message Subscribe {
+  bool on = 1;
+  repeated string apps = 2;   // app ids to mirror, at most 200
+}
+
+message Item {
+  string key = 1;
+  string app_id = 2;
+  string app_name = 3;
+  string title = 4;           // "New notification from <app>" when hidden
+  string text = 5;            // empty when hidden
+  uint64 posted_ms = 6;
+  bool hidden = 7;            // private notification (R18.3)
+}
+
+message App {
+  string id = 1;
+  string name = 2;
+}
+
+message State {
+  repeated Item items = 1;    // picked apps only, newest first, at most 50
+  repeated App apps = 2;      // every app with a notification now, at most 200
+  string unavailable = 3;     // "", "listener_permission", "unsupported"
+}

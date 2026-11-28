@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification mirroring (#26, R18). -->
+    <string name="notify_private_title">New notification from %1$s</string>
+    <string name="notify_full_title">Show private notifications in full</string>
+    <string name="notify_full_body">Show the message text of private notifications on your other devices. When off, they show only the app name or a short summary.</string>
+</resources>

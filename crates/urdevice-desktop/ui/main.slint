@@ -13,6 +13,8 @@ import { TunnelHostSection, TunnelLanBanner } from "features/tunnel.slint";
 // Bluetooth fallback (#23): the banner while on Bluetooth LE.
 import { BleBanner } from "features/bluetooth.slint";
 import { MediaPanel, MediaFeature } from "features/media.slint";
+// Notification mirroring (#26): the phone's notifications, at the bottom of the device page.
+import { NotifyPanel, NotifyFeature } from "features/notify.slint";
 
 export { Labels } from "labels.slint";
 // The feature globals, for src/features/*.rs.
@@ -995,6 +997,8 @@ export component MainWindow inherits Window {
                                         Btn { text: @tr("End"); clicked => { root.stop-activity(a.id); } }
                                     }
                                 }
+                                // The notifications of this device, under the features.
+                                if NotifyFeature.available: NotifyPanel { peer-name: root.peer.name; }
                             }
 
                             // ------------------------------------------------ Feature view

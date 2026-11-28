@@ -167,11 +167,12 @@ impl Capability {
         matches!(self, Self::Terminal | Self::FsWrite)
     }
 
-    /// True for capabilities only an Android host offers.
+    /// True for capabilities only an Android host offers. Notifications are
+    /// listed until desktop → Android mirroring (R18.1) is built.
     pub fn android_only(self) -> bool {
         matches!(
             self,
-            Self::Gallery | Self::Camera | Self::Mic | Self::Telephony
+            Self::Gallery | Self::Camera | Self::Mic | Self::Telephony | Self::Notify
         )
     }
 

@@ -19,7 +19,7 @@ The spec is the source of truth: [requirements](../specs/urdevice/requirements.m
 - **Connection (R4, R6):** Disconnect keeps the pairing and stops auto-reconnect until Reconnect. The UI shows the connection path, latency, and battery. Bluetooth is an automatic fallback, not a setting. On Bluetooth LE a banner names the features that are unavailable.
 - **Media (R11):** source tabs, seek, volume, and mute. No shuffle or repeat.
 - **Localhost (R13):** shared ports are offered to every paired device, gated by the Localhost setting. "Expose on LAN" is per port on the host: "1 hour" or "Always on".
-- **Notifications (R18, Release 2):** Android → desktop and desktop → Android (Windows and Linux only). Off by default; the receiver picks the apps.
+- **Notifications (R18, Release 2):** Android → desktop and desktop → Android (Windows and Linux only). On by default, all apps, no picker (owner decision 2026-11-28); the host's permission setting still gates it.
 - **Speaker (R31):** audio from a source device plays on a target device over the existing session.
 - **UI:** the mockups in `docs/mockup/` are a guide, not a final design. See `ui.md`.
 - Demo target: 2 real devices. The app is still built to support many paired devices.
