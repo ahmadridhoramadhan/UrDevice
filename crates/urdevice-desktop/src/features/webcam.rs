@@ -616,16 +616,10 @@ impl Feature for Webcam {
     }
 
     fn tiles(&self) -> &'static [TileSpec] {
-        &[
-            TileSpec {
-                cap: Capability::Camera,
-                key: "camera.v1",
-            },
-            TileSpec {
-                cap: Capability::Mic,
-                key: "mic.v1",
-            },
-        ]
+        &[TileSpec {
+            cap: Capability::Camera,
+            key: "camera.v1",
+        }]
     }
 
     // The tile opens a window of its own, not a page.

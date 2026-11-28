@@ -1,0 +1,12 @@
+// Phone as microphone (#28, T11.5): the desktop view.
+// Rust side: src/features/mic.rs. See docs/dev/adding-a-feature.md.
+import { Muted } from "../widgets.slint";
+
+// The microphone tile is a switch: on while this computer plays the phone's microphone into a virtual
+// microphone. It has no page; this stays so `features.slint` lists every feature.
+export component MicView inherits VerticalLayout {
+    in property <string> tile;
+    in property <string> peer-name;
+    spacing: 10px;
+    Muted { text: @tr("This feature is not available yet."); }
+}

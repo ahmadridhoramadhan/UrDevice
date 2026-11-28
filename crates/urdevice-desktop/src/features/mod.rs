@@ -28,6 +28,7 @@ mod input;
 mod inspector;
 mod kvm;
 mod media;
+mod mic;
 mod notify;
 mod port_profiles;
 mod proximity_lock;

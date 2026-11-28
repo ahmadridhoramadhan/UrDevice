@@ -11,6 +11,7 @@ import { BluetoothView } from "bluetooth.slint";
 import { NotifyView } from "notify.slint";
 import { RingView } from "ring.slint";
 import { WebcamView } from "webcam.slint";
+import { MicView } from "mic.slint";
 import { TelephonyView } from "telephony.slint";
 import { KvmView } from "kvm.slint";
 import { DisplayView } from "display.slint";
@@ -40,6 +41,7 @@ export component FeatureView inherits VerticalLayout {
     if root.feature == "notify": NotifyView { tile: root.tile; peer-name: root.peer-name; }
     if root.feature == "ring": RingView { tile: root.tile; peer-name: root.peer-name; }
     if root.feature == "webcam": WebcamView { tile: root.tile; peer-name: root.peer-name; }
+    if root.feature == "mic": MicView { tile: root.tile; peer-name: root.peer-name; }
     if root.feature == "telephony": TelephonyView { tile: root.tile; peer-name: root.peer-name; }
     if root.feature == "kvm": KvmView { tile: root.tile; peer-name: root.peer-name; }
     if root.feature == "display": DisplayView { tile: root.tile; peer-name: root.peer-name; }

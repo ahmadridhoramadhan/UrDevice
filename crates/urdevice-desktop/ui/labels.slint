@@ -24,6 +24,20 @@ export global Labels {
         if (cap == "fs.browse.v1") { return @tr("Browse files"); }
         return cap;
     }
+    // A line about the phone microphone (src/features/mic.rs): why it did not start or stopped.
+    pure public function mic-note(kind: int) -> string {
+        if (kind == 1) { return @tr("The other device did not allow the microphone."); }
+        if (kind == 2) { return @tr("The microphone is turned off on the other device."); }
+        if (kind == 3) { return @tr("The other device is offline."); }
+        if (kind == 4) { return @tr("That device has no microphone to share."); }
+        if (kind == 5) { return @tr("The microphone permission was refused on the other device."); }
+        if (kind == 8) { return @tr("The other device did not answer."); }
+        if (kind == 20) { return @tr("The phone microphone is not available on this system yet."); }
+        if (kind == 21) { return @tr("Install pipewire-utils to use the phone microphone."); }
+        if (kind == 22) { return @tr("The virtual microphone could not start."); }
+        return @tr("The microphone could not start.");
+    }
+
     pure public function tile-label(cap: string) -> string {
         if (cap == "files.v1") { return @tr("Send files"); }
         if (cap == "fs.write.v1") { return @tr("Change files"); }
